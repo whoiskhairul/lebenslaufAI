@@ -1,0 +1,139 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.headerRow {
+  margin-bottom: var(--space-4);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  color: var(--foreground);
+}
+
+.subtitle {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.card {
+  padding: var(--space-8);
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.sectionTitle h3 {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.icon {
+  color: var(--primary);
+}
+
+.sectionDesc {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  margin-bottom: var(--space-6);
+  line-height: 1.5;
+}
+
+.themeToggleContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4);
+  background: var(--muted-light);
+  border-radius: var(--radius-md);
+  font-family: var(--font-headers);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+[data-theme="dark"] .themeToggleContainer {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--card-border);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.inputWrapper {
+  position: relative;
+  width: 100%;
+}
+
+.eyeBtn {
+  position: absolute;
+  right: var(--space-3);
+  top: 36px;
+  color: var(--muted);
+  transition: color var(--transition-fast);
+}
+
+.eyeBtn:hover {
+  color: var(--foreground);
+}
+
+.infoBox {
+  display: flex;
+  gap: var(--space-3);
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+}
+
+.infoIcon {
+  color: var(--primary);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.infoBox p {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.saveBtn {
+  align-self: flex-start;
+}
+
+.successBanner {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: var(--success);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.errorBanner {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}

@@ -1,0 +1,576 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.headerRow {
+  margin-bottom: var(--space-6);
+  flex-shrink: 0;
+  text-align: left;
+}
+
+.title {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  color: var(--foreground);
+}
+
+.subtitle {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.layout {
+  display: flex;
+  gap: var(--space-6);
+  flex: 1;
+  overflow: hidden;
+  align-items: flex-start;
+}
+
+.tabs {
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  flex-shrink: 0;
+}
+
+.tabBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0.75rem var(--space-4);
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  font-family: var(--font-headers);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.tabBtn:hover {
+  background: var(--muted-light);
+  color: var(--foreground);
+}
+
+.tabBtn.activeTab {
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--primary);
+  border-left: 3px solid var(--primary);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.viewport {
+  flex: 1;
+  padding: var(--space-8);
+  overflow-y: auto;
+  height: 100%;
+  text-align: left;
+}
+
+.loader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* Banners */
+.successBanner {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: var(--success);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-6);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.errorBanner {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-6);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* Forms */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.saveBtn {
+  align-self: flex-start;
+  margin-top: var(--space-4);
+}
+
+/* Lists and items styling */
+.listSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sectionHeader h3 {
+  font-size: var(--text-lg);
+  color: var(--foreground);
+}
+
+.inlineForm {
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.inlineForm h4 {
+  font-size: var(--text-base);
+  margin-bottom: var(--space-2);
+}
+
+.checkboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-4);
+  cursor: pointer;
+}
+
+.selectGroup {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--space-4);
+}
+
+.selectGroup label {
+  font-family: var(--font-headers);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-1);
+}
+
+.selectGroup select {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--foreground);
+  font-family: var(--font-body);
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.itemsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.listItem {
+  padding: var(--space-4) var(--space-6);
+}
+
+.itemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.itemHeader h4 {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.itemSub {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.subtext {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.deleteBtn {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: color var(--transition-fast);
+}
+
+.deleteBtn:hover {
+  color: var(--danger);
+}
+
+.itemBullets {
+  margin-top: var(--space-4);
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.itemBullets li {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* Skill Tags styling */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.tag {
+  background: var(--muted-light);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+}
+
+.skillsRegistry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.skillCategoryBlock {
+  border-bottom: 1px solid var(--card-border);
+  padding-bottom: var(--space-4);
+}
+
+.skillCategoryBlock:last-child {
+  border: none;
+}
+
+.categoryTitle {
+  font-size: var(--text-base);
+  margin-bottom: var(--space-3);
+  color: var(--foreground);
+}
+
+.skillsGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.skillTagCard {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.skillLevel {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.skillDeleteBtn {
+  color: var(--danger);
+  font-weight: 700;
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+  }
+  .tabs {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: var(--space-2);
+  }
+  .tabBtn {
+    padding: 0.5rem 1rem;
+    white-space: nowrap;
+  }
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Importer Modal styles */
+.importBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 150;
+}
+
+.modal {
+  width: 100%;
+  max-width: 640px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  color: var(--foreground);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--card-border);
+  padding-bottom: var(--space-2);
+  flex-shrink: 0;
+}
+
+.modalHeader h3 {
+  font-size: var(--text-lg);
+  color: var(--foreground);
+  font-family: var(--font-headers);
+  font-weight: 800;
+}
+
+.closeBtn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: color var(--transition-fast);
+}
+
+.closeBtn:hover {
+  color: var(--foreground);
+}
+
+.wizardStep {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.stepDesc {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: var(--space-4);
+  text-align: left;
+}
+
+.fileInputGroup {
+  margin-bottom: var(--space-3);
+  display: flex;
+  justify-content: flex-start;
+}
+
+.fileLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.5rem 1rem;
+  border: 1px dashed var(--card-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  color: var(--muted);
+  transition: all var(--transition-fast);
+  background: var(--glass-bg);
+}
+
+.fileLabel:hover {
+  border-color: var(--primary);
+  color: var(--foreground);
+}
+
+.cvTextarea {
+  width: 100%;
+  height: 180px;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  resize: none;
+  margin-bottom: var(--space-4);
+}
+
+.cvTextarea:focus {
+  border-color: var(--primary);
+}
+
+.wizardScroller {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.parsedCard {
+  background: var(--glass-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  text-align: left;
+}
+
+.parsedCard h4 {
+  font-size: var(--text-sm);
+  font-family: var(--font-headers);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--primary);
+  border-bottom: 1px solid var(--card-border);
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.reviewItem {
+  border-bottom: 1px dashed var(--card-border);
+  padding: var(--space-3) 0;
+}
+
+.reviewItem:last-child {
+  border-bottom: none;
+}
+
+.reviewCheckbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: var(--space-2);
+}
+
+.reviewFields {
+  padding-left: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.bulletsEdit {
+  width: 100%;
+  height: 90px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.bulletsEdit:focus {
+  border-color: var(--primary);
+}
+
+.skillsReviewGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.skillCheckCard {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.skillCheckCard:has(input:checked) {
+  border-color: var(--primary);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  border-top: 1px solid var(--card-border);
+  padding-top: var(--space-4);
+  flex-shrink: 0;
+}
+

@@ -1,0 +1,123 @@
+import React, { useState, useEffect } from 'react';
+import { useAuthStore } from '../store/authStore';
+import { 
+  LayoutDashboard, UserCircle, Wand2, Settings as SettingsIcon, LogOut, Sun, Moon, Menu, X, ChevronLeft, ChevronRight
+} from 'lucide-react';
+import styles from './AppShell.module.css';
+
+interface AppShellProps {
+  children: React.ReactNode;
+  activeView: string;
+  onNavigate: (view: string) => void;
+}
+
+export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavigate }) => {
+  const { fullName, email, logout, theme, setTheme } = useAuthStore();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    return localStorage.getItem('sidebar_collapsed') === 'true';
+  });
+
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
+  const toggleCollapse = () => {
+    setIsCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('sidebar_collapsed', String(next));
+      return next;
+    });
+  };
+
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'master-profile', label: 'Master Profile', icon: UserCircle },
+    { id: 'editor', label: 'Resume Tailor', icon: Wand2 },
+    { id: 'settings', label: 'Settings', icon: SettingsIcon },
+  ];
+
+  return (
+    <div className={styles.container}>
+      {/* Mobile Top Bar */}
+      <header className={`${styles.header} no-print`}>
+        <button 
+          className={styles.menuToggle} 
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          aria-label="Toggle menu"
+        >
+          {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+        <div className={styles.logoContainer}>
+          <span className={styles.logoIcon}>📄</span>
+          <h1 className={styles.logoText}>ResumeAI</h1>
+        </div>
+        <button className={styles.themeBtn} onClick={toggleTheme} aria-label="Toggle theme">
+          {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
+      </header>
+
+      <div className={styles.workspace}>
+        {/* Navigation Sidebar */}
+        <aside className={`${styles.sidebar} ${isSidebarOpen ? styles.sidebarOpen : ''} ${isCollapsed ? styles.collapsed : ''} no-print`}>
+          {/* Desktop Collapse Toggle Button */}
+          <button
+            type="button"
+            className={styles.collapseBtn}
+            onClick={toggleCollapse}
+            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            aria-label="Toggle sidebar collapse"
+          >
+            {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          </button>
+
+          <div className={styles.sidebarLogo}>
+            <span className={styles.logoIconLarge}>📄</span>
+            <span className={styles.logoTitle}>ResumeAI</span>
+          </div>
+
+          <nav className={styles.nav}>
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  className={`${styles.navItem} ${activeView === item.id ? styles.active : ''}`}
+                  title={item.label}
+                  onClick={() => {
+                    onNavigate(item.id);
+                    setIsSidebarOpen(false);
+                  }}
+                >
+                  <Icon size={20} className={styles.navIcon} />
+                  <span className={styles.navLabel}>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className={styles.sidebarFooter}>
+            <div className={styles.userProfile} title={`${fullName || 'User'} (${email || ''})`}>
+              <div className={styles.userAvatar}>
+                {(fullName || 'U').charAt(0).toUpperCase()}
+              </div>
+              <div className={styles.userInfo}>
+                <p className={styles.userName}>{fullName || 'User Profile'}</p>
+                <p className={styles.userEmail}>{email || ''}</p>
+              </div>
+            </div>
+            <button className={styles.logoutBtn} onClick={logout} title="Logout">
+              <LogOut size={18} className={styles.logoutIcon} />
+              <span className={styles.logoutLabel}>Logout</span>
+            </button>
+          </div>
+        </aside>
+
+        {/* Main Content Pane */}
+        <main className={styles.content}>
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+};

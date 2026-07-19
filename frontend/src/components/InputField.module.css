@@ -1,0 +1,55 @@
+.group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--space-4);
+  width: 100%;
+}
+
+.label {
+  font-family: var(--font-headers);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--foreground);
+  margin-bottom: var(--space-1);
+  text-align: left;
+}
+
+.input, .textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
+}
+
+.input:focus, .textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  background: var(--background);
+}
+
+.textarea {
+  min-height: 110px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.error .input, .error .textarea {
+  border-color: var(--danger);
+}
+
+.error .input:focus, .error .textarea:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.errorMsg {
+  color: var(--danger);
+  font-size: var(--text-xs);
+  margin-top: var(--space-1);
+  text-align: left;
+  font-weight: 500;
+}
