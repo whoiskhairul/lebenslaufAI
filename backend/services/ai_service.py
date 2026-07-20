@@ -155,8 +155,11 @@ class AIService:
         profile_text = json.dumps(profile_data, default=str)
         job_text = json.dumps(job_data, default=str)
         
+        from datetime import datetime
+        today_str = datetime.now().strftime("%B %d, %Y")
+        
         system_prompt = (
-            f"You are a Career Consultant writing a cover letter. Tone: {tone}. Length: {length}.\n"
+            f"You are a Career Consultant writing a cover letter. Tone: {tone}. Length: {length}. Today's date is {today_str}.\n"
             "Using the user's master profile, write a custom cover letter addressing the job description.\n"
             "Do NOT fabricate experience. Keep it professional. Return ONLY the final letter text. No chat filler."
         )
@@ -164,6 +167,12 @@ class AIService:
         user_content = f"MASTER_PROFILE:\n{profile_text}\n\nJOB_DESCRIPTION:\n{job_text}"
         result_text = cls.call_deepseek(system_prompt, user_content, api_key=api_key)
         if result_text:
+            import re
+            result_text = re.sub(
+                r'\[[Dd]ate\]|\[[Cc]urrent\s+[Dd]ate\]|\[[Tt]oday\'s\s+[Dd]ate\]|\[date\]',
+                today_str,
+                result_text
+            )
             return result_text
             
         return cls._mock_write_cover_letter(profile_data, job_data, tone, length)
@@ -335,10 +344,13 @@ class AIService:
         
         body = body_corp if tone == "corporate" else body_startup
         
+        from datetime import datetime
+        today_str = datetime.now().strftime("%B %d, %Y")
+        
         letter = f"""{name}
 {email} | {phone}
 
-Date: July 11, 2026
+Date: {today_str}
 
 {intro_salutation}
 
