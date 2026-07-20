@@ -75,11 +75,12 @@
   padding: 4px;
   border-radius: var(--radius-md);
   gap: 2px;
+  margin-bottom: 1.25rem;
 }
 
 .controlTabBtn {
   flex: 1;
-  padding: 0.5rem 0.25rem;
+  padding: 0.6rem 0.5rem;
   font-size: 11px;
   font-family: var(--font-headers);
   font-weight: 600;
@@ -243,7 +244,7 @@
 
 /* Style Customizer Panel */
 .styleControlsForm {
-  padding: var(--space-5);
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -455,6 +456,8 @@
   padding-bottom: var(--space-3);
   margin-bottom: var(--space-4);
   flex-shrink: 0;
+  position: relative;
+  z-index: 110;
 }
 
 .canvasTabs {
@@ -1716,6 +1719,7 @@
     opacity: 0;
     transform: translateY(-6px) scale(0.98);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -1746,6 +1750,7 @@
     opacity: 0;
     transform: translateX(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -2041,4 +2046,202 @@
   .addSkillPillBtn {
     display: none !important;
   }
+
+  .letterTextarea {
+    border: none !important;
+    outline: none !important;
+    resize: none !important;
+    background: transparent !important;
+    overflow: hidden !important;
+    height: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .letterPage {
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+  }
+
+  .pageContainer:last-of-type,
+  .pageContainer:last-child {
+    page-break-after: avoid !important;
+  }
+}
+
+/* CV Loading Skeleton Canvas Styles */
+.skeletonContainer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  overflow: auto;
+  padding: 1rem;
+  background: var(--muted-light, #f8fafc);
+  border-radius: var(--radius-lg, 8px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+  height: 100%;
+}
+
+.skeletonLoaderBanner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  color: var(--primary, #6366f1);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md, 6px);
+  font-size: var(--text-xs, 12px);
+  font-weight: 600;
+  width: 794px;
+  /* match A4 width */
+  box-sizing: border-box;
+  animation: fadeIn 0.3s ease;
+}
+
+.skeletonSpinner {
+  animation: rotate 1.5s linear infinite;
+  color: var(--primary, #6366f1);
+  flex-shrink: 0;
+}
+
+@keyframes rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.skeletonPaperWrapper {
+  box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
+  border-radius: var(--radius-sm, 4px);
+  background: #ffffff;
+  overflow: hidden;
+  position: relative;
+  transition: width 0.3s ease, height 0.3s ease;
+}
+
+.skeletonPaper {
+  background: #ffffff;
+  border-radius: var(--radius-md, 6px);
+  padding: 2rem;
+  box-sizing: border-box;
+  text-align: left;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  animation: fadeIn 0.3s ease;
+}
+
+/* Pulsating skeleton elements */
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.skeletonAvatar {
+  width: 90px;
+  height: 110px;
+  border-radius: var(--radius-sm, 4px);
+  animation: pulse 1.5s ease-in-out infinite;
+  background-color: #e2e8f0;
+  flex-shrink: 0;
+}
+
+.skeletonLineLarge {
+  height: 20px;
+  width: 35%;
+  animation: pulse 1.5s ease-in-out infinite;
+  background-color: #e2e8f0;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.skeletonLineMedium {
+  height: 12px;
+  width: 25%;
+  animation: pulse 1.5s ease-in-out infinite;
+  background-color: #e2e8f0;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.skeletonLineSmall {
+  height: 10px;
+  width: 15%;
+  animation: pulse 1.5s ease-in-out infinite;
+  background-color: #e2e8f0;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.skeletonLineFull {
+  height: 8px;
+  width: 100%;
+  animation: pulse 1.5s ease-in-out infinite;
+  background-color: #e2e8f0;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.skeletonLineTwoThirds {
+  height: 8px;
+  width: 70%;
+  animation: pulse 1.5s ease-in-out infinite;
+  background-color: #e2e8f0;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.skeletonParagraph {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dropdownItem:hover {
+  background-color: var(--muted-light, #f1f5f9) !important;
+  color: var(--accent, #6366f1) !important;
+}
+
+.downloadDropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  z-index: 100;
+  min-width: 150px;
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border, #e2e8f0);
+  background: var(--card-bg, #ffffff);
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-main, #ffffff);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
 }

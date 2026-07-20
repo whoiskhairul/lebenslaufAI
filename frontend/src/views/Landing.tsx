@@ -47,11 +47,28 @@ export const Landing: React.FC = () => {
       }
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(
-        err.response?.data?.detail || 
-        err.response?.data?.error?.message || 
-        'An error occurred. Please verify your credentials and check backend connection.'
-      );
+      let errorText = '';
+      if (err.response?.data) {
+        const data = err.response.data;
+        if (typeof data === 'string') {
+          errorText = data;
+        } else if (data.detail) {
+          errorText = data.detail;
+        } else if (data.non_field_errors) {
+          errorText = Array.isArray(data.non_field_errors) ? data.non_field_errors.join(' ') : String(data.non_field_errors);
+        } else if (typeof data === 'object') {
+          const messages = Object.entries(data).map(([field, errs]) => {
+            const fieldName = field.charAt(0).toUpperCase() + field.slice(1);
+            const fieldErrMsg = Array.isArray(errs) ? errs.join(' ') : String(errs);
+            return `${fieldName}: ${fieldErrMsg}`;
+          });
+          errorText = messages.join(' ');
+        }
+      }
+      if (!errorText) {
+        errorText = err.message || 'An error occurred. Please verify your credentials and check backend connection.';
+      }
+      setErrorMsg(errorText);
     } finally {
       setIsLoading(false);
     }

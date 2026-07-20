@@ -122,25 +122,48 @@ class ResumeTailorView(APIView):
             default=str
         ))
 
-        # 5. Create immutable saved version
-        resume_version = ResumeVersion.objects.create(
-            user=user,
-            application=application,
-            title=f"Resume for {position} at {company}",
-            target_company=company,
-            target_role=position,
-            ats_score=ats_report.get('score', 70),
-            tailored_summary=tailored_result.get('tailored_summary', ''),
-            tailored_details=details_safe,
-            explanations=explanations_safe,
-            validation_alerts=validation_alerts,
-            template=template
-        )
+        save_version = request.data.get('save_version', True)
 
-        return Response({
-            "success": True,
-            "data": ResumeVersionSerializer(resume_version).data
-        }, status=status.HTTP_201_CREATED)
+        # 5. Create immutable saved version
+        if save_version:
+            resume_version = ResumeVersion.objects.create(
+                user=user,
+                application=application,
+                title=f"Resume for {position} at {company}",
+                target_company=company,
+                target_role=position,
+                ats_score=ats_report.get('score', 70),
+                tailored_summary=tailored_result.get('tailored_summary', ''),
+                tailored_details=details_safe,
+                explanations=explanations_safe,
+                validation_alerts=validation_alerts,
+                template=template
+            )
+            return Response({
+                "success": True,
+                "data": ResumeVersionSerializer(resume_version).data
+            }, status=status.HTTP_201_CREATED)
+        else:
+            from datetime import datetime
+            temp_version = ResumeVersion(
+                user=user,
+                application=application,
+                title=f"Unsaved Resume for {position} at {company}",
+                target_company=company,
+                target_role=position,
+                ats_score=ats_report.get('score', 70),
+                tailored_summary=tailored_result.get('tailored_summary', ''),
+                tailored_details=details_safe,
+                explanations=explanations_safe,
+                validation_alerts=validation_alerts,
+                template=template
+            )
+            data = ResumeVersionSerializer(temp_version).data
+            data["id"] = f"unsaved_{user.id}_{int(datetime.now().timestamp())}"
+            return Response({
+                "success": True,
+                "data": data
+            }, status=status.HTTP_200_OK)
 
 class CoverLetterGenerateView(APIView):
     permission_classes = [permissions.IsAuthenticated]

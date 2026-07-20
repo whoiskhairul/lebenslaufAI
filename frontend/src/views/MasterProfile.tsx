@@ -134,6 +134,20 @@ export const MasterProfile: React.FC = () => {
     setCvText(''); // clear text box if file chosen
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      setProfile(prev => ({
+        ...prev,
+        personal_info: { ...prev.personal_info, image_url: base64String }
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleParseCV = async () => {
     if (!cvText.trim() && !selectedFile) return;
     setIsParsing(true);
@@ -729,16 +743,59 @@ export const MasterProfile: React.FC = () => {
                         personal_info: { ...profile.personal_info, website: e.target.value }
                       })}
                     />
-                    <InputField 
-                      label="Profile Image URL" 
-                      id="infoImageUrl"
-                      placeholder="e.g. https://domain.com/photo.jpg"
-                      value={profile.personal_info.image_url || ''}
-                      onChange={(e) => setProfile({
-                        ...profile,
-                        personal_info: { ...profile.personal_info, image_url: e.target.value }
-                      })}
-                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label htmlFor="infoImageUpload" style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main, #1e293b)' }}>Profile Image</label>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {profile.personal_info.image_url && (
+                          <img 
+                            src={profile.personal_info.image_url} 
+                            alt="Preview" 
+                            style={{ width: '40px', height: '48px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--card-border, #e2e8f0)' }} 
+                          />
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            id="infoImageUpload"
+                            onChange={handleImageUpload}
+                            style={{ fontSize: '11px', width: '100%' }}
+                          />
+                          <input 
+                            type="text"
+                            placeholder="Or paste image URL..."
+                            value={profile.personal_info.image_url && !profile.personal_info.image_url.startsWith('data:') ? profile.personal_info.image_url : ''}
+                            onChange={(e) => setProfile({
+                              ...profile,
+                              personal_info: { ...profile.personal_info, image_url: e.target.value }
+                            })}
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--card-border, #e2e8f0)',
+                              fontSize: '12px',
+                              outline: 'none',
+                              background: 'transparent',
+                              width: '100%',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        </div>
+                        {profile.personal_info.image_url && (
+                          <Button 
+                            type="button" 
+                            variant="danger" 
+                            onClick={() => setProfile({
+                              ...profile,
+                              personal_info: { ...profile.personal_info, image_url: '' }
+                            })}
+                            style={{ padding: '6px 10px', fontSize: '12px' }}
+                          >
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   <InputField 

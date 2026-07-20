@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
 import api from '../services/api';
-import { 
+import {
   Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, ExternalLink, ShieldAlert, Sparkles, CheckSquare, Info, FileText
 } from 'lucide-react';
 import styles from './Dashboard.module.css';
@@ -75,7 +75,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
         });
         setAtsScores(scores);
       }
-      
+
       const lettersRes = await api.get('/resume/letters');
       if (lettersRes.data) {
         setCoverLetters(lettersRes.data);
@@ -189,12 +189,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
   const totalApps = applications.length;
   const interviewApps = applications.filter(a => a.status === 'interview').length;
   const offerApps = applications.filter(a => a.status === 'offer').length;
-  
+
   // Average Match Score
   const scoreValues = Object.values(atsScores);
-  const avgMatchScore = scoreValues.length > 0 
+  const avgMatchScore = scoreValues.length > 0
     ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
-    : 75; // baseline default
+    : '--'; // baseline default
 
   // Conversion rate (offers / total)
   const conversionRate = totalApps > 0 ? Math.round((offerApps / totalApps) * 100) : 0;
@@ -230,7 +230,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
         </div>
         <div className={`${styles.metricCard} glass-card`}>
           <p className={styles.metricLabel}>Average Match Score</p>
-          <p className={styles.metricVal}>{avgMatchScore}%</p>
+          <p className={styles.metricVal}>{avgMatchScore === '--' ? avgMatchScore : `${avgMatchScore}%`}</p>
         </div>
         <div className={`${styles.metricCard} glass-card`}>
           <p className={styles.metricLabel}>Upcoming Interviews</p>
@@ -248,8 +248,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
           {columns.map((col) => {
             const colApps = applications.filter((app) => app.status === col.id);
             return (
-              <div 
-                key={col.id} 
+              <div
+                key={col.id}
                 className={`${styles.column} ${dragOverCol === col.id ? styles.columnDragOver : ''}`}
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -278,8 +278,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                     colApps.map((app) => {
                       const score = atsScores[app.id];
                       return (
-                        <div 
-                          key={app.id} 
+                        <div
+                          key={app.id}
                           className={`${styles.card} glass-card`}
                           draggable
                           onDragStart={(e) => handleDragStart(e, app.id)}
@@ -292,7 +292,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                               <h4>{app.position}</h4>
                               {score !== undefined && (
-                                <span className={styles.scoreBadge} style={{ 
+                                <span className={styles.scoreBadge} style={{
                                   background: score > 80 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
                                   color: score > 80 ? 'var(--success)' : 'var(--warning)',
                                   fontSize: '10px',
@@ -329,7 +329,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
 
                           <div className={styles.cardFooter} onClick={(e) => e.stopPropagation()}>
                             <div className={styles.arrows}>
-                              <button 
+                              <button
                                 onClick={() => {
                                   const idx = columns.findIndex(c => c.id === app.status);
                                   if (idx > 0) handleUpdateStatus(app.id, columns[idx - 1].id);
@@ -339,7 +339,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                               >
                                 <ArrowLeft size={14} />
                               </button>
-                              <button 
+                              <button
                                 onClick={() => {
                                   const idx = columns.findIndex(c => c.id === app.status);
                                   if (idx < columns.length - 1) handleUpdateStatus(app.id, columns[idx + 1].id);
@@ -350,11 +350,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                                 <ArrowRight size={14} />
                               </button>
                             </div>
-                            
+
                             <div className={styles.actions}>
-                              <button 
-                                onClick={() => onNavigateToEditor({ 
-                                  company: app.company, 
+                              <button
+                                onClick={() => onNavigateToEditor({
+                                  company: app.company,
                                   position: app.position,
                                   desc: app.job_description || app.notes || '',
                                   application_id: app.id
@@ -469,8 +469,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             onClick={() => {
                               setIsDetailsOpen(false);
                               onNavigateToEditor({
@@ -484,8 +484,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                           >
                             Open
                           </Button>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             onClick={() => handleDeleteVersion(v.id)}
                             style={{ color: 'var(--danger)', padding: '6px 8px' }}
                             title="Delete CV version"
@@ -500,7 +500,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
               )}
 
               <div className={styles.sidebarActions}>
-                <Button 
+                <Button
                   onClick={() => {
                     setIsDetailsOpen(false);
                     onNavigateToEditor({
@@ -515,8 +515,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                   <Sparkles size={16} />
                   <span>Launch Tailoring Canvas</span>
                 </Button>
-                
-                <Button 
+
+                <Button
                   variant="secondary"
                   onClick={() => handleDelete(selectedApp.id)}
                   className={styles.sidebarDeleteBtn}
@@ -545,15 +545,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
 
             <form onSubmit={handleCreate} className={styles.modalForm}>
               <div className={styles.formRow}>
-                <InputField 
-                  label="Company Name *" 
+                <InputField
+                  label="Company Name *"
                   id="modalCompany"
                   placeholder="e.g. Google"
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
                 />
-                <InputField 
-                  label="Position / Role *" 
+                <InputField
+                  label="Position / Role *"
                   id="modalPosition"
                   placeholder="e.g. Senior React Developer"
                   value={position}
@@ -562,15 +562,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
               </div>
 
               <div className={styles.formRow}>
-                <InputField 
-                  label="Salary Range" 
+                <InputField
+                  label="Salary Range"
                   id="modalSalary"
                   placeholder="e.g. $120k - $140k"
                   value={salary}
                   onChange={(e) => setSalary(e.target.value)}
                 />
-                <InputField 
-                  label="Location" 
+                <InputField
+                  label="Location"
                   id="modalLocation"
                   placeholder="e.g. Berlin (Hybrid) / Remote"
                   value={location}
@@ -579,8 +579,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
               </div>
 
               <div className={styles.formRow}>
-                <InputField 
-                  label="Application Deadline" 
+                <InputField
+                  label="Application Deadline"
                   id="modalDeadline"
                   placeholder="e.g. July 25th"
                   value={deadline}
@@ -588,7 +588,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                 />
                 <div className={styles.selectGroup}>
                   <label htmlFor="modalStatus">Kanban Column</label>
-                  <select 
+                  <select
                     id="modalStatus"
                     value={status}
                     onChange={(e) => setStatus(e.target.value as any)}
@@ -603,16 +603,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                 </div>
               </div>
 
-              <InputField 
-                label="Job Posting URL" 
+              <InputField
+                label="Job Posting URL"
                 id="modalUrl"
                 placeholder="https://jobs.company.com/..."
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
               />
 
-              <InputField 
-                label="Raw Job Description (For Tailoring Pipeline)" 
+              <InputField
+                label="Raw Job Description (For Tailoring Pipeline)"
                 id="modalJobDescription"
                 type="textarea"
                 placeholder="Paste the full job advertisement description text here..."
@@ -620,8 +620,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                 onChange={(e) => setJobDescription(e.target.value)}
               />
 
-              <InputField 
-                label="Internal Notes / Progress Diary" 
+              <InputField
+                label="Internal Notes / Progress Diary"
                 id="modalNotes"
                 type="textarea"
                 placeholder="Add any details, contact notes or interview dates."

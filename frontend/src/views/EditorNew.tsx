@@ -100,6 +100,7 @@ interface ResumeVersion {
   }>;
   template: string;
   created_at: string;
+  application?: string;
 }
 
 interface EditorProps {
@@ -219,7 +220,7 @@ const AutoSizeTextarea: React.FC<{
       if (start !== null && end !== null) {
         try {
           textareaRef.current.setSelectionRange(start, end);
-        } catch (_) {}
+        } catch (_) { }
       }
     }
   }, [localVal]);
@@ -295,6 +296,10 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const [template, setTemplate] = useState('pixel_perfect_pdf');
   const [isLoading, setIsLoading] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<ResumeVersion | null>(null);
+  const [isTrackingLoading, setIsTrackingLoading] = useState(false);
+  const [applicationTracked, setApplicationTracked] = useState(false);
+  const [saveAutomatically, setSaveAutomatically] = useState(true);
+  const [isDownloadOpen, setIsDownloadOpen] = useState(false);
 
   // Tabs layout controls
   const [editorTab, setEditorTab] = useState<'resume' | 'letter' | 'job'>('resume');
@@ -544,6 +549,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   // Helper to initialize fields from version object
   const initializeVersionFields = (ver: ResumeVersion) => {
+    setApplicationTracked(!!ver.application);
     setEditableSummary(ver.tailored_summary || '');
     setTemplate(ver.template);
 
@@ -1085,6 +1091,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
     setIsLoading(true);
     setCurrentVersion(null);
+    setApplicationTracked(false);
     setReviewedActions({});
 
     try {
@@ -1093,12 +1100,14 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         company,
         position,
         template,
-        application_id: initialJobParams?.application_id
+        application_id: initialJobParams?.application_id,
+        save_version: saveAutomatically
       });
       if (res.data && res.data.success) {
         const ver = res.data.data as ResumeVersion;
         setCurrentVersion(ver);
         initializeVersionFields(ver);
+        setApplicationTracked(!!ver.application);
 
         // Instantly generate tailored cover letter context
         handleGenerateLetter(ver.target_company, ver.target_role);
@@ -1107,6 +1116,33 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       console.error('Tailoring failed:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleTrackApplication = async () => {
+    if (!currentVersion) return;
+    setIsTrackingLoading(true);
+    try {
+      const appRes = await api.post('/applications', {
+        company: currentVersion.target_company,
+        position: currentVersion.target_role,
+        status: 'preparing',
+        job_description: jobDescription
+      });
+      if (appRes.data && appRes.data.id) {
+        const appId = appRes.data.id;
+        const patchRes = await api.patch(`/resume/versions/${currentVersion.id}`, {
+          application: appId
+        });
+        if (patchRes.data) {
+          setCurrentVersion(prev => prev ? { ...prev, application: appId } : null);
+          setApplicationTracked(true);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to track application:', err);
+    } finally {
+      setIsTrackingLoading(false);
     }
   };
 
@@ -1224,11 +1260,27 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
             headerStyles
           }
         };
-        await api.patch(`/resume/versions/${currentVersion.id}`, {
-          tailored_summary: editableSummary,
-          tailored_details: updatedDetails,
-          template: template
-        });
+        if (currentVersion.id.startsWith('unsaved_')) {
+          const res = await api.post('/resume/versions', {
+            application: initialJobParams?.application_id || null,
+            title: `Resume for ${currentVersion.target_role} at ${currentVersion.target_company}`,
+            target_company: currentVersion.target_company,
+            target_role: currentVersion.target_role,
+            ats_score: currentVersion.ats_score,
+            tailored_summary: editableSummary,
+            tailored_details: updatedDetails,
+            template: template
+          });
+          if (res.data) {
+            setCurrentVersion(res.data);
+          }
+        } else {
+          await api.patch(`/resume/versions/${currentVersion.id}`, {
+            tailored_summary: editableSummary,
+            tailored_details: updatedDetails,
+            template: template
+          });
+        }
       } else {
         const letterRes = await api.get('/resume/letters');
         const matchedLetter = letterRes.data.find((l: any) => l.application === initialJobParams?.application_id || l.target_company === currentVersion.target_company);
@@ -1421,7 +1473,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             <X size={12} />
           </button>
         </div>
-        
+
         <div className={styles.popoverBody}>
           <div className={styles.popoverControlGroup}>
             <label><span>Name Size</span><strong>{headerStyles.nameSize || 24}px</strong></label>
@@ -1531,6 +1583,44 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               <em>T-Italic</em>
             </button>
           </div>
+
+          <div className={styles.popoverControlGroup} style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '12px', fontWeight: 600 }}>Profile Photo</label>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setEditablePersonalInfo(prev => ({ ...prev, image_url: reader.result as string }));
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+                style={{ fontSize: '11px', width: '130px' }}
+              />
+              {editablePersonalInfo.image_url && (
+                <button
+                  type="button"
+                  onClick={() => setEditablePersonalInfo(prev => ({ ...prev, image_url: '' }))}
+                  style={{
+                    padding: '2px 6px',
+                    fontSize: '11px',
+                    backgroundColor: '#ef4444',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>,
       document.body
@@ -1540,7 +1630,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
   // On-Canvas Settings Popover for Sections
   const renderSectionSettingsPopover = (sectionId: string, sec: any) => {
     const localStyles = sec?.customStyles || {};
-    
+
     const updateStyle = (key: string, value: any) => {
       setSections(prev => prev.map(s => s.id === sectionId ? {
         ...s,
@@ -1569,7 +1659,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             <X size={12} />
           </button>
         </div>
-        
+
         <div className={styles.popoverBody}>
           <div className={styles.popoverControlGroup}>
             <label><span>Heading Size</span><strong>{localStyles.headingSize || 16}px</strong></label>
@@ -1581,7 +1671,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               onChange={(e) => updateStyle('headingSize', parseInt(e.target.value))}
             />
           </div>
-          
+
           <div className={styles.popoverControlGroup}>
             <label><span>Text Size</span><strong>{localStyles.fontSize || 13}px</strong></label>
             <input
@@ -1676,7 +1766,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             >
               <em>I</em>
             </button>
-            
+
             <button
               type="button"
               className={`${styles.popoverToggleBtn} ${localStyles.headingWeight === 'normal' ? styles.popoverToggleBtnActive : ''}`}
@@ -1685,7 +1775,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             >
               <strong>H-B</strong>
             </button>
-            
+
             <button
               type="button"
               className={`${styles.popoverToggleBtn} ${localStyles.headingStyle === 'italic' ? styles.popoverToggleBtnActive : ''}`}
@@ -1716,7 +1806,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               </select>
             </div>
           )}
-          
+
           <div className={styles.popoverActionsRow}>
             {sec?.type === 'experience' && (
               <button
@@ -1859,7 +1949,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
           const itCategories = categoryOrder.filter(c => uniqueCats.includes(c));
           const extraCats = uniqueCats.filter(c => !itCategories.includes(c));
           const finalCategories = [...itCategories, ...extraCats];
-          
+
           finalCategories.sort((a, b) => {
             const getCategoryOrderScore = (cat: string) => {
               const order = ['programming languages', 'frameworks & libraries', 'databases', 'cloud & devops', 'development tools', 'testing'];
@@ -1870,11 +1960,11 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             };
             return getCategoryOrderScore(a) - getCategoryOrderScore(b);
           });
-          
-          const lastCat = languagesFirst 
+
+          const lastCat = languagesFirst
             ? (finalCategories.length > 0 ? finalCategories[finalCategories.length - 1] : 'languages')
             : (langSkills.length > 0 ? 'languages' : finalCategories[finalCategories.length - 1]);
-            
+
           if (unit.type === 'skills-languages') return lastCat === 'languages';
           if (unit.type === 'skills-category') return lastCat === unit.category;
         }
@@ -1896,7 +1986,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
       '--section-font-size': localStyles.fontSize ? `${localStyles.fontSize}px` : undefined,
       '--section-spacing': localStyles.spacing ? `${localStyles.spacing}px` : undefined,
       '--section-alignment': localStyles.alignment || undefined,
-      
+
       // Inline overrides
       fontSize: localStyles.fontSize ? `${localStyles.fontSize}px` : undefined,
       lineHeight: localStyles.lineHeight ? `${localStyles.lineHeight}` : undefined,
@@ -2051,13 +2141,11 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 </div>
               </div>
             </div>
-            <div className={styles.ppHeaderRight}>
-              {editablePersonalInfo.image_url ? (
+            {editablePersonalInfo.image_url ? (
+              <div className={styles.ppHeaderRight}>
                 <img src={editablePersonalInfo.image_url} alt="Profile" className={styles.ppAvatar} />
-              ) : (
-                <div className={styles.ppAvatarPlaceholder}>No Photo</div>
-              )}
-            </div>
+              </div>
+            ) : null}
           </div>
         );
       }
@@ -2153,13 +2241,11 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 </div>
               </div>
             </div>
-            <div className={styles.germanHeaderRight}>
-              {editablePersonalInfo.image_url ? (
+            {editablePersonalInfo.image_url ? (
+              <div className={styles.germanHeaderRight}>
                 <img src={editablePersonalInfo.image_url} alt="Profilbild" className={styles.germanAvatar} />
-              ) : (
-                <div className={styles.germanAvatarPlaceholder}>Foto</div>
-              )}
-            </div>
+              </div>
+            ) : null}
           </div>
         );
       }
@@ -2258,11 +2344,11 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 className={styles.itemSortBtn}
                 title="Customize Section Styles"
                 onClick={(e) => {
-                e.stopPropagation();
-                const rect = e.currentTarget.getBoundingClientRect();
-                setPopoverPosition({ top: rect.top, left: rect.left });
-                setActiveSectionSettings(isSettingsOpen ? null : unit.sectionId!);
-              }}
+                  e.stopPropagation();
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setPopoverPosition({ top: rect.top, left: rect.left });
+                  setActiveSectionSettings(isSettingsOpen ? null : unit.sectionId!);
+                }}
               >
                 <Settings size={10} />
               </button>
@@ -2292,7 +2378,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               onChange={(val) => setSections(prev => prev.map(s => s.id === unit.sectionId ? { ...s, name: val } : s))}
             />
           </h3>
-          
+
           {!isMeasuring && isSettingsOpen && renderSectionSettingsPopover(unit.sectionId!, sec)}
         </div>
       );
@@ -2872,7 +2958,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                     />
                   </div>
                 </div>
-                
+
                 <ul className={isPP ? styles.ppBulletsList : styles.germanBulletsList}>
                   {(edu.bullets || []).map((bullet: string, bulletIdx: number) => {
                     const inputId = `bullet-input-education-${edu.id}-${bulletIdx}`;
@@ -2949,7 +3035,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   />
                 </div>
               </div>
-              
+
               <ul className={styles.bulletsList}>
                 {(edu.bullets || []).map((bullet: string, bulletIdx: number) => {
                   const inputId = `bullet-input-education-${edu.id}-${bulletIdx}`;
@@ -3109,7 +3195,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 onChange={(val) => {
                   const names = val.split(',').map(n => n.trim()).filter(Boolean);
                   setEditableSkills(prev => {
-                    const otherSkills = prev.filter(s => s.category.toLowerCase() !== cat.toLowerCase());
+                    const otherSkills = prev.filter(s => s.category.toLowerCase() !== cat.toLowerCase() && (s.category || '').toLowerCase().trim() !== 'languages');
                     const updatedSkills = names.map((name, i) => ({
                       id: `skill_${cat}_${i}_${Date.now()}`,
                       name,
@@ -3367,6 +3453,19 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   </select>
                 </div>
 
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <input
+                    type="checkbox"
+                    id="saveAutomatically"
+                    checked={saveAutomatically}
+                    onChange={(e) => setSaveAutomatically(e.target.checked)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <label htmlFor="saveAutomatically" style={{ fontSize: '13px', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main, #1e293b)' }}>
+                    Save tailored copy automatically
+                  </label>
+                </div>
+
                 <Button type="submit" isLoading={isLoading} className={styles.tailorBtn}>
                   <Wand2 size={16} />
                   <span>Analyze & Tailor</span>
@@ -3383,6 +3482,21 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                     }}>
                       {currentVersion.ats_score}%
                     </div>
+                  </div>
+
+                  <div className={styles.trackingSection} style={{ marginBottom: '20px', padding: '12px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.2)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main, #1e293b)' }}>
+                      {applicationTracked ? '✓ Tracking this Application' : 'Track this job application?'}
+                    </div>
+                    {!applicationTracked ? (
+                      <Button onClick={handleTrackApplication} isLoading={isTrackingLoading} style={{ width: '100%' }}>
+                        Add to Application Tracking
+                      </Button>
+                    ) : (
+                      <div style={{ fontSize: '12px', color: '#475569' }}>
+                        This CV is linked to an active job tracking card.
+                      </div>
+                    )}
                   </div>
 
                   <div className={styles.keywordsTwinGrid}>
@@ -3714,15 +3828,15 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
         <div className={styles.previewCanvas}>
           {isLoading ? (
             <div className={styles.skeletonContainer}>
-              <div className={styles.skeletonLoaderBanner}>
+              <div className={styles.skeletonLoaderBanner} style={{ width: `${794 * scale}px` }}>
                 <RefreshCw className={styles.skeletonSpinner} size={16} />
                 <span>AI is compiling keywords and tailoring resume cards...</span>
               </div>
               <div
                 className={styles.skeletonPaperWrapper}
                 style={{
-                  width: `${(customStyles.pageSize === 'A4' ? 794 : 816) * scale}px`,
-                  height: `${(customStyles.pageSize === 'A4' ? 1123 : 1056) * scale}px`,
+                  width: `${794 * scale}px`,
+                  height: `${1123 * scale}px`,
                   position: 'relative'
                 }}
               >
@@ -3734,30 +3848,115 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                     position: 'absolute',
                     top: 0,
                     left: 0,
-                    width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`,
-                    height: `${customStyles.pageSize === 'A4' ? 1123 : 1056}px`
+                    width: '794px',
+                    height: '1123px',
+                    padding: '48px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '20px'
                   }}
                 >
-                  <div className={styles.skeletonHeader}>
-                    <div className={styles.skeletonAvatar} />
-                    <div className={styles.skeletonHeaderLines}>
-                      <div className={styles.skeletonLineLarge} />
-                      <div className={styles.skeletonLineMedium} />
+                  {/* Pixel Perfect Header structure */}
+                  <div className={styles.ppHeader} style={{ marginBottom: '24px', borderBottom: 'none', display: 'flex', justifyContent: 'space-between' }}>
+                    <div className={styles.ppHeaderLeft} style={{ flex: 1 }}>
+                      {/* Name Skeleton */}
+                      <div className={styles.skeletonLineLarge} style={{ height: '26px', width: '220px', marginBottom: '8px' }} />
+                      {/* Title Skeleton */}
+                      <div className={styles.skeletonLineMedium} style={{ height: '14px', width: '130px', marginBottom: '16px' }} />
+                      {/* Contacts Skeleton matching grid columns */}
+                      <div className={styles.ppContactGrid} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+                        <div className={styles.ppContactCol} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div className={styles.ppContactItem} style={{ display: 'flex', alignItems: 'center' }}>
+                            <span className={styles.ppContactLabel} style={{ width: '40px', height: '10px', display: 'inline-block', backgroundColor: '#e2e8f0', borderRadius: '2px', animation: 'pulse 1.5s infinite', marginRight: '4px' }}></span>
+                            <span className={styles.skeletonLineSmall} style={{ height: '10px', width: '100px' }} />
+                          </div>
+                          <div className={styles.ppContactItem} style={{ display: 'flex', alignItems: 'center' }}>
+                            <span className={styles.ppContactLabel} style={{ width: '35px', height: '10px', display: 'inline-block', backgroundColor: '#e2e8f0', borderRadius: '2px', animation: 'pulse 1.5s infinite', marginRight: '4px' }}></span>
+                            <span className={styles.skeletonLineSmall} style={{ height: '10px', width: '110px' }} />
+                          </div>
+                        </div>
+                        <div className={styles.ppContactCol} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div className={styles.ppContactItem} style={{ display: 'flex', alignItems: 'center' }}>
+                            <span className={styles.ppContactLabel} style={{ width: '40px', height: '10px', display: 'inline-block', backgroundColor: '#e2e8f0', borderRadius: '2px', animation: 'pulse 1.5s infinite', marginRight: '4px' }}></span>
+                            <span className={styles.skeletonLineSmall} style={{ height: '10px', width: '90px' }} />
+                          </div>
+                          <div className={styles.ppContactItem} style={{ display: 'flex', alignItems: 'center' }}>
+                            <span className={styles.ppContactLabel} style={{ width: '45px', height: '10px', display: 'inline-block', backgroundColor: '#e2e8f0', borderRadius: '2px', animation: 'pulse 1.5s infinite', marginRight: '4px' }}></span>
+                            <span className={styles.skeletonLineSmall} style={{ height: '10px', width: '120px' }} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className={styles.ppHeaderRight} style={{ flexShrink: 0, marginLeft: '24px' }}>
+                      {/* Avatar Skeleton */}
+                      <div className={styles.skeletonAvatar} style={{ width: '90px', height: '110px', borderRadius: '4px' }} />
                     </div>
                   </div>
-                  <div className={styles.skeletonDivider} />
-                  <div className={styles.skeletonContactGrid}>
-                    <div className={styles.skeletonLineSmall} />
-                    <div className={styles.skeletonLineSmall} />
-                    <div className={styles.skeletonLineSmall} />
-                  </div>
-                  <div className={styles.skeletonSection}>
-                    <div className={styles.skeletonSectionTitle} />
+
+                  {/* Summary Section */}
+                  <div className={styles.ppSection} style={{ paddingBottom: '20px' }}>
+                    <div className={styles.ppSectionTitle} style={{ fontSize: '14px', fontWeight: 700, borderBottom: '1px solid #1e293b', paddingBottom: '3px', marginBottom: '12px', width: '110px', height: '14px', backgroundColor: '#cbd5e1', borderRadius: '2px', animation: 'pulse 1.5s infinite' }} />
                     <div className={styles.skeletonParagraph}>
+                      <div className={styles.skeletonLineFull} />
                       <div className={styles.skeletonLineFull} />
                       <div className={styles.skeletonLineTwoThirds} />
                     </div>
                   </div>
+
+                  {/* Experience Section */}
+                  <div className={styles.ppSection} style={{ paddingBottom: '20px' }}>
+                    <div className={styles.ppSectionTitle} style={{ fontSize: '14px', fontWeight: 700, borderBottom: '1px solid #1e293b', paddingBottom: '3px', marginBottom: '12px', width: '160px', height: '14px', backgroundColor: '#cbd5e1', borderRadius: '2px', animation: 'pulse 1.5s infinite' }} />
+
+                    {/* Item 1 */}
+                    <div className={styles.ppSectionRow} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '16px', paddingBottom: '12px' }}>
+                      <div className={styles.ppLeftCol}>
+                        <div className={styles.skeletonLineMedium} style={{ height: '12px', width: '90px' }} />
+                      </div>
+                      <div className={styles.ppRightCol}>
+                        <div className={styles.skeletonLineLarge} style={{ height: '14px', width: '220px', marginBottom: '6px' }} />
+                        <div className={styles.skeletonLineSmall} style={{ height: '10px', width: '120px', marginBottom: '8px' }} />
+                        <div className={styles.skeletonParagraph}>
+                          <div className={styles.skeletonLineFull} style={{ height: '8px', marginBottom: '4px' }} />
+                          <div className={styles.skeletonLineFull} style={{ height: '8px', marginBottom: '4px' }} />
+                          <div className={styles.skeletonLineTwoThirds} style={{ height: '8px' }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Item 2 */}
+                    <div className={styles.ppSectionRow} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '16px' }}>
+                      <div className={styles.ppLeftCol}>
+                        <div className={styles.skeletonLineMedium} style={{ height: '12px', width: '80px' }} />
+                      </div>
+                      <div className={styles.ppRightCol}>
+                        <div className={styles.skeletonLineLarge} style={{ height: '14px', width: '180px', marginBottom: '6px' }} />
+                        <div className={styles.skeletonLineSmall} style={{ height: '10px', width: '90px', marginBottom: '8px' }} />
+                        <div className={styles.skeletonParagraph}>
+                          <div className={styles.skeletonLineFull} style={{ height: '8px', marginBottom: '4px' }} />
+                          <div className={styles.skeletonLineTwoThirds} style={{ height: '8px' }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Skills Section */}
+                  <div className={styles.ppSection} style={{ paddingBottom: '20px' }}>
+                    <div className={styles.ppSectionTitle} style={{ fontSize: '14px', fontWeight: 700, borderBottom: '1px solid #1e293b', paddingBottom: '3px', marginBottom: '12px', width: '90px', height: '14px', backgroundColor: '#cbd5e1', borderRadius: '2px', animation: 'pulse 1.5s infinite' }} />
+                    <div className={styles.ppSectionRow} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '16px' }}>
+                      <div className={styles.ppLeftCol}>
+                        <div className={styles.skeletonLineMedium} style={{ height: '12px', width: '100px' }} />
+                      </div>
+                      <div className={styles.ppRightCol}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          <div className={styles.skeletonLineSmall} style={{ height: '22px', width: '80px', borderRadius: '4px' }} />
+                          <div className={styles.skeletonLineSmall} style={{ height: '22px', width: '65px', borderRadius: '4px' }} />
+                          <div className={styles.skeletonLineSmall} style={{ height: '22px', width: '90px', borderRadius: '4px' }} />
+                          <div className={styles.skeletonLineSmall} style={{ height: '22px', width: '70px', borderRadius: '4px' }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             </div>
@@ -3779,19 +3978,43 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   </button>
                 </div>
 
-                <div className={styles.exportActions}>
+                <div className={styles.exportActions} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <Button variant="secondary" onClick={handleSave} isLoading={isSaving}>
                     <Save size={16} />
-                    <span>Save Changes</span>
+                    <span>{currentVersion.id.startsWith('unsaved_') ? 'Save as New Version' : 'Save Changes'}</span>
                   </Button>
-                  <Button variant="secondary" onClick={handlePrint}>
-                    <Printer size={16} />
-                    <span>Print PDF</span>
-                  </Button>
-                  <Button variant="secondary" onClick={exportMarkdown}>
-                    <Download size={16} />
-                    <span>Markdown</span>
-                  </Button>
+                  <div style={{ position: 'relative' }}>
+                    <Button variant="secondary" onClick={() => setIsDownloadOpen(!isDownloadOpen)}>
+                      <Download size={16} />
+                      <span>Download</span>
+                    </Button>
+                    {isDownloadOpen && (
+                      <div className={styles.downloadDropdown}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDownloadOpen(false);
+                            handlePrint();
+                          }}
+                          className={styles.dropdownItem}
+                        >
+                          <Printer size={14} />
+                          <span>Print / PDF</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDownloadOpen(false);
+                            exportMarkdown();
+                          }}
+                          className={styles.dropdownItem}
+                        >
+                          <FileText size={14} />
+                          <span>Markdown</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -3976,16 +4199,122 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               )}
 
               {editorTab === 'letter' && (
-                <div className={styles.letterPaper}>
-                  {isLetterLoading ? (
-                    <div className={styles.loader}>Tailoring cover letter...</div>
-                  ) : (
-                    <textarea
-                      className={styles.letterTextarea}
-                      value={letterContent}
-                      onChange={(e) => setLetterContent(e.target.value)}
-                    />
-                  )}
+                <div ref={viewportRef} className={styles.canvasViewport}>
+                  <div
+                    style={{
+                      transform: `scale(${scale})`,
+                      transformOrigin: 'top center',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '24px',
+                      width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`
+                    }}
+                  >
+                    <div
+                      className={`${styles.pageContainer} ${styles.letterPage}`}
+                      style={{
+                        width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`,
+                        height: `${customStyles.pageSize === 'A4' ? 1123 : 1056}px`,
+                        padding: '75px 75px 75px 75px', // Modern German A4 margins (~2 cm margins)
+                        boxSizing: 'border-box',
+                        background: '#ffffff',
+                        fontFamily: "'Arial', 'Helvetica Neue', Helvetica, sans-serif",
+                        fontSize: '14px',
+                        lineHeight: '1.6',
+                        color: '#1d2939',
+                        position: 'relative'
+                      } as React.CSSProperties}
+                    >
+                      {isLetterLoading ? (
+                        <div
+                          className={styles.skeletonPaper}
+                          style={{
+                            padding: '0px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '20px',
+                            width: '100%',
+                            height: '100%',
+                            boxSizing: 'border-box',
+                            background: 'transparent'
+                          }}
+                        >
+                          {/* Header info */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '20px' }}>
+                            <div className={styles.skeletonLineLarge} style={{ height: '20px', width: '200px' }} />
+                            <div className={styles.skeletonLineSmall} style={{ height: '10px', width: '300px' }} />
+                          </div>
+
+                          {/* Date */}
+                          <div className={styles.skeletonLineSmall} style={{ height: '10px', width: '100px', marginBottom: '15px' }} />
+
+                          {/* Recruiter / Company */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '20px' }}>
+                            <div className={styles.skeletonLineMedium} style={{ height: '12px', width: '120px' }} />
+                            <div className={styles.skeletonLineSmall} style={{ height: '10px', width: '150px' }} />
+                          </div>
+
+                          {/* Dear Hiring Manager */}
+                          <div className={styles.skeletonLineSmall} style={{ height: '12px', width: '140px', marginBottom: '10px' }} />
+
+                          {/* Paragraph 1 */}
+                          <div className={styles.skeletonParagraph} style={{ marginBottom: '12px' }}>
+                            <div className={styles.skeletonLineFull} />
+                            <div className={styles.skeletonLineFull} />
+                            <div className={styles.skeletonLineTwoThirds} />
+                          </div>
+
+                          {/* Paragraph 2 */}
+                          <div className={styles.skeletonParagraph} style={{ marginBottom: '12px' }}>
+                            <div className={styles.skeletonLineFull} />
+                            <div className={styles.skeletonLineFull} />
+                            <div className={styles.skeletonLineFull} />
+                            <div className={styles.skeletonLineTwoThirds} />
+                          </div>
+
+                          {/* Paragraph 3 */}
+                          <div className={styles.skeletonParagraph} style={{ marginBottom: '12px' }}>
+                            <div className={styles.skeletonLineFull} />
+                            <div className={styles.skeletonLineFull} />
+                            <div className={styles.skeletonLineTwoThirds} />
+                          </div>
+
+                          {/* Paragraph 4 */}
+                          <div className={styles.skeletonParagraph} style={{ marginBottom: '24px' }}>
+                            <div className={styles.skeletonLineFull} />
+                            <div className={styles.skeletonLineTwoThirds} />
+                          </div>
+
+                          {/* Sign-off */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <div className={styles.skeletonLineSmall} style={{ height: '10px', width: '80px' }} />
+                            <div className={styles.skeletonLineMedium} style={{ height: '12px', width: '120px' }} />
+                          </div>
+                        </div>
+                      ) : (
+                        <textarea
+                          className={styles.letterTextarea}
+                          value={letterContent}
+                          onChange={(e) => setLetterContent(e.target.value)}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            border: 'none',
+                            outline: 'none',
+                            resize: 'none',
+                            fontFamily: 'inherit',
+                            fontSize: 'inherit',
+                            lineHeight: 'inherit',
+                            color: 'inherit',
+                            padding: 0,
+                            margin: 0,
+                            background: 'transparent',
+                            overflow: 'hidden'
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
