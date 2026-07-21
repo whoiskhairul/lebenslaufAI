@@ -1,4 +1,3 @@
-from PyPDF2 import constants
 import os
 import json
 import requests

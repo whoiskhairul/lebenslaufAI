@@ -117,7 +117,10 @@ class ImportCVView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        import PyPDF2
+        try:
+            import pypdf as PyPDF2
+        except ImportError:
+            import PyPDF2
         import json
         
         cv_text = request.data.get('cv_text', '')
