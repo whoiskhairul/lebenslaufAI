@@ -18,6 +18,8 @@ interface ResumeVersion {
   tailored_summary: string;
   tailored_details: {
     experiences: Array<{ id: string; bullets: string[] }>;
+    skills?: Array<{ id?: string; name: string; category: string; level?: string }>;
+    projects?: Array<{ id?: string; title: string; role?: string; technologies?: string[]; bullets?: string[]; link?: string; date?: string }>;
     ats_report: {
       score: number;
       matched_keywords: string[];
@@ -463,6 +465,175 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const [reviewedActions, setReviewedActions] = useState<Record<string, 'accepted' | 'rejected'>>({});
   const [rephrasePrompt, setRephrasePrompt] = useState<Record<string, string>>({});
   const [isRephrasing, setIsRephrasing] = useState<Record<string, boolean>>({});
+  const [openAiPopoverId, setOpenAiPopoverId] = useState<string | null>(null);
+
+  const handleAiRewriteBlock = async (key: string, originalText: string, customInstruction?: string) => {
+    if (!originalText || !originalText.trim()) return;
+    setIsRephrasing(prev => ({ ...prev, [key]: true }));
+    const instruction = customInstruction || rephrasePrompt[key] || "Improve impact, technical polish, and clarity for ATS optimization";
+
+    try {
+      const res = await api.post('/resume/rephrase', {
+        text: originalText,
+        instruction: instruction
+      });
+
+      if (res.data && res.data.success && res.data.rephrased_text) {
+        const newText = res.data.rephrased_text;
+
+        if (key === 'summary') {
+          setEditableSummary(newText);
+        } else if (key.startsWith('exp-bullet-')) {
+          const parts = key.replace('exp-bullet-', '').split('-');
+          const expIdx = parseInt(parts[0]);
+          const bulletIdx = parseInt(parts[1]);
+          setEditableExperiences(prev => prev.map((exp, idx) => {
+            if (idx !== expIdx) return exp;
+            const updatedBullets = [...exp.bullets];
+            updatedBullets[bulletIdx] = newText;
+            return { ...exp, bullets: updatedBullets };
+          }));
+        } else if (key.startsWith('exp-position-')) {
+          const expIdx = parseInt(key.replace('exp-position-', ''));
+          setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, position: newText } : e));
+        } else if (key.startsWith('proj-bullet-')) {
+          const parts = key.replace('proj-bullet-', '').split('-');
+          const projIdx = parseInt(parts[0]);
+          const bulletIdx = parseInt(parts[1]);
+          setEditableProjects(prev => prev.map((proj, idx) => {
+            if (idx !== projIdx) return proj;
+            const updatedBullets = [...proj.bullets];
+            updatedBullets[bulletIdx] = newText;
+            return { ...proj, bullets: updatedBullets };
+          }));
+        } else if (key.startsWith('proj-title-')) {
+          const projIdx = parseInt(key.replace('proj-title-', ''));
+          setEditableProjects(prev => prev.map((p, i) => i === projIdx ? { ...p, title: newText } : p));
+        } else if (key.startsWith('edu-bullet-')) {
+          const parts = key.replace('edu-bullet-', '').split('-');
+          const eduIdx = parseInt(parts[0]);
+          const bulletIdx = parseInt(parts[1]);
+          setEditableEducations(prev => prev.map((edu, idx) => {
+            if (idx !== eduIdx) return edu;
+            const updatedBullets = [...(edu.bullets || [])];
+            updatedBullets[bulletIdx] = newText;
+            return { ...edu, bullets: updatedBullets };
+          }));
+        } else if (key.startsWith('custom-bullet-')) {
+          const parts = key.replace('custom-bullet-', '').split('-');
+          const secId = parts[0];
+          const bulletIdx = parseInt(parts[1]);
+          setSections(prev => prev.map(s => {
+            if (s.id !== secId) return s;
+            const updatedBullets = [...(s.bullets || [])];
+            updatedBullets[bulletIdx] = newText;
+            return { ...s, bullets: updatedBullets };
+          }));
+        }
+
+        setRephrasePrompt(prev => ({ ...prev, [key]: '' }));
+        setOpenAiPopoverId(null);
+      }
+    } catch (err) {
+      console.error('Failed to rewrite block:', err);
+    } finally {
+      setIsRephrasing(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  // Close AI popover when clicking outside
+  useEffect(() => {
+    const handleClosePopover = (e: MouseEvent) => {
+      if (!openAiPopoverId) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.closest(`.${styles.inlineAiPopover}`) || target.closest(`.${styles.hoverAiBar}`))) {
+        return;
+      }
+      setOpenAiPopoverId(null);
+    };
+    document.addEventListener('mousedown', handleClosePopover);
+    return () => document.removeEventListener('mousedown', handleClosePopover);
+  }, [openAiPopoverId]);
+
+  // Unified Hover AI Controls Renderer for Canvas Text Blocks
+  const renderHoverAiControls = (key: string, currentText: string, customChips?: { label: string; prompt: string }[]) => {
+    const isPopoverOpen = openAiPopoverId === key;
+    const isPending = isRephrasing[key];
+
+    const defaultChips = customChips || [
+      { label: "Punchier", prompt: "Make concise with strong action verbs" },
+      { label: "Metrics & Impact", prompt: "Highlight quantifiable metrics and technical results" },
+      { label: "ATS Polish", prompt: "Optimize key industry terminology for ATS screening" }
+    ];
+
+    return (
+      <>
+        <div className={`${styles.hoverAiBar} ${isPopoverOpen || isPending ? styles.hoverAiBarShow : ''} no-print`}>
+          <button
+            type="button"
+            className={styles.hoverAiBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAiRewriteBlock(key, currentText);
+            }}
+            disabled={isPending}
+            title="1-Click AI Auto Rewrite"
+          >
+            <Wand2 size={10} /> {isPending ? 'Rewriting...' : 'AI Rewrite'}
+          </button>
+          <button
+            type="button"
+            className={`${styles.hoverAiPromptBtn} ${isPopoverOpen ? styles.hoverAiPromptBtnActive : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpenAiPopoverId(isPopoverOpen ? null : key);
+            }}
+            title="Custom AI Instruction Prompt"
+          >
+            <Sparkles size={10} /> Prompt
+          </button>
+        </div>
+
+        {isPopoverOpen && (
+          <div className={`${styles.inlineAiPopover} no-print`} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.popoverHeader}>
+              <span><Wand2 size={12} /> AI Rewrite Assistant</span>
+              <button type="button" onClick={() => setOpenAiPopoverId(null)} className={styles.popoverClose}>
+                <X size={12} />
+              </button>
+            </div>
+            <div className={styles.popoverChips}>
+              {defaultChips.map((chip, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handleAiRewriteBlock(key, currentText, chip.prompt)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+            <div className={styles.popoverInputRow}>
+              <input
+                type="text"
+                placeholder="e.g. Focus on technical leadership..."
+                value={rephrasePrompt[key] || ''}
+                onChange={(e) => setRephrasePrompt(prev => ({ ...prev, [key]: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAiRewriteBlock(key, currentText);
+                  }
+                }}
+              />
+              <button type="button" onClick={() => handleAiRewriteBlock(key, currentText)}>
+                Send
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
 
   // Canvas viewport scale settings
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -614,7 +785,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       });
       setEditableExperiences(experiences);
 
-      const remappedSkills = (profile.skills || []).map((s: any) => {
+      const rawSkills = ver.tailored_details.skills || profile.skills || [];
+      const remappedSkills = rawSkills.map((s: any) => {
         const COMMON_TECH_WORDS = [
           'typescript', 'javascript', 'js', 'ts', 'python', 'java', 'c++', 'c#', 'php', 'ruby',
           'golang', 'html', 'css', 'sql', 'react', 'vue', 'angular', 'node', 'django', 'postgresql',
@@ -627,7 +799,15 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         return s;
       });
       setEditableSkills(remappedSkills);
-      setEditableProjects(profile.projects || []);
+      const rawProjects = ver.tailored_details.projects || profile.projects || [];
+      const mappedProjects = rawProjects.map((p: any) => ({
+        id: p.id || `proj_${Math.random()}`,
+        bullets: p.bullets || [],
+        title: p.title || '',
+        role: p.role || '',
+        date: p.date || ''
+      }));
+      setEditableProjects(mappedProjects);
       setEditableEducations(profile.educations || []);
     }
 
@@ -2426,56 +2606,28 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
       const summaryAlerts = getAlertsFor('summary');
       return (
         <div
-          className={`${styles.summaryBox} ${!reviewedActions['summary'] ? styles.aiHighlighted : ''}`}
+          className={`${styles.summaryBox} ${styles.canvasHoverBlock} ${!reviewedActions['summary'] ? styles.aiHighlighted : ''}`}
           style={mergedStyles}
           onMouseEnter={() => handleMouseEnterSuggestion('summary')}
           onMouseLeave={handleMouseLeaveSuggestion}
         >
-          <AutoSizeTextarea
-            value={editableSummary}
-            onChange={(val) => setEditableSummary(val)}
-          />
+          {renderHoverAiControls('summary', editableSummary, [
+            { label: "Punchier", prompt: "Make concise and punchier with strong executive tone" },
+            { label: "Leadership", prompt: "Highlight leadership, technical strategy, and architecture" },
+            { label: "Metrics & Impact", prompt: "Focus on quantifiable business metrics and project ROI" }
+          ])}
 
-          {/* AI tailor suggestion tooltip */}
-          {!isMeasuring && hoveredSuggestion === 'summary' && !reviewedActions['summary'] && currentVersion && (
-            <div
-              className={`${styles.tooltip} glass no-print`}
-              onMouseEnter={() => handleMouseEnterSuggestion('summary')}
-              onMouseLeave={handleMouseLeaveSuggestion}
-            >
-              <div className={styles.tooltipHeader}>
-                <Brain size={14} />
-                <span>AI recommendation</span>
-                <span className={styles.tooltipConfidence}>95% Match</span>
-              </div>
-              <p className={styles.tooltipReason}>
-                Tailored summary matches required keywords for {company}.
-              </p>
-              <div className={styles.tooltipActions}>
-                <button onClick={() => handleAction('summary', 'rejected')} className={styles.rejectBtn}>
-                  <X size={12} /> Reject
-                </button>
-                <button onClick={() => handleAction('summary', 'accepted')} className={styles.acceptBtn}>
-                  <Check size={12} /> Accept
-                </button>
-              </div>
-              <div className={styles.rephraseForm}>
-                <input
-                  type="text"
-                  placeholder="Ask AI to rephrase..."
-                  value={rephrasePrompt['summary'] || ''}
-                  onChange={(e) => setRephrasePrompt(prev => ({ ...prev, summary: e.target.value }))}
-                  className={styles.rephraseInput}
-                />
-                <button
-                  onClick={() => handleRephrase('summary', editableSummary)}
-                  disabled={isRephrasing['summary']}
-                  className={styles.rephraseSend}
-                >
-                  {isRephrasing['summary'] ? '...' : 'Send'}
-                </button>
-              </div>
+          {isRephrasing['summary'] ? (
+            <div className={styles.canvasSkeletonBlock}>
+              <div className={styles.skeletonLine} style={{ width: '96%' }} />
+              <div className={styles.skeletonLine} style={{ width: '90%' }} />
+              <div className={styles.skeletonLine} style={{ width: '72%' }} />
             </div>
+          ) : (
+            <AutoSizeTextarea
+              value={editableSummary}
+              onChange={(val) => setEditableSummary(val)}
+            />
           )}
         </div>
       );
@@ -2580,11 +2732,17 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   <ul className={isPP ? styles.ppBulletsList : styles.germanBulletsList}>
                     {exp.bullets.map((bullet: string, bulletIdx: number) => {
                       const inputId = `bullet-input-experience-${exp.id}-${bulletIdx}`;
+                      const key = `exp-bullet-${expIdx}-${bulletIdx}`;
                       return (
-                        <li key={bulletIdx} className={isPP ? styles.ppBulletItem : styles.germanBulletItem} style={{ position: 'relative' }}>
+                        <li key={bulletIdx} className={`${isPP ? styles.ppBulletItem : styles.germanBulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
                           <span className={styles.bulletDot} />
+                          {renderHoverAiControls(key, bullet, [
+                            { label: "Action Verbs", prompt: "Make it punchier starting with strong active verbs" },
+                            { label: "Metrics & ROI", prompt: "Highlight quantifiable metrics, percentage gains, or ROI" },
+                            { label: "ATS Tech", prompt: "Inject relevant technical tools and framework details" }
+                          ])}
                           {!isMeasuring && (
-                            <div className={`${styles.bulletControls} no-print`}>
+                            <div className={`${styles.bulletControls} no-print`} style={{ right: '115px' }}>
                               <button
                                 type="button"
                                 onClick={() => handleRemoveExperienceBullet(expIdx, bulletIdx)}
@@ -2595,62 +2753,28 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                               </button>
                             </div>
                           )}
+
                           <div className={styles.bulletContent}>
-                            <AutoSizeTextarea
-                              id={inputId}
-                              value={bullet}
-                              onChange={(val) => setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? {
-                                ...e,
-                                bullets: e.bullets.map((b, bI) => bI === bulletIdx ? val : b)
-                              } : e))}
-                              onKeyDown={(e) => handleBulletKeyDown(e, 'experience', exp.id, expIdx, bulletIdx, exp.bullets)}
-                            />
+                            {isRephrasing[key] ? (
+                              <div className={styles.canvasSkeletonBlock}>
+                                <div className={styles.skeletonLine} style={{ width: '92%' }} />
+                              </div>
+                            ) : (
+                              <AutoSizeTextarea
+                                id={inputId}
+                                value={bullet}
+                                onChange={(val) => setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? {
+                                  ...e,
+                                  bullets: e.bullets.map((b, bI) => bI === bulletIdx ? val : b)
+                                } : e))}
+                                onKeyDown={(e) => handleBulletKeyDown(e, 'experience', exp.id, expIdx, bulletIdx, exp.bullets)}
+                              />
+                            )}
                           </div>
                         </li>
                       );
                     })}
                   </ul>
-
-                  {!isMeasuring && hoveredSuggestion === exp.id && hasAIChange && currentVersion && (
-                    <div
-                      className={`${styles.tooltip} glass no-print`}
-                      onMouseEnter={() => handleMouseEnterSuggestion(exp.id)}
-                      onMouseLeave={handleMouseLeaveSuggestion}
-                    >
-                      <div className={styles.tooltipHeader}>
-                        <Brain size={14} />
-                        <span>AI Recommendation</span>
-                        <span className={styles.tooltipConfidence}>90% Match</span>
-                      </div>
-                      <p className={styles.tooltipReason}>
-                        Optimized experience bullet points targeting role requirements.
-                      </p>
-                      <div className={styles.tooltipActions}>
-                        <button onClick={() => handleAction(exp.id, 'rejected')} className={styles.rejectBtn}>
-                          <X size={12} /> Reject
-                        </button>
-                        <button onClick={() => handleAction(exp.id, 'accepted')} className={styles.acceptBtn}>
-                          <Check size={12} /> Accept
-                        </button>
-                      </div>
-                      <div className={styles.rephraseForm}>
-                        <input
-                          type="text"
-                          placeholder="Rephrase bullet... (e.g. make it punchier)"
-                          value={rephrasePrompt[exp.id] || ''}
-                          onChange={(e) => setRephrasePrompt(prev => ({ ...prev, [exp.id]: e.target.value }))}
-                          className={styles.rephraseInput}
-                        />
-                        <button
-                          onClick={() => handleRephrase(`${exp.id}-0`, exp.bullets[0])}
-                          disabled={isRephrasing[exp.id]}
-                          className={styles.rephraseSend}
-                        >
-                          {isRephrasing[exp.id] ? '...' : 'Send'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </>
@@ -2699,11 +2823,17 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 <ul className={styles.bulletsList}>
                   {exp.bullets.map((bullet: string, bulletIdx: number) => {
                     const inputId = `bullet-input-experience-${exp.id}-${bulletIdx}`;
+                    const key = `exp-bullet-${expIdx}-${bulletIdx}`;
                     return (
-                      <li key={bulletIdx} className={styles.bulletItem} style={{ position: 'relative' }}>
+                      <li key={bulletIdx} className={`${styles.bulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
                         <span className={styles.bulletDot} />
+                        {renderHoverAiControls(key, bullet, [
+                          { label: "Action Verbs", prompt: "Make it punchier starting with strong active verbs" },
+                          { label: "Metrics & ROI", prompt: "Highlight quantifiable metrics, percentage gains, or ROI" },
+                          { label: "ATS Tech", prompt: "Inject relevant technical tools and framework details" }
+                        ])}
                         {!isMeasuring && (
-                          <div className={`${styles.bulletControls} no-print`}>
+                          <div className={`${styles.bulletControls} no-print`} style={{ right: '115px' }}>
                             <button
                               type="button"
                               onClick={() => handleRemoveExperienceBullet(expIdx, bulletIdx)}
@@ -2713,16 +2843,23 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                             </button>
                           </div>
                         )}
+
                         <div className={styles.bulletContent}>
-                          <AutoSizeTextarea
-                            id={inputId}
-                            value={bullet}
-                            onChange={(val) => setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? {
-                              ...e,
-                              bullets: e.bullets.map((b, bI) => bI === bulletIdx ? val : b)
-                            } : e))}
-                            onKeyDown={(e) => handleBulletKeyDown(e, 'experience', exp.id, expIdx, bulletIdx, exp.bullets)}
-                          />
+                          {isRephrasing[key] ? (
+                            <div className={styles.canvasSkeletonBlock}>
+                              <div className={styles.skeletonLine} style={{ width: '92%' }} />
+                            </div>
+                          ) : (
+                            <AutoSizeTextarea
+                              id={inputId}
+                              value={bullet}
+                              onChange={(val) => setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? {
+                                ...e,
+                                bullets: e.bullets.map((b, bI) => bI === bulletIdx ? val : b)
+                              } : e))}
+                              onKeyDown={(e) => handleBulletKeyDown(e, 'experience', exp.id, expIdx, bulletIdx, exp.bullets)}
+                            />
+                          )}
                         </div>
                       </li>
                     );
@@ -2813,10 +2950,17 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 <ul className={isPP ? styles.ppBulletsList : styles.germanBulletsList}>
                   {proj.bullets.map((bullet: string, bulletIdx: number) => {
                     const inputId = `bullet-input-project-${proj.id}-${bulletIdx}`;
+                    const key = `proj-bullet-${projIdx}-${bulletIdx}`;
                     return (
-                      <li key={bulletIdx} className={isPP ? styles.ppBulletItem : styles.germanBulletItem} style={{ position: 'relative' }}>
+                      <li key={bulletIdx} className={`${isPP ? styles.ppBulletItem : styles.germanBulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
+                        <span className={styles.bulletDot} />
+                        {renderHoverAiControls(key, bullet, [
+                          { label: "Action Verbs", prompt: "Make it punchier with strong active verbs" },
+                          { label: "Tech Stack", prompt: "Highlight modern tech stack & system architecture" },
+                          { label: "Deliverables", prompt: "Focus on technical deliverables, scope, and results" }
+                        ])}
                         {!isMeasuring && (
-                          <div className={`${styles.bulletControls} no-print`}>
+                          <div className={`${styles.bulletControls} no-print`} style={{ right: '115px' }}>
                             <button
                               type="button"
                               onClick={() => handleRemoveProjectBullet(projIdx, bulletIdx)}
@@ -2826,16 +2970,23 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                             </button>
                           </div>
                         )}
+
                         <div className={styles.bulletContent}>
-                          <AutoSizeTextarea
-                            id={inputId}
-                            value={bullet}
-                            onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? {
-                              ...p,
-                              bullets: p.bullets.map((b, bI) => bI === bulletIdx ? val : b)
-                            } : p))}
-                            onKeyDown={(e) => handleBulletKeyDown(e, 'project', proj.id, projIdx, bulletIdx, proj.bullets)}
-                          />
+                          {isRephrasing[key] ? (
+                            <div className={styles.canvasSkeletonBlock}>
+                              <div className={styles.skeletonLine} style={{ width: '92%' }} />
+                            </div>
+                          ) : (
+                            <AutoSizeTextarea
+                              id={inputId}
+                              value={bullet}
+                              onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? {
+                                ...p,
+                                bullets: p.bullets.map((b, bI) => bI === bulletIdx ? val : b)
+                              } : p))}
+                              onKeyDown={(e) => handleBulletKeyDown(e, 'project', proj.id, projIdx, bulletIdx, proj.bullets)}
+                            />
+                          )}
                         </div>
                       </li>
                     );
@@ -2871,10 +3022,17 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               <ul className={styles.bulletsList}>
                 {proj.bullets.map((bullet: string, bulletIdx: number) => {
                   const inputId = `bullet-input-project-${proj.id}-${bulletIdx}`;
+                  const key = `proj-bullet-${projIdx}-${bulletIdx}`;
                   return (
-                    <li key={bulletIdx} className={styles.bulletItem} style={{ position: 'relative' }}>
+                    <li key={bulletIdx} className={`${styles.bulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
+                      <span className={styles.bulletDot} />
+                      {renderHoverAiControls(key, bullet, [
+                        { label: "Action Verbs", prompt: "Make it punchier with strong active verbs" },
+                        { label: "Tech Stack", prompt: "Highlight modern tech stack & system architecture" },
+                        { label: "Deliverables", prompt: "Focus on technical deliverables, scope, and results" }
+                      ])}
                       {!isMeasuring && (
-                        <div className={`${styles.bulletControls} no-print`}>
+                        <div className={`${styles.bulletControls} no-print`} style={{ right: '115px' }}>
                           <button
                             type="button"
                             onClick={() => handleRemoveProjectBullet(projIdx, bulletIdx)}
@@ -2884,16 +3042,23 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                           </button>
                         </div>
                       )}
+
                       <div className={styles.bulletContent}>
-                        <AutoSizeTextarea
-                          id={inputId}
-                          value={bullet}
-                          onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? {
-                            ...p,
-                            bullets: p.bullets.map((b, bI) => bI === bulletIdx ? val : b)
-                          } : p))}
-                          onKeyDown={(e) => handleBulletKeyDown(e, 'project', proj.id, projIdx, bulletIdx, proj.bullets)}
-                        />
+                        {isRephrasing[key] ? (
+                          <div className={styles.canvasSkeletonBlock}>
+                            <div className={styles.skeletonLine} style={{ width: '92%' }} />
+                          </div>
+                        ) : (
+                          <AutoSizeTextarea
+                            id={inputId}
+                            value={bullet}
+                            onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? {
+                              ...p,
+                              bullets: p.bullets.map((b, bI) => bI === bulletIdx ? val : b)
+                            } : p))}
+                            onKeyDown={(e) => handleBulletKeyDown(e, 'project', proj.id, projIdx, bulletIdx, proj.bullets)}
+                          />
+                        )}
                       </div>
                     </li>
                   );
@@ -2998,10 +3163,17 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 <ul className={isPP ? styles.ppBulletsList : styles.germanBulletsList}>
                   {(edu.bullets || []).map((bullet: string, bulletIdx: number) => {
                     const inputId = `bullet-input-education-${edu.id}-${bulletIdx}`;
+                    const key = `edu-bullet-${eduIdx}-${bulletIdx}`;
                     return (
-                      <li key={bulletIdx} className={isPP ? styles.ppBulletItem : styles.germanBulletItem} style={{ position: 'relative' }}>
+                      <li key={bulletIdx} className={`${isPP ? styles.ppBulletItem : styles.germanBulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
+                        <span className={styles.bulletDot} />
+                        {renderHoverAiControls(key, bullet, [
+                          { label: "Concise", prompt: "Make concise and academic" },
+                          { label: "Coursework", prompt: "Highlight key relevant technical coursework & projects" },
+                          { label: "Honors", prompt: "Emphasize honors, GPA, or academic distinctions" }
+                        ])}
                         {!isMeasuring && (
-                          <div className={`${styles.bulletControls} no-print`}>
+                          <div className={`${styles.bulletControls} no-print`} style={{ right: '115px' }}>
                             <button
                               type="button"
                               onClick={() => handleRemoveEducationBullet(eduIdx, bulletIdx)}
@@ -3011,16 +3183,23 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                             </button>
                           </div>
                         )}
+
                         <div className={styles.bulletContent}>
-                          <AutoSizeTextarea
-                            id={inputId}
-                            value={bullet}
-                            onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? {
-                              ...e,
-                              bullets: (e.bullets || []).map((b: string, bI: number) => bI === bulletIdx ? val : b)
-                            } : e))}
-                            onKeyDown={(e) => handleBulletKeyDown(e, 'education', edu.id, eduIdx, bulletIdx, edu.bullets || [])}
-                          />
+                          {isRephrasing[key] ? (
+                            <div className={styles.canvasSkeletonBlock}>
+                              <div className={styles.skeletonLine} style={{ width: '92%' }} />
+                            </div>
+                          ) : (
+                            <AutoSizeTextarea
+                              id={inputId}
+                              value={bullet}
+                              onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? {
+                                ...e,
+                                bullets: (e.bullets || []).map((b: string, bI: number) => bI === bulletIdx ? val : b)
+                              } : e))}
+                              onKeyDown={(e) => handleBulletKeyDown(e, 'education', edu.id, eduIdx, bulletIdx, edu.bullets || [])}
+                            />
+                          )}
                         </div>
                       </li>
                     );
@@ -3075,10 +3254,17 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               <ul className={styles.bulletsList}>
                 {(edu.bullets || []).map((bullet: string, bulletIdx: number) => {
                   const inputId = `bullet-input-education-${edu.id}-${bulletIdx}`;
+                  const key = `edu-bullet-${eduIdx}-${bulletIdx}`;
                   return (
-                    <li key={bulletIdx} className={styles.bulletItem} style={{ position: 'relative' }}>
+                    <li key={bulletIdx} className={`${styles.bulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
+                      <span className={styles.bulletDot} />
+                      {renderHoverAiControls(key, bullet, [
+                        { label: "Concise", prompt: "Make concise and academic" },
+                        { label: "Coursework", prompt: "Highlight key relevant technical coursework & projects" },
+                        { label: "Honors", prompt: "Emphasize honors, GPA, or academic distinctions" }
+                      ])}
                       {!isMeasuring && (
-                        <div className={`${styles.bulletControls} no-print`}>
+                        <div className={`${styles.bulletControls} no-print`} style={{ right: '115px' }}>
                           <button
                             type="button"
                             onClick={() => handleRemoveEducationBullet(eduIdx, bulletIdx)}
@@ -3088,16 +3274,23 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                           </button>
                         </div>
                       )}
+
                       <div className={styles.bulletContent}>
-                        <AutoSizeTextarea
-                          id={inputId}
-                          value={bullet}
-                          onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? {
-                            ...e,
-                            bullets: (e.bullets || []).map((b: string, bI: number) => bI === bulletIdx ? val : b)
-                          } : e))}
-                          onKeyDown={(e) => handleBulletKeyDown(e, 'education', edu.id, eduIdx, bulletIdx, edu.bullets || [])}
-                        />
+                        {isRephrasing[key] ? (
+                          <div className={styles.canvasSkeletonBlock}>
+                            <div className={styles.skeletonLine} style={{ width: '92%' }} />
+                          </div>
+                        ) : (
+                          <AutoSizeTextarea
+                            id={inputId}
+                            value={bullet}
+                            onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? {
+                              ...e,
+                              bullets: (e.bullets || []).map((b: string, bI: number) => bI === bulletIdx ? val : b)
+                            } : e))}
+                            onKeyDown={(e) => handleBulletKeyDown(e, 'education', edu.id, eduIdx, bulletIdx, edu.bullets || [])}
+                          />
+                        )}
                       </div>
                     </li>
                   );
@@ -3344,11 +3537,17 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
           <ul className={isPP ? styles.ppBulletsList : (isGerman ? styles.germanBulletsList : styles.bulletsList)}>
             {bulletsList.map((bullet, bulletIdx) => {
               const inputId = `bullet-input-custom-${unit.sectionId}-${bulletIdx}`;
+              const key = `custom-bullet-${unit.sectionId}-${bulletIdx}`;
               return (
-                <li key={bulletIdx} className={isPP ? styles.ppBulletItem : (isGerman ? styles.germanBulletItem : styles.bulletItem)} style={{ position: 'relative' }}>
+                <li key={bulletIdx} className={`${isPP ? styles.ppBulletItem : (isGerman ? styles.germanBulletItem : styles.bulletItem)} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
                   <span className={styles.bulletDot} />
+                  {renderHoverAiControls(key, bullet, [
+                    { label: "Punchier", prompt: "Make punchier with strong professional impact" },
+                    { label: "Tone & Clarity", prompt: "Improve professional tone, grammar, and sentence flow" },
+                    { label: "Domain Expertise", prompt: "Highlight key domain expertise and technical achievements" }
+                  ])}
                   {!isMeasuring && (
-                    <div className={`${styles.bulletControls} no-print`}>
+                    <div className={`${styles.bulletControls} no-print`} style={{ right: '115px' }}>
                       <button
                         type="button"
                         onClick={() => handleRemoveCustomBullet(unit.sectionId!, bulletIdx)}
@@ -3359,18 +3558,25 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       </button>
                     </div>
                   )}
+
                   <div className={styles.bulletContent}>
-                    <AutoSizeTextarea
-                      id={inputId}
-                      value={bullet}
-                      onChange={(val) => {
-                        setSections(prev => prev.map(s => s.id === unit.sectionId ? {
-                          ...s,
-                          bullets: s.bullets!.map((b, bI) => bI === bulletIdx ? val : b)
-                        } : s));
-                      }}
-                      onKeyDown={(e) => handleBulletKeyDown(e, 'custom', unit.sectionId!, 0, bulletIdx, bulletsList)}
-                    />
+                    {isRephrasing[key] ? (
+                      <div className={styles.canvasSkeletonBlock}>
+                        <div className={styles.skeletonLine} style={{ width: '92%' }} />
+                      </div>
+                    ) : (
+                      <AutoSizeTextarea
+                        id={inputId}
+                        value={bullet}
+                        onChange={(val) => {
+                          setSections(prev => prev.map(s => s.id === unit.sectionId ? {
+                            ...s,
+                            bullets: s.bullets!.map((b, bI) => bI === bulletIdx ? val : b)
+                          } : s));
+                        }}
+                        onKeyDown={(e) => handleBulletKeyDown(e, 'custom', unit.sectionId!, 0, bulletIdx, bulletsList)}
+                      />
+                    )}
                   </div>
                 </li>
               );

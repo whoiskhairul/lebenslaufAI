@@ -114,6 +114,8 @@ class ResumeTailorView(APIView):
         import json
         details_safe = json.loads(json.dumps({
             "experiences": tailored_result.get('tailored_experiences', []),
+            "skills": tailored_result.get('tailored_skills', profile_serialized.get('skills', [])),
+            "projects": tailored_result.get('tailored_projects', profile_serialized.get('projects', [])),
             "ats_report": ats_report,
             "original_profile": profile_serialized
         }, default=str))

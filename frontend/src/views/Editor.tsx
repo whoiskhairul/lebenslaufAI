@@ -1093,47 +1093,6 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               <ShieldAlert size={10} /> {a.value}
             </span>
           ))}
-
-          {hoveredSuggestion === 'summary' && !reviewedActions['summary'] && (
-            <div
-              className={`${styles.tooltip} glass no-print`}
-              onMouseEnter={() => handleMouseEnterSuggestion('summary')}
-              onMouseLeave={handleMouseLeaveSuggestion}
-            >
-              <div className={styles.tooltipHeader}>
-                <Brain size={14} />
-                <span>AI Recommendation</span>
-                <span className={styles.tooltipConfidence}>95% Match</span>
-              </div>
-              <p className={styles.tooltipReason}>
-                Tailored summary matches required keywords for {company}.
-              </p>
-              <div className={styles.tooltipActions}>
-                <button onClick={() => handleAction('summary', 'rejected')} className={styles.rejectBtn}>
-                  <X size={12} /> Reject
-                </button>
-                <button onClick={() => handleAction('summary', 'accepted')} className={styles.acceptBtn}>
-                  <Check size={12} /> Accept
-                </button>
-              </div>
-              <div className={styles.rephraseForm}>
-                <input
-                  type="text"
-                  placeholder="Ask AI to rephrase... (e.g. make it punchier)"
-                  value={rephrasePrompt['summary'] || ''}
-                  onChange={(e) => setRephrasePrompt(prev => ({ ...prev, summary: e.target.value }))}
-                  className={styles.rephraseInput}
-                />
-                <button
-                  onClick={() => handleRephrase('summary', editableSummary)}
-                  disabled={isRephrasing['summary']}
-                  className={styles.rephraseSend}
-                >
-                  {isRephrasing['summary'] ? '...' : 'Send'}
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     );

@@ -2244,3 +2244,215 @@
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
 }
+
+/* Canvas Inline Hover AI Rewriter Styles */
+.canvasHoverBlock {
+  position: relative;
+  width: 100%;
+}
+
+/* Hover bridge padding pseudo-element to prevent cursor loss when moving to AI toolbar */
+.canvasHoverBlock::before {
+  content: '';
+  position: absolute;
+  top: -26px;
+  left: 0;
+  right: 0;
+  height: 26px;
+  z-index: 45;
+  pointer-events: none;
+}
+
+.canvasHoverBlock:hover::before {
+  pointer-events: auto;
+}
+
+.canvasHoverBlock:hover .hoverAiBar,
+.hoverAiBarShow {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateY(0) !important;
+}
+
+.hoverAiBar {
+  position: absolute;
+  top: -26px;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out;
+  z-index: 60;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(8px);
+  padding: 3px 6px;
+  border-radius: 5px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+}
+
+.hoverAiBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #ffffff;
+  border: none;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.hoverAiBtn:hover {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  transform: translateY(-1px);
+}
+
+.hoverAiPromptBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.hoverAiPromptBtn:hover,
+.hoverAiPromptBtnActive {
+  background: rgba(99, 102, 241, 0.45);
+  color: #ffffff;
+  border-color: #818cf8;
+}
+
+.inlineAiPopover {
+  position: absolute;
+  top: -125px;
+  right: 0;
+  width: 290px;
+  z-index: 10000;
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.popoverHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  color: #a5b4fc;
+}
+
+.popoverClose {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+
+.popoverClose:hover {
+  color: #ffffff;
+}
+
+.popoverChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.popoverChips button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  font-size: 9.5px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.popoverChips button:hover {
+  background: rgba(99, 102, 241, 0.35);
+  color: #ffffff;
+  border-color: #818cf8;
+}
+
+.popoverInputRow {
+  display: flex;
+  gap: 5px;
+}
+
+.popoverInputRow input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 10.5px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  outline: none;
+}
+
+.popoverInputRow input:focus {
+  border-color: #818cf8;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.popoverInputRow button {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #ffffff;
+  border: none;
+  font-weight: 600;
+  font-size: 10.5px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.popoverInputRow button:hover {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+}
+
+.canvasSkeletonBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+  width: 100%;
+}
+
+.skeletonLine {
+  height: 10px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.15) 25%, rgba(168, 85, 247, 0.35) 50%, rgba(99, 102, 241, 0.15) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s infinite linear;
+}
+
+@keyframes skeletonShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

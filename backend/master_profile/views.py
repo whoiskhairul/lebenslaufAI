@@ -163,3 +163,55 @@ class ImportCVView(APIView):
             "success": True,
             "data": parsed_safe
         })
+
+class GenerateSummaryView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        
+        exps = WorkExperience.objects.filter(user=user)
+        projs = Project.objects.filter(user=user)
+        skills = Skill.objects.filter(user=user)
+        edus = Education.objects.filter(user=user)
+
+        missing_sections = []
+        if not exps.exists():
+            missing_sections.append("Work History")
+        if not projs.exists():
+            missing_sections.append("Featured Projects")
+        if not skills.exists():
+            missing_sections.append("Skills")
+        if not edus.exists():
+            missing_sections.append("Education")
+
+        if missing_sections:
+            return Response({
+                "success": False,
+                "error": {
+                    "message": f"Please add at least one item to: {', '.join(missing_sections)} before generating an Executive Profile Summary."
+                },
+                "missing_sections": missing_sections
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        personal_info = PersonalInfo.objects.filter(user=user).first()
+        profile_data = {
+            'personal_info': personal_info or PersonalInfo(user=user, full_name=user.full_name or "", email=user.email),
+            'work_experiences': exps,
+            'projects': projs,
+            'skills': skills,
+            'educations': edus,
+            'certifications': Certification.objects.filter(user=user),
+        }
+
+        profile_serialized = FullProfileSerializer(profile_data).data
+        api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
+
+        from services.ai_service import AIService
+        summary = AIService.generate_executive_summary(profile_serialized, api_key=api_key)
+
+        return Response({
+            "success": True,
+            "summary": summary
+        })
+

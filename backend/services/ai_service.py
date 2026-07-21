@@ -1,3 +1,4 @@
+from PyPDF2 import constants
 import os
 import json
 import requests
@@ -111,6 +112,84 @@ class AIService:
         return cls._mock_analyze_ats(profile_data, job_data)
 
     @classmethod
+    def generate_executive_summary(cls, profile_data, api_key=None):
+        profile_text = json.dumps(profile_data, default=str)
+        system_prompt = (
+            """
+            Act as an expert technical resume writer. Write a concise, 3-sentence professional summary for a  resume using the provided data.
+            Synthesize the candidate's work experiences, projects, and skills.
+
+            Follow these strict rules:
+            1. Sentence 1: State candidate's title and core technical skills (e.g., Python, React).
+            2. Sentence 2: Highlight a quantifiable achievement from a project or internship.
+            3. Sentence 3: Mention candidate's experience with version control (Git) or agile teamwork, plus my eagerness to contribute to business goals.
+            4. Tone: Use strong action verbs. Eliminate generic fluff like "highly motivated" or "passionate."
+            """
+        )
+        user_content = f"MASTER_PROFILE:\n{profile_text}\n\nExecutive Summary:"
+        res = cls.call_deepseek(system_prompt, user_content, api_key=api_key)
+        if res:
+            return res.strip().strip('"')
+            
+        return cls._mock_generate_executive_summary(profile_data)
+
+    @staticmethod
+    def _mock_generate_executive_summary(profile_data):
+        p_info = profile_data.get('personal_info', {})
+        title = p_info.get('title') or "Software Developer"
+        skills = profile_data.get('skills', [])
+        skill_names = ", ".join([s.get('name') for s in skills[:4] if s.get('name')]) or "modern web technologies"
+        exps = profile_data.get('work_experiences', [])
+        exp_count = len(exps)
+        projs = profile_data.get('projects', [])
+        proj_count = len(projs)
+
+        return (
+            f"Accomplished {title} with proven expertise in {skill_names}. "
+            f"Demonstrated track record across {exp_count} key industry roles and {proj_count} featured technical projects. "
+            f"Adept at building resilient, scalable systems while delivering measurable business value and collaborating across multi-disciplinary teams."
+        )
+
+    @staticmethod
+    def prioritize_items(profile_data, job_data):
+        keywords = [k.lower() for k in job_data.get('keywords', []) if k]
+        primary_skills = [k.lower() for k in job_data.get('primary_hard_skills', []) if k]
+        all_target_terms = list(set(keywords + primary_skills))
+
+        skills = profile_data.get('skills', [])
+        def skill_relevance(s):
+            s_name = (s.get('name') or '').lower()
+            if s_name in primary_skills:
+                return 3
+            if any(term in s_name or s_name in term for term in all_target_terms):
+                return 2
+            return 0
+        sorted_skills = sorted(skills, key=skill_relevance, reverse=True)
+
+        experiences = profile_data.get('work_experiences', [])
+        def exp_relevance(e):
+            text = f"{e.get('position', '')} {e.get('company', '')} {' '.join(e.get('bullets', []) or [])}".lower()
+            score = 0
+            for term in all_target_terms:
+                if term in text:
+                    score += 1
+            return score
+        sorted_experiences = sorted(experiences, key=exp_relevance, reverse=True)
+
+        projects = profile_data.get('projects', [])
+        def proj_relevance(p):
+            techs = " ".join(p.get('technologies', []) or []).lower()
+            text = f"{p.get('title', '')} {p.get('role', '')} {techs} {' '.join(p.get('bullets', []) or [])}".lower()
+            score = 0
+            for term in all_target_terms:
+                if term in text:
+                    score += 1
+            return score
+        sorted_projects = sorted(projects, key=proj_relevance, reverse=True)
+
+        return sorted_skills, sorted_experiences, sorted_projects
+
+    @classmethod
     def tailor_resume(cls, profile_data, job_data, api_key=None):
         profile_text = json.dumps(profile_data, default=str)
         job_text = json.dumps(job_data, default=str)
@@ -142,13 +221,22 @@ class AIService:
         
         user_content = f"MASTER_PROFILE:\n{profile_text}\n\nJOB_DESCRIPTION:\n{job_text}"
         result_text = cls.call_deepseek(system_prompt, user_content, {"type": "json_object"}, api_key)
+        
+        sorted_skills, sorted_experiences, sorted_projects = cls.prioritize_items(profile_data, job_data)
+        
         if result_text:
             try:
-                return json.loads(result_text)
+                res = json.loads(result_text)
+                res['tailored_skills'] = sorted_skills
+                res['tailored_projects'] = sorted_projects
+                return res
             except ValueError:
                 pass
                 
-        return cls._mock_tailor_resume(profile_data, job_data)
+        mock_res = cls._mock_tailor_resume(profile_data, job_data)
+        mock_res['tailored_skills'] = sorted_skills
+        mock_res['tailored_projects'] = sorted_projects
+        return mock_res
 
     @classmethod
     def write_cover_letter(cls, profile_data, job_data, tone="professional", length="medium", api_key=None):
