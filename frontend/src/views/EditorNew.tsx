@@ -1277,6 +1277,15 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
               ...currentVersion.tailored_details.original_profile.personal_info,
               ...editablePersonalInfo
             },
+            work_experiences: editableExperiences.map(e => ({
+              id: e.id,
+              company: e.company,
+              position: e.position,
+              location: e.location,
+              start_date: e.start_date,
+              end_date: e.end_date,
+              bullets: e.bullets
+            })),
             skills: editableSkills,
             projects: editableProjects,
             educations: editableEducations
@@ -3406,7 +3415,8 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
   return (
     <div className={styles.container}>
       {/* Dynamic print page styling to force correct browser paper size */}
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @media print {
           @page {
             size: ${customStyles.pageSize === 'A4' ? 'A4' : 'letter'} portrait !important;
@@ -3449,414 +3459,568 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
           </div>
 
           {activeControlTab === 'tailor' ? (
-            <>
-              <form onSubmit={handleTailor} className={`${styles.form} glass-card`}>
-                <h3>Job Listing Details</h3>
-                <div className={styles.formGrid}>
+            editorTab === 'resume' ? (
+              // CV Tailoring UI
+              <>
+                <form onSubmit={handleTailor} className={`${styles.form} glass-card`}>
+                  <h3>Job Listing Details</h3>
+                  <div className={styles.formGrid}>
+                    <InputField
+                      label="Company Name"
+                      id="editorCompany"
+                      placeholder="e.g. Stripe"
+                      value={company}
+                      onChange={(e) => setCompany(e.target.value)}
+                    />
+                    <InputField
+                      label="Target Position"
+                      id="editorRole"
+                      placeholder="e.g. Lead Frontend Engineer"
+                      value={position}
+                      onChange={(e) => setPosition(e.target.value)}
+                    />
+                  </div>
                   <InputField
-                    label="Company Name"
-                    id="editorCompany"
-                    placeholder="e.g. Stripe"
-                    value={company}
-                    onChange={(e) => setCompany(e.target.value)}
+                    label="Job Description Text *"
+                    id="editorDesc"
+                    type="textarea"
+                    placeholder="Paste responsibilities and key requirements..."
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                    required
                   />
+
+                  <div className={styles.selectGroup}>
+                    <label htmlFor="editorTemplate">Layout Template</label>
+                    <select id="editorTemplate" value={template} onChange={(e) => setTemplate(e.target.value)}>
+                      <option value="pixel_perfect_pdf">Pixel Perfect CV Template</option>
+                      <option value="modern_minimalist" disabled>Cooming soon</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                    <input
+                      type="checkbox"
+                      id="saveAutomatically"
+                      checked={saveAutomatically}
+                      onChange={(e) => setSaveAutomatically(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <label htmlFor="saveAutomatically" style={{ fontSize: '13px', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main, #1e293b)' }}>
+                      Save tailored copy automatically
+                    </label>
+                  </div>
+
+                  <Button type="submit" isLoading={isLoading} className={styles.tailorBtn}>
+                    <Wand2 size={16} />
+                    <span>Analyze & Tailor</span>
+                  </Button>
+                </form>
+
+                {currentVersion && (
+                  <div className={`${styles.atsCard} glass-card`}>
+                    <div className={styles.atsHeader}>
+                      <h3>ATS Match Score</h3>
+                      <div className={styles.scoreGauge} style={{
+                        color: currentVersion.ats_score > 80 ? 'var(--success)' : 'var(--warning)',
+                        borderColor: currentVersion.ats_score > 80 ? 'var(--success)' : 'var(--warning)'
+                      }}>
+                        {currentVersion.ats_score}%
+                      </div>
+                    </div>
+
+                    <div className={styles.trackingSection} style={{ marginBottom: '20px', padding: '12px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.2)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main, #1e293b)' }}>
+                        {applicationTracked ? '✓ Tracking this Application' : 'Track this job application?'}
+                      </div>
+                      {!applicationTracked ? (
+                        <Button onClick={handleTrackApplication} isLoading={isTrackingLoading} style={{ width: '100%' }}>
+                          Add to Application Tracking
+                        </Button>
+                      ) : (
+                        <div style={{ fontSize: '12px', color: '#475569' }}>
+                          This CV is linked to an active job tracking card.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className={styles.keywordsTwinGrid}>
+                      <div className={styles.keywordsBlock}>
+                        <h4>Matched Keywords ({currentVersion.tailored_details.ats_report.matched_keywords.length})</h4>
+                        <div className={styles.keywordsGrid}>
+                          {currentVersion.tailored_details.ats_report.matched_keywords.map((k, i) => (
+                            <span key={i} className={styles.matchedKw}>{k}</span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className={styles.keywordsBlock}>
+                        <h4>Missing Keywords ({currentVersion.tailored_details.ats_report.missing_keywords.length})</h4>
+                        <div className={styles.keywordsGrid}>
+                          {currentVersion.tailored_details.ats_report.missing_keywords.map((k, i) => (
+                            <span key={i} className={styles.missingKw}>{k}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={styles.suggestionsList}>
+                      <h4>ATS Suggestions</h4>
+                      <ul>
+                        {currentVersion.tailored_details.ats_report.suggestions.map((s, i) => (
+                          <li key={i}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              // Cover Letter Tailoring UI
+              <>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleGenerateLetter(company, position);
+                  }}
+                  className={`${styles.form} glass-card`}
+                >
+                  <h3>Cover Letter Tailoring</h3>
+                  <div className={styles.formGrid}>
+                    <InputField
+                      label="Company Name"
+                      id="letterCompany"
+                      placeholder="e.g. Stripe"
+                      value={company}
+                      onChange={(e) => setCompany(e.target.value)}
+                    />
+                    <InputField
+                      label="Target Position"
+                      id="letterRole"
+                      placeholder="e.g. Lead Frontend Engineer"
+                      value={position}
+                      onChange={(e) => setPosition(e.target.value)}
+                    />
+                  </div>
                   <InputField
-                    label="Target Position"
-                    id="editorRole"
-                    placeholder="e.g. Lead Frontend Engineer"
-                    value={position}
-                    onChange={(e) => setPosition(e.target.value)}
+                    label="Job Description Text *"
+                    id="letterDesc"
+                    type="textarea"
+                    placeholder="Paste job details to tailor your cover letter..."
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                    required
                   />
-                </div>
-                <InputField
-                  label="Job Description Text *"
-                  id="editorDesc"
-                  type="textarea"
-                  placeholder="Paste responsibilities and key requirements..."
-                  value={jobDescription}
-                  onChange={(e) => setJobDescription(e.target.value)}
-                  required
-                />
 
-                <div className={styles.selectGroup}>
-                  <label htmlFor="editorTemplate">Layout Template</label>
-                  <select id="editorTemplate" value={template} onChange={(e) => setTemplate(e.target.value)}>
-                    <option value="pixel_perfect_pdf">Pixel Perfect CV Template</option>
-                    <option value="german_style_cv">German-Style CV Template</option>
-                    <option value="modern_minimalist">Modern Minimalist</option>
-                    <option value="executive_professional">Executive Professional</option>
-                    <option value="creative_tech">Creative Tech</option>
-                  </select>
-                </div>
+                  <div className={styles.selectGroup}>
+                    <label htmlFor="letterTone">Writing Tone</label>
+                    <select
+                      id="letterTone"
+                      value={letterTone}
+                      onChange={(e) => setLetterTone(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--card-border, #cbd5e1)',
+                        background: 'white',
+                        fontSize: '13px',
+                        outline: 'none',
+                        color: 'var(--text-main, #1e293b)'
+                      }}
+                    >
+                      <option value="professional">Professional & Direct (Recommended)</option>
+                      <option value="enthusiastic">Enthusiastic & Passionate</option>
+                      <option value="creative">Creative & Narrative</option>
+                      <option value="executive">Executive & Formal</option>
+                      <option value="direct">Short & Conversational</option>
+                    </select>
+                  </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                  <input
-                    type="checkbox"
-                    id="saveAutomatically"
-                    checked={saveAutomatically}
-                    onChange={(e) => setSaveAutomatically(e.target.checked)}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  <label htmlFor="saveAutomatically" style={{ fontSize: '13px', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main, #1e293b)' }}>
-                    Save tailored copy automatically
-                  </label>
-                </div>
+                  <Button type="submit" isLoading={isLetterLoading} className={styles.tailorBtn}>
+                    <Sparkles size={16} />
+                    <span>Generate & Tailor Cover Letter</span>
+                  </Button>
+                </form>
 
-                <Button type="submit" isLoading={isLoading} className={styles.tailorBtn}>
-                  <Wand2 size={16} />
-                  <span>Analyze & Tailor</span>
-                </Button>
-              </form>
-
-              {currentVersion && (
                 <div className={`${styles.atsCard} glass-card`}>
-                  <div className={styles.atsHeader}>
-                    <h3>ATS Match Score</h3>
-                    <div className={styles.scoreGauge} style={{
-                      color: currentVersion.ats_score > 80 ? 'var(--success)' : 'var(--warning)',
-                      borderColor: currentVersion.ats_score > 80 ? 'var(--success)' : 'var(--warning)'
-                    }}>
-                      {currentVersion.ats_score}%
-                    </div>
-                  </div>
-
-                  <div className={styles.trackingSection} style={{ marginBottom: '20px', padding: '12px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.2)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main, #1e293b)' }}>
-                      {applicationTracked ? '✓ Tracking this Application' : 'Track this job application?'}
-                    </div>
-                    {!applicationTracked ? (
-                      <Button onClick={handleTrackApplication} isLoading={isTrackingLoading} style={{ width: '100%' }}>
-                        Add to Application Tracking
-                      </Button>
-                    ) : (
-                      <div style={{ fontSize: '12px', color: '#475569' }}>
-                        This CV is linked to an active job tracking card.
-                      </div>
-                    )}
-                  </div>
-
-                  <div className={styles.keywordsTwinGrid}>
-                    <div className={styles.keywordsBlock}>
-                      <h4>Matched Keywords ({currentVersion.tailored_details.ats_report.matched_keywords.length})</h4>
-                      <div className={styles.keywordsGrid}>
-                        {currentVersion.tailored_details.ats_report.matched_keywords.map((k, i) => (
-                          <span key={i} className={styles.matchedKw}>{k}</span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className={styles.keywordsBlock}>
-                      <h4>Missing Keywords ({currentVersion.tailored_details.ats_report.missing_keywords.length})</h4>
-                      <div className={styles.keywordsGrid}>
-                        {currentVersion.tailored_details.ats_report.missing_keywords.map((k, i) => (
-                          <span key={i} className={styles.missingKw}>{k}</span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className={styles.suggestionsList}>
-                    <h4>ATS Suggestions</h4>
-                    <ul>
-                      {currentVersion.tailored_details.ats_report.suggestions.map((s, i) => (
-                        <li key={i}>{s}</li>
-                      ))}
-                    </ul>
+                  <h3>Cover Letter Guidelines</h3>
+                  <div style={{ fontSize: '13px', lineHeight: '1.6', color: 'var(--muted, #64748b)', display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+                    <p>
+                      <strong>1. Premium Structure:</strong> A cover letter should be kept to a single, impactful page. It includes contact details, greeting, hook opening, value body paragraphs, and professional closing.
+                    </p>
+                    <p>
+                      <strong>2. Adaptive Tone:</strong> Startups value enthusiastic/conversational tones, whereas traditional businesses require a professional/executive tone. Match the writing tone above accordingly.
+                    </p>
                   </div>
                 </div>
-              )}
-            </>
+              </>
+            )
           ) : (
             // Design and Typography Customizers
-            <div className={`${styles.styleControlsForm} glass-card`}>
-              <h3>Typography & Sizing</h3>
+            editorTab === 'resume' ? (
+              // CV Design Options
+              <div className={`${styles.styleControlsForm} glass-card`}>
+                <h3>Typography & Sizing</h3>
 
-              <div className={styles.slidersTwinGrid}>
-                <div className={styles.sliderGroup}>
-                  <label>Base Font Size: <strong>{customStyles.fontSize}px</strong></label>
-                  <input
-                    type="range"
-                    min="10"
-                    max="18"
-                    value={customStyles.fontSize}
-                    onChange={(e) => setCustomStyles(s => ({ ...s, fontSize: parseInt(e.target.value) }))}
-                  />
+                <div className={styles.slidersTwinGrid}>
+                  <div className={styles.sliderGroup}>
+                    <label>Base Font Size: <strong>{customStyles.fontSize}px</strong></label>
+                    <input
+                      type="range"
+                      min="10"
+                      max="18"
+                      value={customStyles.fontSize}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, fontSize: parseInt(e.target.value) }))}
+                    />
+                  </div>
+
+                  <div className={styles.sliderGroup}>
+                    <label>Heading Multiplier: <strong>x{customStyles.headingSize}</strong></label>
+                    <input
+                      type="range"
+                      min="1.0"
+                      max="2.2"
+                      step="0.1"
+                      value={customStyles.headingSize}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, headingSize: parseFloat(e.target.value) }))}
+                    />
+                  </div>
                 </div>
 
-                <div className={styles.sliderGroup}>
-                  <label>Heading Multiplier: <strong>x{customStyles.headingSize}</strong></label>
-                  <input
-                    type="range"
-                    min="1.0"
-                    max="2.2"
-                    step="0.1"
-                    value={customStyles.headingSize}
-                    onChange={(e) => setCustomStyles(s => ({ ...s, headingSize: parseFloat(e.target.value) }))}
-                  />
-                </div>
-              </div>
+                <div className={styles.slidersTwinGrid}>
+                  <div className={styles.sliderGroup}>
+                    <label>Line Height: <strong>{customStyles.lineHeight}</strong></label>
+                    <input
+                      type="range"
+                      min="1.0"
+                      max="2.0"
+                      step="0.1"
+                      value={customStyles.lineHeight}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, lineHeight: parseFloat(e.target.value) }))}
+                    />
+                  </div>
 
-              <div className={styles.slidersTwinGrid}>
-                <div className={styles.sliderGroup}>
-                  <label>Line Height: <strong>{customStyles.lineHeight}</strong></label>
-                  <input
-                    type="range"
-                    min="1.0"
-                    max="2.0"
-                    step="0.1"
-                    value={customStyles.lineHeight}
-                    onChange={(e) => setCustomStyles(s => ({ ...s, lineHeight: parseFloat(e.target.value) }))}
-                  />
-                </div>
-
-                <div className={styles.sliderGroup}>
-                  <label>Section Spacing: <strong>{customStyles.sectionSpacing}px</strong></label>
-                  <input
-                    type="range"
-                    min="10"
-                    max="45"
-                    value={customStyles.sectionSpacing}
-                    onChange={(e) => setCustomStyles(s => ({ ...s, sectionSpacing: parseInt(e.target.value) }))}
-                  />
-                </div>
-              </div>
-
-              <div className={styles.slidersTwinGrid}>
-                <div className={styles.sliderGroup}>
-                  <label>Bullet Point Spacing: <strong>{customStyles.bulletSpacing !== undefined ? customStyles.bulletSpacing : 4}px</strong></label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="15"
-                    value={customStyles.bulletSpacing !== undefined ? customStyles.bulletSpacing : 4}
-                    onChange={(e) => setCustomStyles(s => ({ ...s, bulletSpacing: parseInt(e.target.value) }))}
-                  />
+                  <div className={styles.sliderGroup}>
+                    <label>Section Spacing: <strong>{customStyles.sectionSpacing}px</strong></label>
+                    <input
+                      type="range"
+                      min="10"
+                      max="45"
+                      value={customStyles.sectionSpacing}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, sectionSpacing: parseInt(e.target.value) }))}
+                    />
+                  </div>
                 </div>
 
-                <div className={styles.sliderGroup}>
-                  <label>Page Margin: <strong>{customStyles.pageMargin || (template === 'german_style_cv' ? 77 : (template === 'pixel_perfect_pdf' ? 48 : 32))}px</strong></label>
-                  <input
-                    type="range"
-                    min="20"
-                    max="90"
-                    value={customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32))}
-                    onChange={(e) => setCustomStyles(s => ({ ...s, pageMargin: parseInt(e.target.value) }))}
-                  />
+                <div className={styles.slidersTwinGrid}>
+                  <div className={styles.sliderGroup}>
+                    <label>Bullet Point Spacing: <strong>{customStyles.bulletSpacing !== undefined ? customStyles.bulletSpacing : 4}px</strong></label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="15"
+                      value={customStyles.bulletSpacing !== undefined ? customStyles.bulletSpacing : 4}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, bulletSpacing: parseInt(e.target.value) }))}
+                    />
+                  </div>
+
+                  <div className={styles.sliderGroup}>
+                    <label>Page Margin: <strong>{customStyles.pageMargin || (template === 'german_style_cv' ? 77 : (template === 'pixel_perfect_pdf' ? 48 : 32))}px</strong></label>
+                    <input
+                      type="range"
+                      min="20"
+                      max="90"
+                      value={customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32))}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, pageMargin: parseInt(e.target.value) }))}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className={styles.colorPickers}>
-                <div className={styles.colorPickerGroup}>
-                  <label>Accent Color</label>
-                  <input
-                    type="color"
-                    value={customStyles.accentColor}
-                    onChange={(e) => setCustomStyles(s => ({ ...s, accentColor: e.target.value }))}
-                  />
+                <div className={styles.colorPickers}>
+                  <div className={styles.colorPickerGroup}>
+                    <label>Accent Color</label>
+                    <input
+                      type="color"
+                      value={customStyles.accentColor}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, accentColor: e.target.value }))}
+                    />
+                  </div>
+                  <div className={styles.colorPickerGroup}>
+                    <label>Text Color</label>
+                    <input
+                      type="color"
+                      value={customStyles.textColor}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, textColor: e.target.value }))}
+                    />
+                  </div>
                 </div>
-                <div className={styles.colorPickerGroup}>
-                  <label>Text Color</label>
-                  <input
-                    type="color"
-                    value={customStyles.textColor}
-                    onChange={(e) => setCustomStyles(s => ({ ...s, textColor: e.target.value }))}
-                  />
-                </div>
-              </div>
 
-              <hr style={{ margin: 'var(--space-2) 0', borderColor: 'var(--card-border)' }} />
+                <hr style={{ margin: 'var(--space-2) 0', borderColor: 'var(--card-border)' }} />
 
-              <h3>Sections Control Panel</h3>
-              <div className={styles.sectionsList}>
-                {sections.map((secItem, idx) => (
-                  <div key={secItem.id} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', width: '100%' }}>
-                    <div className={styles.sectionSortRow}>
-                      <input
-                        type="checkbox"
-                        checked={secItem.visible}
-                        onChange={(e) => setSections(prev => prev.map((s, i) => i === idx ? { ...s, visible: e.target.checked } : s))}
-                      />
-                      <span className={styles.sectionSortName}>{secItem.name}</span>
+                <h3>Sections Control Panel</h3>
+                <div className={styles.sectionsList}>
+                  {sections.map((secItem, idx) => (
+                    <div key={secItem.id} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', width: '100%' }}>
+                      <div className={styles.sectionSortRow}>
+                        <input
+                          type="checkbox"
+                          checked={secItem.visible}
+                          onChange={(e) => setSections(prev => prev.map((s, i) => i === idx ? { ...s, visible: e.target.checked } : s))}
+                        />
+                        <span className={styles.sectionSortName}>{secItem.name}</span>
 
-                      <button
-                        type="button"
-                        className={styles.settingsToggleBtn}
-                        onClick={() => setExpandedSectionSettings(expandedSectionSettings === secItem.id ? null : secItem.id)}
-                      >
-                        <Settings size={12} />
-                      </button>
-
-                      {secItem.id.startsWith('custom_') && (
                         <button
                           type="button"
                           className={styles.settingsToggleBtn}
-                          style={{ color: '#ef4444' }}
-                          onClick={() => setSections(prev => prev.filter(s => s.id !== secItem.id))}
+                          onClick={() => setExpandedSectionSettings(expandedSectionSettings === secItem.id ? null : secItem.id)}
                         >
-                          <Trash size={12} />
+                          <Settings size={12} />
                         </button>
-                      )}
 
-                      <div className={styles.sortButtons}>
-                        <button
-                          type="button"
-                          disabled={idx === 0}
-                          onClick={() => {
-                            const reordered = [...sections];
-                            const temp = reordered[idx];
-                            reordered[idx] = reordered[idx - 1];
-                            reordered[idx - 1] = temp;
-                            setSections(reordered);
-                          }}
-                        >
-                          ↑
-                        </button>
-                        <button
-                          type="button"
-                          disabled={idx === sections.length - 1}
-                          onClick={() => {
-                            const reordered = [...sections];
-                            const temp = reordered[idx];
-                            reordered[idx] = reordered[idx + 1];
-                            reordered[idx + 1] = temp;
-                            setSections(reordered);
-                          }}
-                        >
-                          ↓
-                        </button>
+                        {secItem.id.startsWith('custom_') && (
+                          <button
+                            type="button"
+                            className={styles.settingsToggleBtn}
+                            style={{ color: '#ef4444' }}
+                            onClick={() => setSections(prev => prev.filter(s => s.id !== secItem.id))}
+                          >
+                            <Trash size={12} />
+                          </button>
+                        )}
+
+                        <div className={styles.sortButtons}>
+                          <button
+                            type="button"
+                            disabled={idx === 0}
+                            onClick={() => {
+                              const reordered = [...sections];
+                              const temp = reordered[idx];
+                              reordered[idx] = reordered[idx - 1];
+                              reordered[idx - 1] = temp;
+                              setSections(reordered);
+                            }}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            disabled={idx === sections.length - 1}
+                            onClick={() => {
+                              const reordered = [...sections];
+                              const temp = reordered[idx];
+                              reordered[idx] = reordered[idx + 1];
+                              reordered[idx + 1] = temp;
+                              setSections(reordered);
+                            }}
+                          >
+                            ↓
+                          </button>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Local individual section styles panel */}
-                    {expandedSectionSettings === secItem.id && (
-                      <div className={styles.sectionSettingsCard}>
-                        <h4>{secItem.name} Config</h4>
+                      {/* Local individual section styles panel */}
+                      {expandedSectionSettings === secItem.id && (
+                        <div className={styles.sectionSettingsCard}>
+                          <h4>{secItem.name} Config</h4>
 
-                        <div className={styles.sliderGroup}>
-                          <label>Font Size</label>
-                          <input
-                            type="range"
-                            min="10"
-                            max="18"
-                            value={secItem.customStyles?.fontSize || customStyles.fontSize}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value);
-                              setSections(prev => prev.map(s => s.id === secItem.id ? {
-                                ...s,
-                                customStyles: { ...s.customStyles, fontSize: val }
-                              } : s));
-                            }}
-                          />
-                        </div>
-
-                        <div className={styles.sliderGroup}>
-                          <label>Spacing</label>
-                          <input
-                            type="range"
-                            min="5"
-                            max="50"
-                            value={secItem.customStyles?.spacing || customStyles.sectionSpacing}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value);
-                              setSections(prev => prev.map(s => s.id === secItem.id ? {
-                                ...s,
-                                customStyles: { ...s.customStyles, spacing: val }
-                              } : s));
-                            }}
-                          />
-                        </div>
-
-                        {/* Local layout choice for custom sections */}
-                        {secItem.type === 'custom' && (
                           <div className={styles.sliderGroup}>
-                            <label>Section Format</label>
-                            <select
-                              value={secItem.customFormat || 'bullets'}
+                            <label>Font Size</label>
+                            <input
+                              type="range"
+                              min="10"
+                              max="18"
+                              value={secItem.customStyles?.fontSize || customStyles.fontSize}
                               onChange={(e) => {
-                                const val = e.target.value as 'bullets' | 'keyvalue';
+                                const val = parseInt(e.target.value);
                                 setSections(prev => prev.map(s => s.id === secItem.id ? {
                                   ...s,
-                                  customFormat: val,
-                                  keyValuePairs: val === 'keyvalue' ? (s.keyValuePairs || [{ key: 'Languages', value: 'German (Native), English (C1)' }]) : undefined
+                                  customStyles: { ...s.customStyles, fontSize: val }
                                 } : s));
                               }}
-                              style={{
-                                padding: '4px',
-                                fontSize: '11px',
-                                background: 'var(--card-bg)',
-                                border: '1px solid var(--card-border)',
-                                color: 'var(--foreground)'
-                              }}
-                            >
-                              <option value="bullets">Multi-bullet list</option>
-                              <option value="keyvalue">Structured Key-Value grid</option>
-                            </select>
+                            />
                           </div>
-                        )}
 
-                        {secItem.type === 'skills' && (
-                          <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              style={{ fontSize: '10px', padding: '4px' }}
-                              onClick={() => {
-                                const catName = window.prompt('Enter category name (e.g. databases, cloud):');
-                                if (catName && catName.trim()) {
-                                  setEditableSkills(prev => [...prev, {
-                                    id: `sk_${Date.now()}`,
-                                    name: 'New Skill',
-                                    category: catName.trim().toLowerCase()
-                                  }]);
-                                }
+                          <div className={styles.sliderGroup}>
+                            <label>Spacing</label>
+                            <input
+                              type="range"
+                              min="5"
+                              max="50"
+                              value={secItem.customStyles?.spacing || customStyles.sectionSpacing}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                setSections(prev => prev.map(s => s.id === secItem.id ? {
+                                  ...s,
+                                  customStyles: { ...s.customStyles, spacing: val }
+                                } : s));
                               }}
-                            >
-                              + Add Skills Category
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              style={{ fontSize: '10px', padding: '4px' }}
-                              onClick={() => {
-                                const langName = window.prompt('Enter language (e.g. French (B2)):');
-                                if (langName && langName.trim()) {
-                                  setEditableSkills(prev => [...prev, {
-                                    id: `sk_${Date.now()}`,
-                                    name: langName.trim(),
-                                    category: 'languages'
-                                  }]);
-                                }
-                              }}
-                            >
-                              + Add Language
-                            </Button>
+                            />
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
+
+                          {/* Local layout choice for custom sections */}
+                          {secItem.type === 'custom' && (
+                            <div className={styles.sliderGroup}>
+                              <label>Section Format</label>
+                              <select
+                                value={secItem.customFormat || 'bullets'}
+                                onChange={(e) => {
+                                  const val = e.target.value as 'bullets' | 'keyvalue';
+                                  setSections(prev => prev.map(s => s.id === secItem.id ? {
+                                    ...s,
+                                    customFormat: val,
+                                    keyValuePairs: val === 'keyvalue' ? (s.keyValuePairs || [{ key: 'Languages', value: 'German (Native), English (C1)' }]) : undefined
+                                  } : s));
+                                }}
+                                style={{
+                                  padding: '4px',
+                                  fontSize: '11px',
+                                  background: 'var(--card-bg)',
+                                  border: '1px solid var(--card-border)',
+                                  color: 'var(--foreground)'
+                                }}
+                              >
+                                <option value="bullets">Multi-bullet list</option>
+                                <option value="keyvalue">Structured Key-Value grid</option>
+                              </select>
+                            </div>
+                          )}
+
+                          {secItem.type === 'skills' && (
+                            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                style={{ fontSize: '10px', padding: '4px' }}
+                                onClick={() => {
+                                  const catName = window.prompt('Enter category name (e.g. databases, cloud):');
+                                  if (catName && catName.trim()) {
+                                    setEditableSkills(prev => [...prev, {
+                                      id: `sk_${Date.now()}`,
+                                      name: 'New Skill',
+                                      category: catName.trim().toLowerCase()
+                                    }]);
+                                  }
+                                }}
+                              >
+                                + Add Skills Category
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                style={{ fontSize: '10px', padding: '4px' }}
+                                onClick={() => {
+                                  const langName = window.prompt('Enter language (e.g. French (B2)):');
+                                  if (langName && langName.trim()) {
+                                    setEditableSkills(prev => [...prev, {
+                                      id: `sk_${Date.now()}`,
+                                      name: langName.trim(),
+                                      category: 'languages'
+                                    }]);
+                                  }
+                                }}
+                              >
+                                + Add Language
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  className={styles.addCustomSecBtn}
+                  onClick={() => {
+                    const secName = window.prompt("Enter Section Title:", "Certifications");
+                    if (secName) {
+                      setSections(prev => [...prev, {
+                        id: `custom_${Date.now()}`,
+                        name: secName,
+                        visible: true,
+                        type: 'custom',
+                        bullets: ['Add certification credential detail...']
+                      }]);
+                    }
+                  }}
+                >
+                  <Plus size={14} /> Add Custom Section
+                </button>
               </div>
+            ) : (
+              // Cover Letter Design Options
+              <div className={`${styles.styleControlsForm} glass-card`}>
+                <h3>Cover Letter Style</h3>
 
-              <button
-                type="button"
-                className={styles.addCustomSecBtn}
-                onClick={() => {
-                  const secName = window.prompt("Enter Section Title:", "Certifications");
-                  if (secName) {
-                    setSections(prev => [...prev, {
-                      id: `custom_${Date.now()}`,
-                      name: secName,
-                      visible: true,
-                      type: 'custom',
-                      bullets: ['Add certification credential detail...']
-                    }]);
-                  }
-                }}
-              >
-                <Plus size={14} /> Add Custom Section
-              </button>
-            </div>
+                <div className={styles.slidersTwinGrid}>
+                  <div className={styles.sliderGroup}>
+                    <label>Base Font Size: <strong>{customStyles.fontSize}px</strong></label>
+                    <input
+                      type="range"
+                      min="11"
+                      max="18"
+                      value={customStyles.fontSize}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, fontSize: parseInt(e.target.value) }))}
+                    />
+                  </div>
+
+                  <div className={styles.sliderGroup}>
+                    <label>Line Height: <strong>{customStyles.lineHeight}</strong></label>
+                    <input
+                      type="range"
+                      min="1.2"
+                      max="2.2"
+                      step="0.1"
+                      value={customStyles.lineHeight}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, lineHeight: parseFloat(e.target.value) }))}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.slidersTwinGrid}>
+                  <div className={styles.sliderGroup}>
+                    <label>Page Size: <strong>{customStyles.pageSize}</strong></label>
+                    <select
+                      value={customStyles.pageSize}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, pageSize: e.target.value as 'A4' | 'Letter' }))}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--card-border, #cbd5e1)',
+                        background: 'white',
+                        fontSize: '13px',
+                        outline: 'none',
+                        color: 'var(--text-main, #1e293b)'
+                      }}
+                    >
+                      <option value="A4">A4 (210mm x 297mm)</option>
+                      <option value="Letter">Letter (8.5in x 11in)</option>
+                    </select>
+                  </div>
+
+                  <div className={styles.sliderGroup}>
+                    <label>Text Color</label>
+                    <input
+                      type="color"
+                      value={customStyles.textColor}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, textColor: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        height: '36px',
+                        border: '1px solid var(--card-border, #cbd5e1)',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        padding: '0',
+                        background: 'transparent'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )
           )}
         </div>
 
