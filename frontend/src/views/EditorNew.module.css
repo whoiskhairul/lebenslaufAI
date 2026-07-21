@@ -501,8 +501,9 @@
   justify-content: center;
   align-items: flex-start;
   padding: var(--space-6);
-  background: #cbd5e1;
-  /* Subtle slate grey sheet background */
+  background: var(--canvas-bg, var(--muted-light));
+  transition: background-color var(--transition-normal);
+  /* Adaptive theme canvas viewport background */
   border-radius: var(--radius-lg);
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.08);
 }
@@ -523,7 +524,7 @@
 .pageBreakLine {
   width: 100%;
   height: 20px;
-  background: #cbd5e1;
+  background: var(--canvas-bg, var(--muted-light));
   border-top: 1px dashed rgba(0, 0, 0, 0.1);
   border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
   pointer-events: none;
@@ -2453,6 +2454,11 @@
 }
 
 @keyframes skeletonShimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}

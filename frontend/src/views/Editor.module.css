@@ -494,7 +494,8 @@
   justify-content: center;
   align-items: flex-start;
   padding: var(--space-4);
-  background: var(--muted-light);
+  background: var(--canvas-bg, var(--muted-light));
+  transition: background-color var(--transition-normal);
   border-radius: var(--radius-lg);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
 }
@@ -537,12 +538,14 @@
 .resumePaper.executive_professional {
   font-family: 'Lora', Georgia, serif;
   color: #1a202c;
-  background: #fffdf9; /* creamy elegant tone */
+  background: #fffdf9;
+  /* creamy elegant tone */
 }
 
 .resumePaper.executive_professional .resumeHeader {
   text-align: center;
-  border-bottom: 4px double #1e3a8a; /* deep navy double border */
+  border-bottom: 4px double #1e3a8a;
+  /* deep navy double border */
   padding-bottom: var(--space-3);
   margin-bottom: var(--space-6);
 }
@@ -555,14 +558,16 @@
 .resumePaper.executive_professional .resumeSectionTitle {
   font-family: 'Merriweather', serif;
   color: #1e3a8a;
-  border-bottom: 2px solid #d97706; /* gold accent rule */
+  border-bottom: 2px solid #d97706;
+  /* gold accent rule */
   text-transform: uppercase;
   font-weight: 700;
   letter-spacing: 0.05em;
 }
 
 .resumePaper.executive_professional .resumeTitle {
-  color: #d97706; /* gold accent */
+  color: #d97706;
+  /* gold accent */
   font-style: italic;
   font-family: 'Merriweather', serif;
 }
@@ -576,14 +581,16 @@
 
 .resumePaper.creative_tech .resumeHeader {
   text-align: left;
-  border-bottom: 2px solid #10b981; /* emerald accent */
+  border-bottom: 2px solid #10b981;
+  /* emerald accent */
   padding-bottom: var(--space-4);
   margin-bottom: var(--space-4);
 }
 
 .resumePaper.creative_tech .resumeSectionTitle {
   font-family: 'Fira Code', 'JetBrains Mono', monospace;
-  color: #10b981; /* emerald accent */
+  color: #10b981;
+  /* emerald accent */
   border-bottom: 1px solid #e2e8f0;
   text-transform: lowercase;
   font-size: var(--text-sm);
@@ -642,15 +649,18 @@
 /* Page Break Divider styles */
 .pageBreakLine {
   position: absolute;
-  height: 16px; /* 16px gap */
-  background: var(--muted-light); /* Matches canvas viewport background */
-  box-shadow: inset 0 8px 8px -8px rgba(0, 0, 0, 0.15), 
-              inset 0 -8px 8px -8px rgba(0, 0, 0, 0.15);
+  height: 16px;
+  /* 16px gap */
+  background: var(--muted-light);
+  /* Matches canvas viewport background */
+  box-shadow: inset 0 8px 8px -8px rgba(0, 0, 0, 0.15),
+    inset 0 -8px 8px -8px rgba(0, 0, 0, 0.15);
   border-top: 1px solid rgba(0, 0, 0, 0.05);
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   pointer-events: none;
   z-index: 5;
-  margin-top: -8px; /* Center the 16px height exactly around the 1056px/2112px marks */
+  margin-top: -8px;
+  /* Center the 16px height exactly around the 1056px/2112px marks */
 }
 
 /* Page Break Warning Banner outside of CV */
@@ -660,7 +670,8 @@
   gap: var(--space-3);
   background-color: rgba(245, 158, 11, 0.08);
   border: 1px solid rgba(245, 158, 11, 0.25);
-  color: #b45309; /* warm amber/brown text for readability */
+  color: #b45309;
+  /* warm amber/brown text for readability */
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   margin-bottom: var(--space-4);
@@ -762,7 +773,8 @@
   z-index: 10;
 }
 
-.dragHandleBtn, .deleteBlockBtn {
+.dragHandleBtn,
+.deleteBlockBtn {
   width: 22px;
   height: 22px;
   border-radius: var(--radius-sm);
@@ -777,7 +789,8 @@
   padding: 0;
 }
 
-.dragHandleBtn:hover, .deleteBlockBtn:hover {
+.dragHandleBtn:hover,
+.deleteBlockBtn:hover {
   background: #f1f5f9;
   color: #0f172a;
 }
@@ -970,7 +983,8 @@
   font-family: 'Arial', 'Helvetica Neue', Helvetica, sans-serif;
   color: #1e293b;
   background: #ffffff;
-  padding: var(--page-margin, 48px) !important; /* Equal margin on all sides */
+  padding: var(--page-margin, 48px) !important;
+  /* Equal margin on all sides */
   box-sizing: border-box;
   text-align: left;
   line-height: 1.5;
@@ -1231,7 +1245,8 @@
   font-family: 'Arial', 'Helvetica Neue', Helvetica, sans-serif;
   color: #222222;
   background: #ffffff;
-  padding: var(--page-margin, 76.8px) !important; /* 0.8in margins */
+  padding: var(--page-margin, 76.8px) !important;
+  /* 0.8in margins */
   box-sizing: border-box;
   text-align: left;
   line-height: 1.3;
@@ -1268,7 +1283,8 @@
 .germanTitle {
   font-size: calc(var(--base-font-size, 13px) * 1.2 * var(--heading-size-mult, 1.0));
   font-weight: normal;
-  color: #458FE9; /* Highlight blue */
+  color: #458FE9;
+  /* Highlight blue */
   margin: 0 0 16px 0;
   letter-spacing: -0.05px;
 }
@@ -1278,8 +1294,10 @@
 }
 
 .germanAvatar {
-  width: 119px; /* 89.25pt */
-  height: 116px; /* 87pt */
+  width: 119px;
+  /* 89.25pt */
+  height: 116px;
+  /* 87pt */
   object-fit: cover;
   border-radius: var(--radius-sm);
   border: 1px solid var(--card-border);
@@ -1341,7 +1359,8 @@
 }
 
 .germanSectionTitle {
-  font-size: 18.6px; /* 14pt */
+  font-size: 18.6px;
+  /* 14pt */
   font-weight: bold;
   color: #222222;
   border-bottom: 1.3px solid #458FE9;
@@ -1352,7 +1371,8 @@
 
 .germanRow {
   display: grid;
-  grid-template-columns: 158.7px 1fr; /* 119.05pt */
+  grid-template-columns: 158.7px 1fr;
+  /* 119.05pt */
   gap: 16px;
   margin-bottom: 16px;
 }
@@ -1382,7 +1402,8 @@
 .germanJobTitle {
   font-size: calc(var(--base-font-size, 13px) * 1.2);
   font-weight: bold;
-  color: #458FE9; /* Highlight blue */
+  color: #458FE9;
+  /* Highlight blue */
   margin: 0 0 4px 0;
   letter-spacing: 1.2px;
 }
@@ -1464,7 +1485,8 @@
 }
 
 .germanSkillsLine {
-  font-size: 14.6px; /* 11pt */
+  font-size: 14.6px;
+  /* 11pt */
   color: #222222;
   margin: 0 0 6px 0;
   line-height: 1.4;
@@ -1486,7 +1508,8 @@
 }
 
 .germanSignatureDate {
-  font-size: 14.6px; /* 11pt */
+  font-size: 14.6px;
+  /* 11pt */
   color: #222222;
 }
 
@@ -1497,6 +1520,7 @@
 }
 
 .pixel_perfect_pdf {}
+
 .german_style_cv {}
 
 /* CV Loading Skeleton Canvas Styles */
@@ -1569,9 +1593,11 @@
   0% {
     opacity: 0.6;
   }
+
   50% {
     opacity: 1;
   }
+
   100% {
     opacity: 0.6;
   }
@@ -1661,7 +1687,8 @@
   height: 12px;
   width: 20%;
   animation: pulse 1.5s ease-in-out infinite;
-  background-color: #cbd5e1; /* slightly darker for headers */
+  background-color: #cbd5e1;
+  /* slightly darker for headers */
   border-radius: var(--radius-sm);
   margin-bottom: var(--space-1);
 }
@@ -1720,23 +1747,28 @@
   width: 80px;
   animation: pulse 1.5s ease-in-out infinite;
   background-color: #e2e8f0;
-  border-radius: 11px; /* rounded pill tags */
+  border-radius: 11px;
+  /* rounded pill tags */
 }
 
 /* Print Overrides */
 @media print {
   @page {
-    margin: 0 !important; /* Programmatically remove browser headers and footers */
+    margin: 0 !important;
+    /* Programmatically remove browser headers and footers */
   }
+
   .previewCanvas {
     overflow: visible !important;
     height: auto !important;
     width: 100% !important;
   }
+
   .previewContainer {
     height: auto !important;
     overflow: visible !important;
   }
+
   .resumePaperWrapper {
     box-shadow: none !important;
     border: none !important;
@@ -1744,6 +1776,7 @@
     width: 100% !important;
     height: auto !important;
   }
+
   .resumePaper {
     box-shadow: none !important;
     border: none !important;
@@ -1754,13 +1787,20 @@
     width: 100% !important;
     position: static !important;
     transform: none !important;
-    background: #ffffff !important; /* White backgrounds for print sheets */
+    background: #ffffff !important;
+    /* White backgrounds for print sheets */
     color: #000000 !important;
     box-sizing: border-box !important;
   }
-  .controlPanel, .tabHeader, .pageBreakLine, .alertBadge, .no-print {
+
+  .controlPanel,
+  .tabHeader,
+  .pageBreakLine,
+  .alertBadge,
+  .no-print {
     display: none !important;
   }
+
   .container,
   .workspace,
   .canvasViewport {
@@ -1768,7 +1808,10 @@
     overflow: visible !important;
     display: block !important;
   }
-  .resumeItem, .ppSectionRow, .germanRow {
+
+  .resumeItem,
+  .ppSectionRow,
+  .germanRow {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     /* margin-top is NOT overridden here, preserving screen page spacer alignment */
@@ -1786,17 +1829,29 @@
   font-size: var(--base-font-size, 13px) !important;
 }
 
-.resumeSection, .ppSection, .germanSection {
+.resumeSection,
+.ppSection,
+.germanSection {
   font-size: var(--section-font-size, var(--base-font-size, 13px)) !important;
   text-align: var(--section-alignment, var(--text-alignment, left)) !important;
   margin-bottom: var(--section-spacing, var(--section-spacing-global, var(--space-6))) !important;
 }
 
-.resumeSection textarea, .ppSection textarea, .germanSection textarea,
-.resumeSection span, .ppSection span, .germanSection span,
-.resumeSection p, .ppSection p, .germanSection p,
-.resumeSection li, .ppSection li, .germanSection li,
-.resumeSection div, .ppSection div, .germanSection div {
+.resumeSection textarea,
+.ppSection textarea,
+.germanSection textarea,
+.resumeSection span,
+.ppSection span,
+.germanSection span,
+.resumeSection p,
+.ppSection p,
+.germanSection p,
+.resumeSection li,
+.ppSection li,
+.germanSection li,
+.resumeSection div,
+.ppSection div,
+.germanSection div {
   font-size: var(--section-font-size, inherit) !important;
 }
 
@@ -2265,6 +2320,7 @@
 }
 
 @media print {
+
   .pagePrintSpacerLine,
   .pagePrintSpacerLabel {
     display: none !important;

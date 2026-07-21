@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
 import api from '../services/api';
-import { 
+import {
   User, Briefcase, FolderGit2, Dumbbell, GraduationCap, Award, Trash2, Plus, Edit3, Check, X, Upload, Brain, Wand2, Sparkles, Lock
 } from 'lucide-react';
 import styles from './MasterProfile.module.css';
@@ -82,13 +82,13 @@ export const MasterProfile: React.FC = () => {
     educations: Education[];
     certifications: Certification[];
   }>({
-    personal_info: { 
-      full_name: '', 
-      title: '', 
-      email: '', 
-      phone: '', 
-      location: '', 
-      summary: '', 
+    personal_info: {
+      full_name: '',
+      title: '',
+      email: '',
+      phone: '',
+      location: '',
+      summary: '',
       links: [],
       date_of_birth: '',
       nationality: '',
@@ -114,7 +114,6 @@ export const MasterProfile: React.FC = () => {
   if (profile.work_experiences.length === 0) missingSummarySections.push('Work History');
   if (profile.projects.length === 0) missingSummarySections.push('Featured Projects');
   if (profile.skills.length === 0) missingSummarySections.push('Skills');
-  if (profile.educations.length === 0) missingSummarySections.push('Education');
   const isSummaryAiUnlocked = missingSummarySections.length === 0;
 
   const handleGenerateSummaryAI = async () => {
@@ -203,7 +202,7 @@ export const MasterProfile: React.FC = () => {
           }));
         }
         setParsedData(data);
-        
+
         // Pre-select all extracted items by default
         const expSelection: Record<number, boolean> = {};
         data.work_experiences?.forEach((_: any, idx: number) => { expSelection[idx] = true; });
@@ -661,8 +660,8 @@ export const MasterProfile: React.FC = () => {
               {activeTab === 'info' && (
                 <form onSubmit={handleSaveInfo} className={styles.form}>
                   <div className={styles.formGrid}>
-                    <InputField 
-                      label="Full Name" 
+                    <InputField
+                      label="Full Name"
                       id="infoName"
                       value={profile.personal_info.full_name}
                       onChange={(e) => setProfile({
@@ -670,8 +669,8 @@ export const MasterProfile: React.FC = () => {
                         personal_info: { ...profile.personal_info, full_name: e.target.value }
                       })}
                     />
-                    <InputField 
-                      label="Professional Title" 
+                    <InputField
+                      label="Professional Title"
                       id="infoTitle"
                       placeholder="e.g. Senior Fullstack Architect"
                       value={profile.personal_info.title}
@@ -683,8 +682,8 @@ export const MasterProfile: React.FC = () => {
                   </div>
 
                   <div className={styles.formGrid}>
-                    <InputField 
-                      label="Email Address" 
+                    <InputField
+                      label="Email Address"
                       id="infoEmail"
                       value={profile.personal_info.email}
                       onChange={(e) => setProfile({
@@ -692,8 +691,8 @@ export const MasterProfile: React.FC = () => {
                         personal_info: { ...profile.personal_info, email: e.target.value }
                       })}
                     />
-                    <InputField 
-                      label="Phone Number" 
+                    <InputField
+                      label="Phone Number"
                       id="infoPhone"
                       placeholder="e.g. +1 555-0199"
                       value={profile.personal_info.phone}
@@ -704,8 +703,8 @@ export const MasterProfile: React.FC = () => {
                     />
                   </div>
 
-                  <InputField 
-                    label="Location (City, Country)" 
+                  <InputField
+                    label="Location (City, Country)"
                     id="infoLoc"
                     placeholder="e.g. Berlin, Germany"
                     value={profile.personal_info.location}
@@ -716,8 +715,8 @@ export const MasterProfile: React.FC = () => {
                   />
 
                   <div className={styles.formGrid}>
-                    <InputField 
-                      label="Date of Birth" 
+                    <InputField
+                      label="Date of Birth"
                       id="infoDOB"
                       placeholder="e.g. January 4th, 1985"
                       value={profile.personal_info.date_of_birth || ''}
@@ -726,8 +725,8 @@ export const MasterProfile: React.FC = () => {
                         personal_info: { ...profile.personal_info, date_of_birth: e.target.value }
                       })}
                     />
-                    <InputField 
-                      label="Nationality" 
+                    <InputField
+                      label="Nationality"
                       id="infoNationality"
                       placeholder="e.g. Guatemala"
                       value={profile.personal_info.nationality || ''}
@@ -739,8 +738,8 @@ export const MasterProfile: React.FC = () => {
                   </div>
 
                   <div className={styles.formGrid}>
-                    <InputField 
-                      label="LinkedIn Profile URL" 
+                    <InputField
+                      label="LinkedIn Profile URL"
                       id="infoLinkedIn"
                       placeholder="e.g. linkedin.com/in/username"
                       value={profile.personal_info.linkedin || ''}
@@ -749,8 +748,8 @@ export const MasterProfile: React.FC = () => {
                         personal_info: { ...profile.personal_info, linkedin: e.target.value }
                       })}
                     />
-                    <InputField 
-                      label="GitHub Profile URL" 
+                    <InputField
+                      label="GitHub Profile URL"
                       id="infoGitHub"
                       placeholder="e.g. github.com/username"
                       value={profile.personal_info.github || ''}
@@ -762,8 +761,8 @@ export const MasterProfile: React.FC = () => {
                   </div>
 
                   <div className={styles.formGrid}>
-                    <InputField 
-                      label="Website / Portfolio URL" 
+                    <InputField
+                      label="Website / Portfolio URL"
                       id="infoWebsite"
                       placeholder="e.g. portfolio.com"
                       value={profile.personal_info.website || ''}
@@ -776,21 +775,21 @@ export const MasterProfile: React.FC = () => {
                       <label htmlFor="infoImageUpload" style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main, #1e293b)' }}>Profile Image</label>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         {profile.personal_info.image_url && (
-                          <img 
-                            src={profile.personal_info.image_url} 
-                            alt="Preview" 
-                            style={{ width: '40px', height: '48px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--card-border, #e2e8f0)' }} 
+                          <img
+                            src={profile.personal_info.image_url}
+                            alt="Preview"
+                            style={{ width: '40px', height: '48px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--card-border, #e2e8f0)' }}
                           />
                         )}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-                          <input 
-                            type="file" 
-                            accept="image/*" 
+                          <input
+                            type="file"
+                            accept="image/*"
                             id="infoImageUpload"
                             onChange={handleImageUpload}
                             style={{ fontSize: '11px', width: '100%' }}
                           />
-                          <input 
+                          <input
                             type="text"
                             placeholder="Or paste image URL..."
                             value={profile.personal_info.image_url && !profile.personal_info.image_url.startsWith('data:') ? profile.personal_info.image_url : ''}
@@ -811,9 +810,9 @@ export const MasterProfile: React.FC = () => {
                           />
                         </div>
                         {profile.personal_info.image_url && (
-                          <Button 
-                            type="button" 
-                            variant="danger" 
+                          <Button
+                            type="button"
+                            variant="danger"
                             onClick={() => setProfile({
                               ...profile,
                               personal_info: { ...profile.personal_info, image_url: '' }
@@ -836,7 +835,7 @@ export const MasterProfile: React.FC = () => {
                         <span className={styles.tagDoneCompact}>✓ All sections ready</span>
                       ) : (
                         <span className={styles.tagMissingCompact}>
-                          {4 - missingSummarySections.length}/4 sections completed
+                          {3 - missingSummarySections.length}/3 sections completed
                         </span>
                       )}
                     </div>
@@ -871,9 +870,6 @@ export const MasterProfile: React.FC = () => {
                       <span className={profile.skills.length > 0 ? styles.tagDone : styles.tagMissing}>
                         {profile.skills.length > 0 ? '✓' : '✗'} Skills
                       </span>
-                      <span className={profile.educations.length > 0 ? styles.tagDone : styles.tagMissing}>
-                        {profile.educations.length > 0 ? '✓' : '✗'} Education
-                      </span>
                     </div>
                   )}
 
@@ -881,7 +877,7 @@ export const MasterProfile: React.FC = () => {
                     {isGeneratingSummary && (
                       <div className={styles.skeletonOverlay}>
                         <div className={styles.skeletonHeader}>
-                          <Wand2 size={16} /> Synthesizing your work history, projects, skills & education...
+                          <Wand2 size={16} /> Synthesizing your work history, projects & skills...
                         </div>
                         <div className={styles.skeletonShimmerLine} style={{ width: '96%' }} />
                         <div className={styles.skeletonShimmerLine} style={{ width: '88%' }} />
@@ -889,8 +885,8 @@ export const MasterProfile: React.FC = () => {
                       </div>
                     )}
                     <div style={isGeneratingSummary ? { opacity: 0, filter: 'blur(4px)', pointerEvents: 'none' } : undefined}>
-                      <InputField 
-                        label="Executive Profile Summary" 
+                      <InputField
+                        label="Executive Profile Summary"
                         id="infoSummary"
                         type="textarea"
                         placeholder="Write a brief professional summary describing your core value proposition..."
@@ -936,20 +932,20 @@ export const MasterProfile: React.FC = () => {
                       <label className={styles.checkboxLabel}>
                         <input type="checkbox" checked={expCurrent} onChange={e => {
                           setExpCurrent(e.target.checked);
-                          if(e.target.checked) setExpEnd('Present');
+                          if (e.target.checked) setExpEnd('Present');
                         }} />
                         <span>I currently work here</span>
                       </label>
-                      
-                      <InputField 
-                        label="Achievements / Bullet Points (one per line)" 
+
+                      <InputField
+                        label="Achievements / Bullet Points (one per line)"
                         id="addExpBullets"
                         type="textarea"
                         placeholder="Optimized loading speeds by 40% using SSR.&#10;Mentored 4 junior frontend developers."
                         value={expBullets}
                         onChange={e => setExpBullets(e.target.value)}
                       />
-                      
+
                       <div className={styles.formActions}>
                         <Button variant="ghost" type="button" onClick={() => {
                           setIsAdding(false);
@@ -960,7 +956,7 @@ export const MasterProfile: React.FC = () => {
                       </div>
                     </form>
                   )}
- 
+
                   <div className={styles.itemsList}>
                     {profile.work_experiences.map((exp) => (
                       <div key={exp.id} className={`${styles.listItem} glass-card`}>
@@ -1013,9 +1009,9 @@ export const MasterProfile: React.FC = () => {
                         <InputField label="Year / Date" id="addProjDate" placeholder="e.g. 2017" value={projDate} onChange={e => setProjDate(e.target.value)} />
                       </div>
                       <InputField label="Technologies Used (comma separated)" id="addProjTech" placeholder="React, TypeScript, CSS Modules" value={projTech} onChange={e => setProjTech(e.target.value)} />
-                      
-                      <InputField 
-                        label="Project Scope & Contributions (one per line)" 
+
+                      <InputField
+                        label="Project Scope & Contributions (one per line)"
                         id="addProjBullets"
                         type="textarea"
                         placeholder="Built state engine using Zustand.&#10;Integrated REST controllers."
@@ -1083,7 +1079,7 @@ export const MasterProfile: React.FC = () => {
                       <h4>{editingId ? 'Edit Skill Tag' : 'Add Skill Tag'}</h4>
                       <div className={styles.formGrid}>
                         <InputField label="Skill Name *" id="addSkillName" placeholder="e.g. React" value={skillName} onChange={e => setSkillName(e.target.value)} />
-                        
+
                         <div className={styles.selectGroup}>
                           <label htmlFor="addSkillCat">Category / Group *</label>
                           <select id="addSkillCat" value={skillCategory} onChange={e => {
@@ -1152,7 +1148,7 @@ export const MasterProfile: React.FC = () => {
                           </select>
                         </div>
                       </div>
-                      
+
                       <div className={styles.selectGroup} style={{ marginTop: '16px' }}>
                         <label htmlFor="addSkillLevel">Proficiency Level</label>
                         <select id="addSkillLevel" value={skillLevel} onChange={e => setSkillLevel(e.target.value)}>
@@ -1215,23 +1211,23 @@ export const MasterProfile: React.FC = () => {
                         return getCategoryOrderScore(catA) - getCategoryOrderScore(catB);
                       })
                       .map(([category, skills]) => (
-                      <div key={category} className={styles.skillCategoryBlock}>
-                        <h4 className={styles.categoryTitle}>{category}</h4>
-                        <div className={styles.skillsGrid}>
-                          {skills.map((s) => (
-                            <div key={s.id} className={styles.skillTagCard} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                              <span>{s.name} <span className={styles.skillLevel}>({s.level})</span></span>
-                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                <button type="button" onClick={() => handleStartEditSkill(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', color: 'var(--primary-color, #4f46e5)' }} title="Edit skill">
-                                  <Edit3 size={12} />
-                                </button>
-                                <button onClick={() => handleDeleteSkill(s.id!)} className={styles.skillDeleteBtn}>X</button>
+                        <div key={category} className={styles.skillCategoryBlock}>
+                          <h4 className={styles.categoryTitle}>{category}</h4>
+                          <div className={styles.skillsGrid}>
+                            {skills.map((s) => (
+                              <div key={s.id} className={styles.skillTagCard} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                <span>{s.name} <span className={styles.skillLevel}>({s.level})</span></span>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                  <button type="button" onClick={() => handleStartEditSkill(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', color: 'var(--primary-color, #4f46e5)' }} title="Edit skill">
+                                    <Edit3 size={12} />
+                                  </button>
+                                  <button onClick={() => handleDeleteSkill(s.id!)} className={styles.skillDeleteBtn}>X</button>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 </div>
               )}
@@ -1266,7 +1262,7 @@ export const MasterProfile: React.FC = () => {
                       <label className={styles.checkboxLabel}>
                         <input type="checkbox" checked={eduCurrent} onChange={e => {
                           setEduCurrent(e.target.checked);
-                          if(e.target.checked) setEduEnd('Present');
+                          if (e.target.checked) setEduEnd('Present');
                         }} />
                         <span>I currently study here</span>
                       </label>
@@ -1370,7 +1366,7 @@ export const MasterProfile: React.FC = () => {
                 <p className={styles.stepDesc}>
                   Select and edit the parsed sections below. Only checked items will be saved to your Master Profile.
                 </p>
-                
+
                 <div className={styles.wizardScroller}>
                   {/* 1. Personal Info */}
                   {parsedData?.personal_info && (
@@ -1433,7 +1429,7 @@ export const MasterProfile: React.FC = () => {
                             />
                             <span>Import Job {idx + 1} ({exp.company})</span>
                           </label>
-                          
+
                           {selectedExperiences[idx] && (
                             <div className={styles.reviewFields}>
                               <div className={styles.formGrid}>
@@ -1480,10 +1476,10 @@ export const MasterProfile: React.FC = () => {
                                     if (!prev || !prev.work_experiences) return prev;
                                     const parts = e.target.value.split('-');
                                     const list = [...prev.work_experiences];
-                                    list[idx] = { 
-                                      ...list[idx], 
-                                      start_date: parts[0]?.trim() || '', 
-                                      end_date: parts[1]?.trim() || '' 
+                                    list[idx] = {
+                                      ...list[idx],
+                                      start_date: parts[0]?.trim() || '',
+                                      end_date: parts[1]?.trim() || ''
                                     };
                                     return { ...prev, work_experiences: list };
                                   })}
@@ -1627,26 +1623,26 @@ export const MasterProfile: React.FC = () => {
                                     if (!prev || !prev.educations) return prev;
                                     const parts = e.target.value.split('-');
                                     const list = [...prev.educations];
-                                    list[idx] = { 
-                                      ...list[idx], 
-                                      start_date: parts[0]?.trim() || '', 
-                                      end_date: parts[1]?.trim() || '' 
+                                    list[idx] = {
+                                      ...list[idx],
+                                      start_date: parts[0]?.trim() || '',
+                                      end_date: parts[1]?.trim() || ''
                                     };
                                     return { ...prev, educations: list };
                                   })}
                                 />
                               </div>
                               <InputField
-                                  label="Field of Study / Description"
-                                  id={`eduField_${idx}`}
-                                  value={edu.field_of_study || ''}
-                                  onChange={(e) => setParsedData(prev => {
-                                    if (!prev || !prev.educations) return prev;
-                                    const list = [...prev.educations];
-                                    list[idx] = { ...list[idx], field_of_study: e.target.value };
-                                    return { ...prev, educations: list };
-                                  })}
-                                />
+                                label="Field of Study / Description"
+                                id={`eduField_${idx}`}
+                                value={edu.field_of_study || ''}
+                                onChange={(e) => setParsedData(prev => {
+                                  if (!prev || !prev.educations) return prev;
+                                  const list = [...prev.educations];
+                                  list[idx] = { ...list[idx], field_of_study: e.target.value };
+                                  return { ...prev, educations: list };
+                                })}
+                              />
                             </div>
                           )}
                         </div>

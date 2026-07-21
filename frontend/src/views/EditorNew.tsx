@@ -1205,7 +1205,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       // Distribute stream across isolated pages
       const pageHeight = customStyles.pageSize === 'A4' ? 1123 : 1056;
       const pageMargin = customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32));
-      const totalPrintableHeight = pageHeight - 2 * pageMargin - 70;
+
+      const totalPrintableHeight = pageHeight - 2 * pageMargin - (120)
 
       const newPages: RenderableUnit[][] = [[]];
 

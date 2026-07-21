@@ -14,14 +14,22 @@
   --space-12: 48px;
 
   /* Font Sizes */
-  --text-xs: 0.75rem;     /* 12px */
-  --text-sm: 0.875rem;    /* 14px */
-  --text-base: 1rem;      /* 16px */
-  --text-lg: 1.125rem;    /* 18px */
-  --text-xl: 1.25rem;     /* 20px */
-  --text-2xl: 1.5rem;     /* 24px */
-  --text-3xl: 1.875rem;   /* 30px */
-  --text-4xl: 2.25rem;    /* 36px */
+  --text-xs: 0.75rem;
+  /* 12px */
+  --text-sm: 0.875rem;
+  /* 14px */
+  --text-base: 1rem;
+  /* 16px */
+  --text-lg: 1.125rem;
+  /* 18px */
+  --text-xl: 1.25rem;
+  /* 20px */
+  --text-2xl: 1.5rem;
+  /* 24px */
+  --text-3xl: 1.875rem;
+  /* 30px */
+  --text-4xl: 2.25rem;
+  /* 36px */
 
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -44,17 +52,23 @@
   --foreground: #0F172A;
   --card-bg: rgba(255, 255, 255, 0.8);
   --card-border: rgba(226, 232, 240, 0.8);
-  --primary: #6366F1;       /* Indigo */
+  --primary: #6366F1;
+  /* Indigo */
   --primary-hover: #4F46E5;
-  --secondary: #06B6D4;     /* Cyan */
+  --secondary: #06B6D4;
+  /* Cyan */
   --secondary-hover: #0891B2;
-  --success: #10B981;       /* Emerald */
-  --warning: #F59E0B;       /* Amber */
-  --danger: #EF4444;        /* Rose */
+  --success: #10B981;
+  /* Emerald */
+  --warning: #F59E0B;
+  /* Amber */
+  --danger: #EF4444;
+  /* Rose */
   --muted: #64748B;
   --muted-light: #E2E8F0;
   --glass-bg: rgba(255, 255, 255, 0.45);
   --glass-border: rgba(255, 255, 255, 0.6);
+  --canvas-bg: #cbd5e1;
   --brand-gradient: linear-gradient(135deg, #6366F1 0%, #06B6D4 100%);
   --sidebar-width: 260px;
 }
@@ -74,6 +88,7 @@
   --danger: #F87171;
   --muted: #94A3B8;
   --muted-light: #1E293B;
+  --canvas-bg: #04111f;
   --glass-bg: rgba(15, 23, 42, 0.65);
   --glass-border: rgba(255, 255, 255, 0.06);
   --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.37);

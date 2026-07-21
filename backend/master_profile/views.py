@@ -176,7 +176,6 @@ class GenerateSummaryView(APIView):
         exps = WorkExperience.objects.filter(user=user)
         projs = Project.objects.filter(user=user)
         skills = Skill.objects.filter(user=user)
-        edus = Education.objects.filter(user=user)
 
         missing_sections = []
         if not exps.exists():
@@ -185,8 +184,6 @@ class GenerateSummaryView(APIView):
             missing_sections.append("Featured Projects")
         if not skills.exists():
             missing_sections.append("Skills")
-        if not edus.exists():
-            missing_sections.append("Education")
 
         if missing_sections:
             return Response({
@@ -203,7 +200,7 @@ class GenerateSummaryView(APIView):
             'work_experiences': exps,
             'projects': projs,
             'skills': skills,
-            'educations': edus,
+            'educations': [],
             'certifications': Certification.objects.filter(user=user),
         }
 
