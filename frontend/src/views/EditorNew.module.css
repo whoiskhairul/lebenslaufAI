@@ -2012,16 +2012,15 @@
     padding: 0 !important;
   }
 
-  /* Mask all other components and only print the pages stack */
   .pageContainer {
     box-shadow: none !important;
     border: none !important;
     margin: 0 !important;
     transform: none !important;
     /* Force 100% scale */
-    width: 210mm !important;
-    /* Force true A4 size in print */
-    height: 297mm !important;
+    width: var(--print-page-width, 210mm) !important;
+    /* Force true page size in print */
+    height: var(--print-page-height, 297mm) !important;
     display: flex !important;
     flex-direction: column !important;
     page-break-after: always !important;

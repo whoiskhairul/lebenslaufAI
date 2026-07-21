@@ -185,6 +185,8 @@ const formatDate = (dateStr: string, format: 'MM/YYYY' | 'MMM YYYY' | 'YYYY') =>
   return dateStr;
 };
 
+const MeasuringContext = React.createContext(false);
+
 // Auto-resizing Textarea supporting clean canvas inline editing
 const AutoSizeTextarea: React.FC<{
   value: string;
@@ -194,11 +196,36 @@ const AutoSizeTextarea: React.FC<{
   placeholder?: string;
   id?: string;
 }> = ({ value, onChange, onKeyDown, className, placeholder, id }) => {
+  const isMeasuring = React.useContext(MeasuringContext);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [localVal, setLocalVal] = useState(value);
   const selectionRef = useRef<{ start: number | null; end: number | null }>({ start: null, end: null });
   const isTypingRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  if (isMeasuring) {
+    return (
+      <div
+        className={className}
+        style={{
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          width: '100%',
+          display: 'block',
+          fontSize: 'inherit',
+          lineHeight: 'inherit',
+          fontFamily: 'inherit',
+          fontWeight: 'inherit',
+          color: 'inherit',
+          padding: '2px 0',
+          minHeight: '1.2em',
+          boxSizing: 'border-box'
+        }}
+      >
+        {value || placeholder || ' '}
+      </div>
+    );
+  }
 
   useEffect(() => {
     if (!isTypingRef.current) {
@@ -998,7 +1025,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       // Distribute stream across isolated pages
       const pageHeight = customStyles.pageSize === 'A4' ? 1123 : 1056;
       const pageMargin = customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32));
-      const totalPrintableHeight = pageHeight - 2 * pageMargin - 30;
+      const totalPrintableHeight = pageHeight - 2 * pageMargin - 70;
 
       const newPages: RenderableUnit[][] = [[]];
 
@@ -3378,6 +3405,15 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
   return (
     <div className={styles.container}>
+      {/* Dynamic print page styling to force correct browser paper size */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          @page {
+            size: ${customStyles.pageSize === 'A4' ? 'A4' : 'letter'} portrait !important;
+            margin: 0 !important;
+          }
+        }
+      `}} />
       <div className={`${styles.headerRow} no-print`}>
         <div>
           <h2 className={styles.title}>Premium CV Rebuilder</h2>
@@ -4030,292 +4066,302 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
               {/* Hidden off-screen unscaled layout for DOM measurements */}
               {editorTab === 'resume' && (
-                <div
-                  ref={hiddenCanvasRef}
-                  className={`${styles.pageContainer} ${styles[template]} no-print`}
-                  style={{
-                    position: 'absolute',
-                    left: '-9999px',
-                    top: 0,
-                    width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`,
-                    height: 'auto',
-                    visibility: 'hidden',
-                    pointerEvents: 'none',
-                    boxSizing: 'border-box',
-                    padding: `${customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32))}px`,
-                    fontSize: `${customStyles.fontSize}px`,
-                    lineHeight: customStyles.lineHeight,
-                    '--base-font-size': `${customStyles.fontSize}px`,
-                    '--heading-size-mult': customStyles.headingSize,
-                    '--line-height-mult': customStyles.lineHeight,
-                    '--section-spacing': `${customStyles.sectionSpacing}px`,
-                    '--bullet-spacing': `${customStyles.bulletSpacing || 4}px`,
-                    '--accent-color': customStyles.accentColor,
-                    '--text-color': customStyles.textColor,
-                    '--text-alignment': customStyles.alignment
-                  } as React.CSSProperties}
-                >
-                  {template === 'creative_tech' ? (
-                    <>
-                      <div data-measuring-id="header" style={{ width: '100%' }}>
-                        {renderUnit({ type: 'header', id: 'header' }, true)}
-                      </div>
-                      <div className={styles.gridContainer}>
-                        <div className={styles.sidebarColumn}>
-                          <div data-measuring-id="contacts-static" style={{ width: '100%' }}>
-                            {renderUnit({ type: 'contacts-static', id: 'contacts-static' }, true)}
-                          </div>
-                          {sections.filter(s => s.id === 'skills').map(s => {
-                            if (!s.visible) return null;
-                            return (
-                              <React.Fragment key={s.id}>
-                                <div data-measuring-id={`title-${s.id}`} style={{ width: '100%' }}>
-                                  {renderUnit({ type: 'section-title', id: `title-${s.id}`, sectionId: s.id, titleText: s.name }, true)}
-                                </div>
-                                {renderSkillsMeasuringUnits(s)}
-                              </React.Fragment>
-                            );
-                          })}
+                <MeasuringContext.Provider value={true}>
+                  <div
+                    ref={hiddenCanvasRef}
+                    className={`${styles.pageContainer} ${styles[template]} no-print`}
+                    style={{
+                      position: 'absolute',
+                      left: '-9999px',
+                      top: 0,
+                      width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`,
+                      height: 'auto',
+                      visibility: 'hidden',
+                      pointerEvents: 'none',
+                      boxSizing: 'border-box',
+                      padding: `${customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32))}px`,
+                      fontSize: `${customStyles.fontSize}px`,
+                      lineHeight: customStyles.lineHeight,
+                      '--base-font-size': `${customStyles.fontSize}px`,
+                      '--heading-size-mult': customStyles.headingSize,
+                      '--line-height-mult': customStyles.lineHeight,
+                      '--section-spacing': `${customStyles.sectionSpacing}px`,
+                      '--bullet-spacing': `${customStyles.bulletSpacing || 4}px`,
+                      '--accent-color': customStyles.accentColor,
+                      '--text-color': customStyles.textColor,
+                      '--text-alignment': customStyles.alignment
+                    } as React.CSSProperties}
+                  >
+                    {template === 'creative_tech' ? (
+                      <>
+                        <div data-measuring-id="header" style={{ width: '100%' }}>
+                          {renderUnit({ type: 'header', id: 'header' }, true)}
                         </div>
-                        <div className={styles.mainColumn}>
-                          {sections.filter(s => s.id !== 'skills').map(s => {
-                            if (!s.visible) return null;
-                            return (
-                              <React.Fragment key={s.id}>
-                                <div data-measuring-id={`title-${s.id}`} style={{ width: '100%' }}>
-                                  {renderUnit({ type: 'section-title', id: `title-${s.id}`, sectionId: s.id, titleText: s.name }, true)}
-                                </div>
-                                {renderSectionMeasuringUnits(s)}
-                              </React.Fragment>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div data-measuring-id="header" style={{ width: '100%' }}>
-                        {renderUnit({ type: 'header', id: 'header' }, true)}
-                      </div>
-                      {sections.map(s => {
-                        if (!s.visible) return null;
-                        return (
-                          <React.Fragment key={s.id}>
-                            <div data-measuring-id={`title-${s.id}`} style={{ width: '100%' }}>
-                              {renderUnit({ type: 'section-title', id: `title-${s.id}`, sectionId: s.id, titleText: s.name }, true)}
+                        <div className={styles.gridContainer}>
+                          <div className={styles.sidebarColumn}>
+                            <div data-measuring-id="contacts-static" style={{ width: '100%' }}>
+                              {renderUnit({ type: 'contacts-static', id: 'contacts-static' }, true)}
                             </div>
-                            {s.id === 'skills' ? renderSkillsMeasuringUnits(s) : renderSectionMeasuringUnits(s)}
-                          </React.Fragment>
-                        );
-                      })}
-                    </>
-                  )}
-                </div>
+                            {sections.filter(s => s.id === 'skills').map(s => {
+                              if (!s.visible) return null;
+                              return (
+                                <React.Fragment key={s.id}>
+                                  <div data-measuring-id={`title-${s.id}`} style={{ width: '100%' }}>
+                                    {renderUnit({ type: 'section-title', id: `title-${s.id}`, sectionId: s.id, titleText: s.name }, true)}
+                                  </div>
+                                  {renderSkillsMeasuringUnits(s)}
+                                </React.Fragment>
+                              );
+                            })}
+                          </div>
+                          <div className={styles.mainColumn}>
+                            {sections.filter(s => s.id !== 'skills').map(s => {
+                              if (!s.visible) return null;
+                              return (
+                                <React.Fragment key={s.id}>
+                                  <div data-measuring-id={`title-${s.id}`} style={{ width: '100%' }}>
+                                    {renderUnit({ type: 'section-title', id: `title-${s.id}`, sectionId: s.id, titleText: s.name }, true)}
+                                  </div>
+                                  {renderSectionMeasuringUnits(s)}
+                                </React.Fragment>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div data-measuring-id="header" style={{ width: '100%' }}>
+                          {renderUnit({ type: 'header', id: 'header' }, true)}
+                        </div>
+                        {sections.map(s => {
+                          if (!s.visible) return null;
+                          return (
+                            <React.Fragment key={s.id}>
+                              <div data-measuring-id={`title-${s.id}`} style={{ width: '100%' }}>
+                                {renderUnit({ type: 'section-title', id: `title-${s.id}`, sectionId: s.id, titleText: s.name }, true)}
+                              </div>
+                              {s.id === 'skills' ? renderSkillsMeasuringUnits(s) : renderSectionMeasuringUnits(s)}
+                            </React.Fragment>
+                          );
+                        })}
+                      </>
+                    )}
+                  </div>
+                </MeasuringContext.Provider>
               )}
 
               {/* Viewport render canvas mapping pages array */}
               {editorTab === 'resume' && (
-                <div ref={viewportRef} className={styles.canvasViewport}>
-                  <div
-                    style={{
-                      transform: `scale(${scale})`,
-                      transformOrigin: 'top center',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '24px',
-                      width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`
-                    }}
-                  >
-                    {pages.map((pageUnits, pageIdx) => {
-                      const pageMargin = customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32));
-                      const isCreative = template === 'creative_tech';
+                <MeasuringContext.Provider value={false}>
+                  <div ref={viewportRef} className={styles.canvasViewport}>
+                    <div
+                      style={{
+                        transform: `scale(${scale})`,
+                        transformOrigin: 'top center',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '24px',
+                        width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`
+                      }}
+                    >
+                      {pages.map((pageUnits, pageIdx) => {
+                        const pageMargin = customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32));
+                        const isCreative = template === 'creative_tech';
 
-                      // Content inside this page
-                      const headerUnit = pageUnits.find(u => u.type === 'header');
-                      const sidebarUnits = pageUnits.filter(u => isCreative && (u.sectionId === 'skills' || u.type === 'contacts-static'));
-                      const mainUnits = pageUnits.filter(u => !headerUnit && (!isCreative || (u.sectionId !== 'skills' && u.type !== 'contacts-static')));
+                        // Content inside this page
+                        const headerUnit = pageUnits.find(u => u.type === 'header');
+                        const sidebarUnits = pageUnits.filter(u => isCreative && (u.sectionId === 'skills' || u.type === 'contacts-static'));
+                        const mainUnits = pageUnits.filter(u => !headerUnit && (!isCreative || (u.sectionId !== 'skills' && u.type !== 'contacts-static')));
 
-                      return (
-                        <React.Fragment key={pageIdx}>
-                          {pageIdx > 0 && <div className={`${styles.pageBreakLine} no-print`}>PAGE {pageIdx + 1}</div>}
-                          <div
-                            className={`${styles.pageContainer} ${styles[template]}`}
-                            style={{
-                              width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`,
-                              height: `${customStyles.pageSize === 'A4' ? 1123 : 1056}px`,
-                              padding: `${pageMargin}px`,
-                              boxSizing: 'border-box',
-                              fontSize: `${customStyles.fontSize}px`,
-                              lineHeight: customStyles.lineHeight,
-                              '--base-font-size': `${customStyles.fontSize}px`,
-                              '--heading-size-mult': customStyles.headingSize,
-                              '--line-height-mult': customStyles.lineHeight,
-                              '--section-spacing': `${customStyles.sectionSpacing}px`,
-                              '--bullet-spacing': `${customStyles.bulletSpacing || 4}px`,
-                              '--accent-color': customStyles.accentColor,
-                              '--text-color': customStyles.textColor,
-                              '--text-alignment': customStyles.alignment
-                            } as React.CSSProperties}
-                          >
-                            {/* Standard single column or split grid column templates */}
-                            {isCreative ? (
-                              <>
-                                {headerUnit && renderUnit(headerUnit)}
-                                <div className={styles.gridContainer}>
-                                  <div className={styles.sidebarColumn}>
-                                    {sidebarUnits.map(unit => renderUnit(unit))}
-                                  </div>
-                                  <div className={styles.mainColumn}>
-                                    {mainUnits.map(unit => renderUnit(unit))}
-                                  </div>
-                                </div>
-                              </>
-                            ) : (
-                              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                                {pageUnits.map(unit => renderUnit(unit))}
-                              </div>
-                            )}
-
-                            {/* Render dashed margin guidelines strictly on canvas viewport */}
+                        return (
+                          <React.Fragment key={pageIdx}>
+                            {pageIdx > 0 && <div className={`${styles.pageBreakLine} no-print`}>PAGE {pageIdx + 1}</div>}
                             <div
-                              className="no-print"
+                              className={`${styles.pageContainer} ${styles[template]}`}
                               style={{
-                                position: 'absolute',
-                                top: `${pageMargin}px`,
-                                left: `${pageMargin}px`,
-                                right: `${pageMargin}px`,
-                                bottom: `${pageMargin}px`,
-                                border: 'none',
-                                pointerEvents: 'none',
-                                zIndex: 1
-                              }}
-                            />
-                          </div>
-                        </React.Fragment>
-                      );
-                    })}
+                                width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`,
+                                height: `${customStyles.pageSize === 'A4' ? 1123 : 1056}px`,
+                                '--print-page-width': customStyles.pageSize === 'A4' ? '210mm' : '8.5in',
+                                '--print-page-height': customStyles.pageSize === 'A4' ? '297mm' : '11in',
+                                padding: `${pageMargin}px`,
+                                boxSizing: 'border-box',
+                                fontSize: `${customStyles.fontSize}px`,
+                                lineHeight: customStyles.lineHeight,
+                                '--base-font-size': `${customStyles.fontSize}px`,
+                                '--heading-size-mult': customStyles.headingSize,
+                                '--line-height-mult': customStyles.lineHeight,
+                                '--section-spacing': `${customStyles.sectionSpacing}px`,
+                                '--bullet-spacing': `${customStyles.bulletSpacing || 4}px`,
+                                '--accent-color': customStyles.accentColor,
+                                '--text-color': customStyles.textColor,
+                                '--text-alignment': customStyles.alignment
+                              } as React.CSSProperties}
+                            >
+                              {/* Standard single column or split grid column templates */}
+                              {isCreative ? (
+                                <>
+                                  {headerUnit && renderUnit(headerUnit)}
+                                  <div className={styles.gridContainer}>
+                                    <div className={styles.sidebarColumn}>
+                                      {sidebarUnits.map(unit => renderUnit(unit))}
+                                    </div>
+                                    <div className={styles.mainColumn}>
+                                      {mainUnits.map(unit => renderUnit(unit))}
+                                    </div>
+                                  </div>
+                                </>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                                  {pageUnits.map(unit => renderUnit(unit))}
+                                </div>
+                              )}
+
+                              {/* Render dashed margin guidelines strictly on canvas viewport */}
+                              <div
+                                className="no-print"
+                                style={{
+                                  position: 'absolute',
+                                  top: `${pageMargin}px`,
+                                  left: `${pageMargin}px`,
+                                  right: `${pageMargin}px`,
+                                  bottom: `${pageMargin}px`,
+                                  border: 'none',
+                                  pointerEvents: 'none',
+                                  zIndex: 1
+                                }}
+                              />
+                            </div>
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                </MeasuringContext.Provider>
               )}
 
               {editorTab === 'letter' && (
-                <div ref={viewportRef} className={styles.canvasViewport}>
-                  <div
-                    style={{
-                      transform: `scale(${scale})`,
-                      transformOrigin: 'top center',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '24px',
-                      width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`
-                    }}
-                  >
+                <MeasuringContext.Provider value={false}>
+                  <div ref={viewportRef} className={styles.canvasViewport}>
                     <div
-                      className={`${styles.pageContainer} ${styles.letterPage}`}
                       style={{
-                        width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`,
-                        height: `${customStyles.pageSize === 'A4' ? 1123 : 1056}px`,
-                        padding: '75px 75px 75px 75px', // Modern German A4 margins (~2 cm margins)
-                        boxSizing: 'border-box',
-                        background: '#ffffff',
-                        fontFamily: "'Arial', 'Helvetica Neue', Helvetica, sans-serif",
-                        fontSize: '14px',
-                        lineHeight: '1.6',
-                        color: '#1d2939',
-                        position: 'relative'
-                      } as React.CSSProperties}
+                        transform: `scale(${scale})`,
+                        transformOrigin: 'top center',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '24px',
+                        width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`
+                      }}
                     >
-                      {isLetterLoading ? (
-                        <div
-                          className={styles.skeletonPaper}
-                          style={{
-                            padding: '0px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '20px',
-                            width: '100%',
-                            height: '100%',
-                            boxSizing: 'border-box',
-                            background: 'transparent'
-                          }}
-                        >
-                          {/* Header info */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '20px' }}>
-                            <div className={styles.skeletonLineLarge} style={{ height: '20px', width: '200px' }} />
-                            <div className={styles.skeletonLineSmall} style={{ height: '10px', width: '300px' }} />
+                      <div
+                        className={`${styles.pageContainer} ${styles.letterPage}`}
+                        style={{
+                          width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`,
+                          height: `${customStyles.pageSize === 'A4' ? 1123 : 1056}px`,
+                          '--print-page-width': customStyles.pageSize === 'A4' ? '210mm' : '8.5in',
+                          '--print-page-height': customStyles.pageSize === 'A4' ? '297mm' : '11in',
+                          padding: '75px 75px 75px 75px', // Modern German A4 margins (~2 cm margins)
+                          boxSizing: 'border-box',
+                          background: '#ffffff',
+                          fontFamily: "'Arial', 'Helvetica Neue', Helvetica, sans-serif",
+                          fontSize: '14px',
+                          lineHeight: '1.6',
+                          color: '#1d2939',
+                          position: 'relative'
+                        } as React.CSSProperties}
+                      >
+                        {isLetterLoading ? (
+                          <div
+                            className={styles.skeletonPaper}
+                            style={{
+                              padding: '0px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '20px',
+                              width: '100%',
+                              height: '100%',
+                              boxSizing: 'border-box',
+                              background: 'transparent'
+                            }}
+                          >
+                            {/* Header info */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '20px' }}>
+                              <div className={styles.skeletonLineLarge} style={{ height: '20px', width: '200px' }} />
+                              <div className={styles.skeletonLineSmall} style={{ height: '10px', width: '300px' }} />
+                            </div>
+
+                            {/* Date */}
+                            <div className={styles.skeletonLineSmall} style={{ height: '10px', width: '100px', marginBottom: '15px' }} />
+
+                            {/* Recruiter / Company */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '20px' }}>
+                              <div className={styles.skeletonLineMedium} style={{ height: '12px', width: '120px' }} />
+                              <div className={styles.skeletonLineSmall} style={{ height: '10px', width: '150px' }} />
+                            </div>
+
+                            {/* Dear Hiring Manager */}
+                            <div className={styles.skeletonLineSmall} style={{ height: '12px', width: '140px', marginBottom: '10px' }} />
+
+                            {/* Paragraph 1 */}
+                            <div className={styles.skeletonParagraph} style={{ marginBottom: '12px' }}>
+                              <div className={styles.skeletonLineFull} />
+                              <div className={styles.skeletonLineFull} />
+                              <div className={styles.skeletonLineTwoThirds} />
+                            </div>
+
+                            {/* Paragraph 2 */}
+                            <div className={styles.skeletonParagraph} style={{ marginBottom: '12px' }}>
+                              <div className={styles.skeletonLineFull} />
+                              <div className={styles.skeletonLineFull} />
+                              <div className={styles.skeletonLineFull} />
+                              <div className={styles.skeletonLineTwoThirds} />
+                            </div>
+
+                            {/* Paragraph 3 */}
+                            <div className={styles.skeletonParagraph} style={{ marginBottom: '12px' }}>
+                              <div className={styles.skeletonLineFull} />
+                              <div className={styles.skeletonLineFull} />
+                              <div className={styles.skeletonLineTwoThirds} />
+                            </div>
+
+                            {/* Paragraph 4 */}
+                            <div className={styles.skeletonParagraph} style={{ marginBottom: '24px' }}>
+                              <div className={styles.skeletonLineFull} />
+                              <div className={styles.skeletonLineTwoThirds} />
+                            </div>
+
+                            {/* Sign-off */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <div className={styles.skeletonLineSmall} style={{ height: '10px', width: '80px' }} />
+                              <div className={styles.skeletonLineMedium} style={{ height: '12px', width: '120px' }} />
+                            </div>
                           </div>
-
-                          {/* Date */}
-                          <div className={styles.skeletonLineSmall} style={{ height: '10px', width: '100px', marginBottom: '15px' }} />
-
-                          {/* Recruiter / Company */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '20px' }}>
-                            <div className={styles.skeletonLineMedium} style={{ height: '12px', width: '120px' }} />
-                            <div className={styles.skeletonLineSmall} style={{ height: '10px', width: '150px' }} />
-                          </div>
-
-                          {/* Dear Hiring Manager */}
-                          <div className={styles.skeletonLineSmall} style={{ height: '12px', width: '140px', marginBottom: '10px' }} />
-
-                          {/* Paragraph 1 */}
-                          <div className={styles.skeletonParagraph} style={{ marginBottom: '12px' }}>
-                            <div className={styles.skeletonLineFull} />
-                            <div className={styles.skeletonLineFull} />
-                            <div className={styles.skeletonLineTwoThirds} />
-                          </div>
-
-                          {/* Paragraph 2 */}
-                          <div className={styles.skeletonParagraph} style={{ marginBottom: '12px' }}>
-                            <div className={styles.skeletonLineFull} />
-                            <div className={styles.skeletonLineFull} />
-                            <div className={styles.skeletonLineFull} />
-                            <div className={styles.skeletonLineTwoThirds} />
-                          </div>
-
-                          {/* Paragraph 3 */}
-                          <div className={styles.skeletonParagraph} style={{ marginBottom: '12px' }}>
-                            <div className={styles.skeletonLineFull} />
-                            <div className={styles.skeletonLineFull} />
-                            <div className={styles.skeletonLineTwoThirds} />
-                          </div>
-
-                          {/* Paragraph 4 */}
-                          <div className={styles.skeletonParagraph} style={{ marginBottom: '24px' }}>
-                            <div className={styles.skeletonLineFull} />
-                            <div className={styles.skeletonLineTwoThirds} />
-                          </div>
-
-                          {/* Sign-off */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <div className={styles.skeletonLineSmall} style={{ height: '10px', width: '80px' }} />
-                            <div className={styles.skeletonLineMedium} style={{ height: '12px', width: '120px' }} />
-                          </div>
-                        </div>
-                      ) : (
-                        <textarea
-                          className={styles.letterTextarea}
-                          value={letterContent}
-                          onChange={(e) => setLetterContent(e.target.value)}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            border: 'none',
-                            outline: 'none',
-                            resize: 'none',
-                            fontFamily: 'inherit',
-                            fontSize: 'inherit',
-                            lineHeight: 'inherit',
-                            color: 'inherit',
-                            padding: 0,
-                            margin: 0,
-                            background: 'transparent',
-                            overflow: 'hidden'
-                          }}
-                        />
-                      )}
+                        ) : (
+                          <textarea
+                            className={styles.letterTextarea}
+                            value={letterContent}
+                            onChange={(e) => setLetterContent(e.target.value)}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              border: 'none',
+                              outline: 'none',
+                              resize: 'none',
+                              fontFamily: 'inherit',
+                              fontSize: 'inherit',
+                              lineHeight: 'inherit',
+                              color: 'inherit',
+                              padding: 0,
+                              margin: 0,
+                              background: 'transparent',
+                              overflow: 'hidden'
+                            }}
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                </MeasuringContext.Provider>
               )}
             </div>
           ) : (
