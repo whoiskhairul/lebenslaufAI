@@ -83,13 +83,17 @@ class AIService:
 
     @classmethod
     def analyze_ats(cls, profile_data, job_data, api_key=None):
-        # Compares profile details with job description
+        # Compares active candidate CV details against job description
         profile_text = json.dumps(profile_data, default=str)
         job_text = json.dumps(job_data, default=str)
         
         system_prompt = (
-            "You are an ATS Scoring Algorithm.\n"
-            "Compare the User's Master Profile against the Job Description details.\n"
+            "You are an objective ATS (Applicant Tracking System) Scoring Algorithm.\n"
+            "Compare the Candidate's Active CV Details (including summary, work experience, projects, and skills) against the target Job Description.\n"
+            "CRITICAL:\n"
+            "- 'matched_keywords' MUST contain all job requirement keywords that ARE explicitly present in the candidate's active skills or experience text.\n"
+            "- 'missing_keywords' MUST contain ONLY job requirement keywords that are NOT currently present in the candidate's active skills or experience text.\n"
+            "- Calculate 'score' strictly based on the ratio of matched_keywords versus total required job keywords (0-100 scale).\n"
             "Return ONLY a JSON object matching this schema:\n"
             "{\n"
             "  \"score\": 0-100,\n"
@@ -100,7 +104,7 @@ class AIService:
             "Do not return markdown codeblocks."
         )
         
-        user_content = f"MASTER_PROFILE:\n{profile_text}\n\nJOB_DESCRIPTION:\n{job_text}"
+        user_content = f"CANDIDATE_ACTIVE_CV:\n{profile_text}\n\nTARGET_JOB_DESCRIPTION:\n{job_text}"
         result_text = cls.call_deepseek(system_prompt, user_content, {"type": "json_object"}, api_key)
         if result_text:
             try:
@@ -189,12 +193,30 @@ class AIService:
         return sorted_skills, sorted_experiences, sorted_projects
 
     @classmethod
-    def tailor_resume(cls, profile_data, job_data, api_key=None):
+    def tailor_resume(cls, profile_data, job_data, api_key=None, target_language="en", aggressive_mode=False):
         profile_text = json.dumps(profile_data, default=str)
         job_text = json.dumps(job_data, default=str)
         
+        lang_instruction = (
+            "IMPORTANT: Translate and write ALL tailored content (tailored_summary, tailored_experiences bullets) in GERMAN (Deutsch).\n"
+            if target_language in ['de', 'deutsch', 'german']
+            else "Write ALL tailored content in ENGLISH.\n"
+        )
+
+        aggressive_instruction = (
+            "AGGRESSIVE ATS OPTIMIZATION ENABLED:\n"
+            "- Actively weave key missing technical terms, tools, methodologies, and frameworks from the JOB_DESCRIPTION into experience bullet points and professional summary where contextually appropriate to maximize ATS score.\n"
+            "- Ensure sentences remain natural, highly impressive, and professional.\n\n"
+            if aggressive_mode
+            else "STANDARD PROFILE ALIGNMENT (STRICT):\n"
+            "- Do NOT invent/fabricate new unlisted tools, jobs, dates, or degrees.\n"
+            "- Rephrase candidate's existing experience to align strictly with job keywords.\n\n"
+        )
+        
         system_prompt = (
             "You are a professional Resume Writer.\n"
+            f"{lang_instruction}"
+            f"{aggressive_instruction}"
             "Tailor the user's resume summary and experience bullets to match the job description.\n"
             "CRITICAL: Do NOT invent/fabricate skills, jobs, dates, or degrees.\n"
             "Return ONLY a JSON object matching this schema:\n"
@@ -238,19 +260,27 @@ class AIService:
         return mock_res
 
     @classmethod
-    def write_cover_letter(cls, profile_data, job_data, tone="professional", length="medium", api_key=None):
+    def write_cover_letter(cls, profile_data, job_data, tone="professional", length="medium", api_key=None, target_language="en"):
         profile_text = json.dumps(profile_data, default=str)
         job_text = json.dumps(job_data, default=str)
         
         from datetime import datetime
         today_str = datetime.now().strftime("%B %d, %Y")
         
+        is_german = target_language in ['de', 'deutsch', 'german']
+        lang_prompt = (
+            "CRITICAL: Write the entire cover letter in GERMAN (Deutsch). Use authentic German business phrasing (Bewerbungsschreiben), e.g., 'Sehr geehrte Damen und Herren,' or 'Sehr geehrte/r Frau/Herr [Hiring Manager],', 'Mit freundlichen Grüßen', etc.\n\n"
+            if is_german
+            else "Write the cover letter in ENGLISH.\n\n"
+        )
+        
         system_prompt = (
             f"You are a senior technical recruiter, hiring manager, and professional resume writer with 20+ years of experience hiring software engineers in Germany and the EU.\n\n"
+            f"{lang_prompt}"
             f"Write a personalized, ATS-friendly, human-sounding cover letter for the position the candidate is applying to using the information provided (resume contents, job description, company, and any extra notes).\n\n"
             f"Today's date is {today_str}.\n\n"
             f"## Format (Germany)\n"
-            f"Follow the modern German Bewerbungsschreiben format in English.\n"
+            f"Follow the modern German Bewerbungsschreiben format.\n"
             f"- A4 paper\n"
             f"- Maximum 1 page (250–380 words)\n"
             f"- Left-aligned\n"
@@ -264,9 +294,9 @@ class AIService:
             f"Date\n\n"
             f"Hiring Manager\n"
             f"Company\n\n"
-            f"Dear Hiring Manager,\n\n"
+            f"Salutation\n\n"
             f"Body\n\n"
-            f"Kind regards,\n\n"
+            f"Closing\n\n"
             f"My Name\n\n"
             f"## Structure\n"
             f"Write four concise paragraphs:\n"

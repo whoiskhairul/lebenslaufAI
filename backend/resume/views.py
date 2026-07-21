@@ -49,6 +49,9 @@ class ResumeTailorView(APIView):
         position = request.data.get('position', '')
         template = request.data.get('template', 'modern_minimalist')
         application_id = request.data.get('application_id', None)
+        target_language = request.data.get('target_language', 'en')
+        selected_project_ids = request.data.get('selected_project_ids', None)
+        aggressive_mode = request.data.get('aggressive_mode', False)
 
         # 1. Load User's Master Profile
         personal_info = PersonalInfo.objects.filter(user=user).first()
@@ -58,11 +61,15 @@ class ResumeTailorView(APIView):
                 full_name=user.full_name or "",
                 email=user.email
             )
-            
+
+        projects_qs = Project.objects.filter(user=user)
+        if selected_project_ids is not None and isinstance(selected_project_ids, list):
+            projects_qs = projects_qs.filter(id__in=selected_project_ids)
+
         profile_data = {
             'personal_info': personal_info,
             'work_experiences': WorkExperience.objects.filter(user=user),
-            'projects': Project.objects.filter(user=user),
+            'projects': projects_qs,
             'skills': Skill.objects.filter(user=user),
             'educations': Education.objects.filter(user=user),
             'certifications': Certification.objects.filter(user=user),
@@ -101,7 +108,7 @@ class ResumeTailorView(APIView):
         ats_report = AIService.analyze_ats(profile_serialized, job_details, api_key=api_key)
 
         # 4. Tailor Resume Details
-        tailored_result = AIService.tailor_resume(profile_serialized, job_details, api_key=api_key)
+        tailored_result = AIService.tailor_resume(profile_serialized, job_details, api_key=api_key, target_language=target_language, aggressive_mode=aggressive_mode)
 
         # Agent 4: Run deterministic hallucination validator
         validation_alerts = AIService.validate_hallucinations(
@@ -178,6 +185,8 @@ class CoverLetterGenerateView(APIView):
         tone = request.data.get('tone', 'professional')
         length = request.data.get('length', 'medium')
         application_id = request.data.get('application_id', None)
+        target_language = request.data.get('target_language', 'en')
+        selected_project_ids = request.data.get('selected_project_ids', None)
 
         if not job_description:
             return Response({
@@ -207,10 +216,14 @@ class CoverLetterGenerateView(APIView):
 
         # Gather profile
         personal_info = PersonalInfo.objects.filter(user=user).first()
+        projects_qs = Project.objects.filter(user=user)
+        if selected_project_ids is not None and isinstance(selected_project_ids, list):
+            projects_qs = projects_qs.filter(id__in=selected_project_ids)
+
         profile_data = {
             'personal_info': personal_info or PersonalInfo(user=user, full_name=user.full_name or "", email=user.email),
             'work_experiences': WorkExperience.objects.filter(user=user),
-            'projects': Project.objects.filter(user=user),
+            'projects': projects_qs,
             'skills': Skill.objects.filter(user=user),
             'educations': Education.objects.filter(user=user),
             'certifications': Certification.objects.filter(user=user),
@@ -218,7 +231,7 @@ class CoverLetterGenerateView(APIView):
         profile_serialized = FullProfileSerializer(profile_data).data
 
         # Call AI
-        letter_content = AIService.write_cover_letter(profile_serialized, job_details, tone, length, api_key=api_key)
+        letter_content = AIService.write_cover_letter(profile_serialized, job_details, tone, length, api_key=api_key, target_language=target_language)
 
         # Create Letter record
         cover_letter = CoverLetterVersion.objects.create(
@@ -263,9 +276,40 @@ class ResumeRephraseView(APIView):
         profile_serialized = FullProfileSerializer(profile_data).data
         
         api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
-        rephrased_text = AIService.rephrase_block(text, instruction, profile_serialized, api_key=api_key)
-        
+        rephrased = AIService.rephrase_text(text, instruction, profile_serialized, api_key=api_key)
         return Response({
             "success": True,
-            "rephrased_text": rephrased_text
-        })
+            "rephrased_text": rephrased
+        }, status=status.HTTP_200_OK)
+
+class ATSScoreCheckView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        job_description = request.data.get('job_description', '')
+        company = request.data.get('company', '')
+        position = request.data.get('position', '')
+        cv_details = request.data.get('cv_details', None)
+
+        if not job_description or not cv_details:
+            return Response({
+                "success": False,
+                "error": {"message": "Job description and CV details are required."}
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
+
+        job_details = {
+            "company": company or 'Target Company',
+            "position": position or 'Role Candidate',
+            "keywords": []
+        }
+
+        # Analyze ATS score for the updated CV payload without re-tailoring
+        ats_report = AIService.analyze_ats(cv_details, job_details, api_key=api_key)
+
+        return Response({
+            "success": True,
+            "ats_report": ats_report
+        }, status=status.HTTP_200_OK)

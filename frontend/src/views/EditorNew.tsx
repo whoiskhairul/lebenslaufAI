@@ -330,6 +330,16 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const [saveAutomatically, setSaveAutomatically] = useState(true);
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
 
+  // New Features: Language Selection, Aggressive Mode & Selective Projects
+  const [targetLanguage, setTargetLanguage] = useState<'en' | 'de'>('en');
+  const [aggressiveMode, setAggressiveMode] = useState<boolean>(false);
+  const [masterProjects, setMasterProjects] = useState<Array<{ id: string; title: string; role?: string; technologies?: string[] }>>([]);
+  const [masterProfileInfo, setMasterProfileInfo] = useState<any>(null);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [isProjectsCollapsed, setIsProjectsCollapsed] = useState(false);
+  const [isAtsChecking, setIsAtsChecking] = useState<boolean>(false);
+  const [keywordCategoryPopover, setKeywordCategoryPopover] = useState<string | null>(null);
+
   // Tabs layout controls
   const [editorTab, setEditorTab] = useState<'resume' | 'letter' | 'job'>('resume');
   const [activeControlTab, setActiveControlTab] = useState<'tailor' | 'style'>('tailor');
@@ -685,6 +695,34 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   useEffect(() => {
     window.dispatchEvent(new Event('cv-style-change'));
   }, [customStyles, sections, template]);
+
+  // Load master profile projects and info for tailoring selection & diagnostics
+  useEffect(() => {
+    const fetchMasterProfile = async () => {
+      try {
+        const res = await api.get('/master-profile/full');
+        const profileObj = (res.data && res.data.success) ? res.data.data : res.data;
+        if (profileObj) {
+          if (profileObj.personal_info) {
+            setMasterProfileInfo(profileObj.personal_info);
+          }
+          if (profileObj.projects) {
+            const projs = profileObj.projects.map((p: any) => ({
+              id: p.id,
+              title: p.title || 'Untitled Project',
+              role: p.role || '',
+              technologies: p.technologies || []
+            }));
+            setMasterProjects(projs);
+            setSelectedProjectIds(projs.map((p: any) => p.id));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load master profile:', err);
+      }
+    };
+    fetchMasterProfile();
+  }, []);
 
   // Keyboard focus relocation hook for bullet list manipulation
   useEffect(() => {
@@ -1309,7 +1347,10 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         position,
         template,
         application_id: initialJobParams?.application_id,
-        save_version: saveAutomatically
+        save_version: saveAutomatically,
+        target_language: targetLanguage,
+        selected_project_ids: selectedProjectIds,
+        aggressive_mode: aggressiveMode
       });
       if (res.data && res.data.success) {
         const ver = res.data.data as ResumeVersion;
@@ -1362,7 +1403,9 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         company: targetCompany,
         position: targetRole,
         tone: letterTone,
-        application_id: initialJobParams?.application_id
+        application_id: initialJobParams?.application_id,
+        target_language: targetLanguage,
+        selected_project_ids: selectedProjectIds
       });
       if (res.data && res.data.success) {
         setLetterContent(res.data.data.content);
@@ -1371,6 +1414,44 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       console.error('Letter generation failed:', err);
     } finally {
       setIsLetterLoading(false);
+    }
+  };
+
+  const handleRecheckAtsScore = async () => {
+    if (!currentVersion || !jobDescription) return;
+    setIsAtsChecking(true);
+    try {
+      const activeCvPayload = {
+        personal_info: editablePersonalInfo,
+        summary: editableSummary,
+        work_experiences: editableExperiences,
+        projects: editableProjects,
+        skills: editableSkills,
+        educations: editableEducations
+      };
+
+      const res = await api.post('/resume/ats-check', {
+        job_description: jobDescription,
+        company,
+        position,
+        cv_details: activeCvPayload
+      });
+
+      if (res.data && res.data.success && res.data.ats_report) {
+        const newReport = res.data.ats_report;
+        setCurrentVersion(prev => prev ? {
+          ...prev,
+          ats_score: newReport.score,
+          tailored_details: {
+            ...prev.tailored_details,
+            ats_report: newReport
+          }
+        } : null);
+      }
+    } catch (err) {
+      console.error('Failed to recheck ATS score:', err);
+    } finally {
+      setIsAtsChecking(false);
     }
   };
 
@@ -2287,7 +2368,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               </h2>
               <div className={styles.ppContactGrid} style={contactsStyleOverride}>
                 <div className={styles.ppContactCol}>
-                  {editablePersonalInfo.location && (
+                  {!!editablePersonalInfo.location?.trim() && (
                     <div className={styles.ppContactItem}>
                       <span className={styles.ppContactLabel}>Address:</span>
                       <span className={styles.ppContactVal}>
@@ -2298,7 +2379,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       </span>
                     </div>
                   )}
-                  {editablePersonalInfo.email && (
+                  {!!editablePersonalInfo.email?.trim() && (
                     <div className={styles.ppContactItem}>
                       <span className={styles.ppContactLabel}>Email:</span>
                       <span className={styles.ppContactVal}>
@@ -2309,7 +2390,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       </span>
                     </div>
                   )}
-                  {editablePersonalInfo.website && (
+                  {!!editablePersonalInfo.website?.trim() && (
                     <div className={styles.ppContactItem}>
                       <span className={styles.ppContactLabel}>Website:</span>
                       <span className={styles.ppContactVal}>
@@ -2322,7 +2403,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   )}
                 </div>
                 <div className={styles.ppContactCol}>
-                  {editablePersonalInfo.phone && (
+                  {!!editablePersonalInfo.phone?.trim() && (
                     <div className={styles.ppContactItem}>
                       <span className={styles.ppContactLabel}>Phone:</span>
                       <span className={styles.ppContactVal}>
@@ -2333,7 +2414,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       </span>
                     </div>
                   )}
-                  {editablePersonalInfo.linkedin && (
+                  {!!editablePersonalInfo.linkedin?.trim() && (
                     <div className={styles.ppContactItem}>
                       <span className={styles.ppContactLabel}>LinkedIn:</span>
                       <span className={styles.ppContactVal}>
@@ -2344,7 +2425,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       </span>
                     </div>
                   )}
-                  {editablePersonalInfo.github && (
+                  {!!editablePersonalInfo.github?.trim() && (
                     <div className={styles.ppContactItem}>
                       <span className={styles.ppContactLabel}>GitHub:</span>
                       <span className={styles.ppContactVal}>
@@ -3701,9 +3782,213 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                     <label htmlFor="editorTemplate">Layout Template</label>
                     <select id="editorTemplate" value={template} onChange={(e) => setTemplate(e.target.value)}>
                       <option value="pixel_perfect_pdf">Pixel Perfect CV Template</option>
-                      <option value="modern_minimalist" disabled>Cooming soon</option>
+                      <option value="modern_minimalist" disabled>More templates Coming soon</option>
                     </select>
+
+                                {/* 1. Language & ATS Strategy Options */}
+                  <div className={styles.selectGroup} style={{ marginBottom: '16px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main, #1e293b)', marginBottom: '6px', display: 'block' }}>
+                      Target Output Language
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setTargetLanguage('en')}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          border: targetLanguage === 'en' ? '2px solid #6366f1' : '1px solid #cbd5e1',
+                          background: targetLanguage === 'en' ? 'rgba(99, 102, 241, 0.1)' : '#ffffff',
+                          fontWeight: targetLanguage === 'en' ? 700 : 500,
+                          color: targetLanguage === 'en' ? '#4f46e5' : '#475569',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span>🇬🇧 English</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTargetLanguage('de')}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          border: targetLanguage === 'de' ? '2px solid #6366f1' : '1px solid #cbd5e1',
+                          background: targetLanguage === 'de' ? 'rgba(99, 102, 241, 0.1)' : '#ffffff',
+                          fontWeight: targetLanguage === 'de' ? 700 : 500,
+                          color: targetLanguage === 'de' ? '#4f46e5' : '#475569',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span>🇩🇪 Deutsch</span>
+                      </button>
+                    </div>
+
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main, #1e293b)', marginBottom: '6px', display: 'block' }}>
+                      ATS Keyword Strategy
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setAggressiveMode(false)}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '2px',
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          border: !aggressiveMode ? '2px solid #6366f1' : '1px solid #cbd5e1',
+                          background: !aggressiveMode ? 'rgba(99, 102, 241, 0.08)' : '#ffffff',
+                          color: !aggressiveMode ? '#4f46e5' : '#475569',
+                          cursor: 'pointer',
+                          textAlign: 'center'
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, fontSize: '12px' }}>🛡️ Standard</span>
+                        <span style={{ fontSize: '10px', opacity: 0.8 }}>Strict Profile Match</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAggressiveMode(true)}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '2px',
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          border: aggressiveMode ? '2px solid #8b5cf6' : '1px solid #cbd5e1',
+                          background: aggressiveMode ? 'rgba(139, 92, 246, 0.12)' : '#ffffff',
+                          color: aggressiveMode ? '#6d28d9' : '#475569',
+                          cursor: 'pointer',
+                          textAlign: 'center'
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, fontSize: '12px' }}>⚡ Aggressive</span>
+                        <span style={{ fontSize: '10px', opacity: 0.85 }}>High ATS Optimization</span>
+                      </button>
+                    </div>
                   </div>
+                  </div>
+
+                  {/* 2. Selective Projects List in Side Panel */}
+                  <div style={{ marginBottom: '16px', background: 'rgba(248, 250, 252, 0.8)', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px' }}>
+                    <div
+                      onClick={() => setIsProjectsCollapsed(!isProjectsCollapsed)}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>Include Projects ({masterProjects.length > 0 ? `${selectedProjectIds.length} of ${masterProjects.length} selected` : 'None added in profile'})</span>
+                      </div>
+                      <span style={{ fontSize: '11px', color: '#6366f1', fontWeight: 600 }}>
+                        {isProjectsCollapsed ? 'Expand ▼' : 'Collapse ▲'}
+                      </span>
+                    </div>
+
+                    {!isProjectsCollapsed && (
+                      <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
+                        {masterProjects.length > 0 ? (
+                          masterProjects.map(proj => {
+                            const isChecked = selectedProjectIds.includes(proj.id);
+                            return (
+                              <label
+                                key={proj.id}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  padding: '6px 8px',
+                                  borderRadius: '6px',
+                                  background: isChecked ? '#ffffff' : 'transparent',
+                                  border: isChecked ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent',
+                                  cursor: 'pointer',
+                                  fontSize: '12px'
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedProjectIds(prev => [...prev, proj.id]);
+                                    } else {
+                                      setSelectedProjectIds(prev => prev.filter(id => id !== proj.id));
+                                    }
+                                  }}
+                                  style={{ accentColor: '#6366f1' }}
+                                />
+                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  <strong style={{ color: '#1e293b', display: 'block', lineHeight: '1.2' }}>{proj.title}</strong>
+                                  {proj.role && <span style={{ fontSize: '10.5px', color: '#64748b' }}>{proj.role}</span>}
+                                </div>
+                              </label>
+                            );
+                          })
+                        ) : (
+                          <div style={{ fontSize: '11.5px', color: '#94a3b8', padding: '6px 4px', fontStyle: 'italic' }}>
+                            No projects found in Master Profile. Add projects in your profile settings to filter them here.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Missing Profile Details Diagnostic Widget in Side Panel */}
+                  {(() => {
+                    const infoToCheck = currentVersion ? editablePersonalInfo : (masterProfileInfo || {});
+                    const missing: { field: string; label: string; icon: string }[] = [];
+                    if (!infoToCheck.linkedin) missing.push({ field: 'linkedin', label: 'LinkedIn Profile URL', icon: '🔗' });
+                    if (!infoToCheck.github) missing.push({ field: 'github', label: 'GitHub Profile URL', icon: '💻' });
+                    if (!infoToCheck.phone) missing.push({ field: 'phone', label: 'Phone Number', icon: '📞' });
+                    if (!infoToCheck.location) missing.push({ field: 'location', label: 'Location / City', icon: '📍' });
+                    if (!infoToCheck.email) missing.push({ field: 'email', label: 'Email Address', icon: '✉️' });
+
+                    if (missing.length === 0) return null;
+
+                    return (
+                      <div style={{ marginBottom: '16px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '8px', padding: '12px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#d48806', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                          <ShieldAlert size={14} />
+                          <span>Missing Profile Details ({missing.length})</span>
+                        </div>
+                        <p style={{ fontSize: '11px', color: '#8c6b00', marginBottom: '8px', lineHeight: '1.4' }}>
+                          {currentVersion
+                            ? "The following optional details are missing from your active canvas and won't appear on your CV:"
+                            : "The following optional details are missing from your Master Profile:"}
+                        </p>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {missing.map((item, idx) => (
+                            <span
+                              key={idx}
+                              style={{
+                                fontSize: '10.5px',
+                                background: '#fff',
+                                border: '1px solid #ffe58f',
+                                padding: '3px 8px',
+                                borderRadius: '12px',
+                                color: '#ad6800',
+                                fontWeight: 500
+                              }}
+                            >
+                              {item.icon} {item.label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                     <input
@@ -3737,8 +4022,20 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                     </div>
 
                     <div className={styles.trackingSection} style={{ marginBottom: '20px', padding: '12px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.2)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main, #1e293b)' }}>
-                        {applicationTracked ? '✓ Tracking this Application' : 'Track this job application?'}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main, #1e293b)' }}>
+                          {applicationTracked ? '✓ Tracking this Application' : 'Track this job application?'}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={handleRecheckAtsScore}
+                          isLoading={isAtsChecking}
+                          style={{ fontSize: '11px', padding: '4px 10px' }}
+                          title="Re-calculate ATS Match Score for edited CV content without re-tailoring"
+                        >
+                          <RefreshCw size={12} /> Re-check ATS Score
+                        </Button>
                       </div>
                       {!applicationTracked ? (
                         <Button onClick={handleTrackApplication} isLoading={isTrackingLoading} style={{ width: '100%' }}>
@@ -3763,10 +4060,158 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                       <div className={styles.keywordsBlock}>
                         <h4>Missing Keywords ({currentVersion.tailored_details.ats_report.missing_keywords.length})</h4>
+                        <div style={{ fontSize: '10.5px', color: '#64748b', marginBottom: '6px' }}>
+                          Click to toggle skill on CV or choose category:
+                        </div>
                         <div className={styles.keywordsGrid}>
-                          {currentVersion.tailored_details.ats_report.missing_keywords.map((k, i) => (
-                            <span key={i} className={styles.missingKw}>{k}</span>
-                          ))}
+                          {currentVersion.tailored_details.ats_report.missing_keywords.map((k, i) => {
+                            const existingSkill = editableSkills.find(sk => sk.name.toLowerCase() === k.toLowerCase());
+                            const isAlreadyInSkills = !!existingSkill;
+                            const isPopoverOpen = keywordCategoryPopover === k;
+
+                            // Restrict skill category options strictly to categories existing in user's profile
+                            const userProfileCategories = Array.from(new Set(editableSkills.map(s => (s.category || 'technical').toLowerCase().trim()))).filter(Boolean);
+                            const availableCategories = userProfileCategories.length > 0 ? userProfileCategories : ['technical'];
+
+                            const categorizeSkill = (term: string): string => {
+                              const t = term.toLowerCase();
+                              // Pick matching category from user's active categories if possible
+                              const matchedUserCat = userProfileCategories.find(cat => {
+                                if (cat.includes('lang') && ['python', 'javascript', 'typescript', 'java', 'c++', 'c#', 'go', 'rust', 'sql', 'html', 'css'].some(l => t.includes(l))) return true;
+                                if ((cat.includes('frame') || cat.includes('lib')) && ['react', 'vue', 'angular', 'next', 'django', 'express', 'node', 'spring', 'flask', 'tailwind'].some(f => t.includes(f))) return true;
+                                if (cat.includes('data') && ['postgres', 'mysql', 'mongo', 'redis', 'sqlite', 'oracle', 'dynamo'].some(d => t.includes(d))) return true;
+                                if ((cat.includes('cloud') || cat.includes('devops')) && ['aws', 'docker', 'kubernetes', 'azure', 'gcp', 'terraform', 'ci/cd', 'git'].some(c => t.includes(c))) return true;
+                                return false;
+                              });
+                              return matchedUserCat || availableCategories[0];
+                            };
+
+                            const handleToggleSkill = (targetCategory?: string) => {
+                              if (isAlreadyInSkills) {
+                                // Remove skill from CV
+                                setEditableSkills(prev => prev.filter(sk => sk.name.toLowerCase() !== k.toLowerCase()));
+                              } else {
+                                // Add skill under target or smart auto category
+                                const cat = targetCategory || categorizeSkill(k);
+                                setEditableSkills(prev => [...prev, {
+                                  id: `sk_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+                                  name: k,
+                                  category: cat
+                                }]);
+                              }
+                              setKeywordCategoryPopover(null);
+                            };
+
+                            return (
+                              <div key={i} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleSkill()}
+                                  className={styles.missingKw}
+                                  title={isAlreadyInSkills ? `Click to remove ${k} from CV` : `Click to add ${k} (Auto Category: ${categorizeSkill(k)})`}
+                                  style={{
+                                    cursor: 'pointer',
+                                    background: isAlreadyInSkills ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.1)',
+                                    color: isAlreadyInSkills ? '#059669' : '#dc2626',
+                                    border: isAlreadyInSkills ? '1px solid rgba(16, 185, 129, 0.4)' : '1px dashed rgba(239, 68, 68, 0.4)',
+                                    padding: '3px 8px',
+                                    borderRadius: '6px',
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  {isAlreadyInSkills ? '✓ ' : '+ '} {k}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setKeywordCategoryPopover(isPopoverOpen ? null : k);
+                                  }}
+                                  style={{
+                                    border: 'none',
+                                    background: 'transparent',
+                                    cursor: 'pointer',
+                                    fontSize: '9px',
+                                    color: '#64748b',
+                                    padding: '0 2px',
+                                    marginLeft: '2px'
+                                  }}
+                                  title="Choose Category"
+                                >
+                                  ⚙️
+                                </button>
+
+                                {isPopoverOpen && (
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      bottom: '100%',
+                                      left: 0,
+                                      marginBottom: '4px',
+                                      background: '#ffffff',
+                                      border: '1px solid #cbd5e1',
+                                      borderRadius: '6px',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 99999,
+                                      padding: '6px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '4px',
+                                      minWidth: '150px'
+                                    }}
+                                  >
+                                    <div style={{ fontSize: '10px', fontWeight: 700, color: '#334155', borderBottom: '1px solid #f1f5f9', paddingBottom: '3px' }}>
+                                      Select Category for "{k}"
+                                    </div>
+                                    {availableCategories.map(cat => (
+                                      <button
+                                        key={cat}
+                                        type="button"
+                                        onClick={() => handleToggleSkill(cat)}
+                                        style={{
+                                          textAlign: 'left',
+                                          background: existingSkill?.category === cat ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                                          border: 'none',
+                                          fontSize: '10.5px',
+                                          padding: '3px 6px',
+                                          borderRadius: '4px',
+                                          cursor: 'pointer',
+                                          color: existingSkill?.category === cat ? '#4f46e5' : '#475569',
+                                          fontWeight: existingSkill?.category === cat ? 700 : 400
+                                        }}
+                                      >
+                                        {cat}
+                                      </button>
+                                    ))}
+                                    {isAlreadyInSkills && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleSkill()}
+                                        style={{
+                                          textAlign: 'left',
+                                          background: 'rgba(239, 68, 68, 0.1)',
+                                          border: 'none',
+                                          fontSize: '10.5px',
+                                          padding: '4px 6px',
+                                          borderRadius: '4px',
+                                          cursor: 'pointer',
+                                          color: '#dc2626',
+                                          fontWeight: 600,
+                                          marginTop: '4px'
+                                        }}
+                                      >
+                                        ✕ Remove from CV
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
