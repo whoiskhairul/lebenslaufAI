@@ -710,6 +710,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
   const [languagesFirst, setLanguagesFirst] = useState(false);
+  const [languagesTitle, setLanguagesTitle] = useState<string>('');
+  const [expandedSkillCats, setExpandedSkillCats] = useState<Record<string, boolean>>({});
 
   // Focus redirection metadata when editing lists dynamically
   const [focusedBulletInfo, setFocusedBulletInfo] = useState<{ type: 'experience' | 'project' | 'education' | 'custom'; itemId: string; bulletIdx: number } | null>(null);
@@ -1091,14 +1093,18 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         return s;
       });
       setEditableSkills(remappedSkills);
-      const rawProjects = ver.tailored_details.projects || profile.projects || [];
-      const mappedProjects = rawProjects.map((p: any) => ({
-        id: p.id || `proj_${Math.random()}`,
-        bullets: p.bullets || [],
-        title: p.title || '',
-        role: p.role || '',
-        date: p.date || ''
-      }));
+      const detailsAny = ver.tailored_details as any;
+      const tailoredProjects = detailsAny.tailored_projects || detailsAny.projects || profile.projects || [];
+      const mappedProjects = (profile.projects || tailoredProjects).map((p: any) => {
+        const tailoredP = (detailsAny.tailored_projects || []).find((tp: any) => tp.id === p.id);
+        return {
+          id: p.id || `proj_${Math.random()}`,
+          bullets: tailoredP?.bullets || p.bullets || [],
+          title: p.title || '',
+          role: p.role || '',
+          date: p.date || ''
+        };
+      });
       setEditableProjects(mappedProjects);
       setEditableEducations(profile.educations || []);
     }
@@ -1116,13 +1122,23 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       if (customData.headerStyles) setHeaderStyles(customData.headerStyles);
     } else {
       setHeaderStyles({});
-      // Default styles
+      const detailsAny = ver.tailored_details as any;
+      const secNames = detailsAny.tailored_section_names || (
+        targetLanguage === 'de' ? {
+          summary: 'Zusammenfassung',
+          experience: 'Berufserfahrung',
+          projects: 'Projekte',
+          education: 'Ausbildung',
+          skills: 'Kenntnisse'
+        } : null
+      );
+
       setSections([
-        { id: 'summary', name: 'Professional Summary', visible: true, type: 'summary' },
-        { id: 'experience', name: 'Work Experience', visible: true, type: 'experience' },
-        { id: 'projects', name: 'Projects', visible: true, type: 'projects' },
-        { id: 'education', name: 'Education', visible: true, type: 'education' },
-        { id: 'skills', name: 'Skills', visible: true, type: 'skills' }
+        { id: 'summary', name: secNames?.summary || 'Professional Summary', visible: true, type: 'summary' },
+        { id: 'experience', name: secNames?.experience || 'Work Experience', visible: true, type: 'experience' },
+        { id: 'projects', name: secNames?.projects || 'Projects', visible: true, type: 'projects' },
+        { id: 'education', name: secNames?.education || 'Education', visible: true, type: 'education' },
+        { id: 'skills', name: secNames?.skills || 'Skills', visible: true, type: 'skills' }
       ]);
       setCustomStyles({
         fontSize: 13,
@@ -1168,6 +1184,46 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     nextList[idx] = nextList[targetIdx];
     nextList[targetIdx] = temp;
     setEditableExperiences(nextList);
+  };
+
+  const getLocalizedCategoryName = (catName: string): string => {
+    const norm = (catName || '').toLowerCase().trim();
+    if (targetLanguage === 'de') {
+      if (norm === 'languages' || norm === 'languages & dialects' || norm === 'sprachen') return 'Sprachen';
+      if (norm === 'programming languages' || norm === 'technical' || norm === 'technologies' || norm === 'programmiersprachen') return 'Programmiersprachen & Kenntnisse';
+      if (norm === 'frameworks' || norm === 'frameworks & libraries' || norm === 'frameworks & bibliotheken') return 'Frameworks & Bibliotheken';
+      if (norm === 'databases' || norm === 'datenbanken') return 'Datenbanken';
+      if (norm === 'cloud' || norm === 'cloud & devops' || norm === 'devops' || norm === 'cloud & infrastructure') return 'Cloud & Infrastructure';
+      if (norm === 'tools' || norm === 'development tools' || norm === 'werkzeuge & tools') return 'Werkzeuge & Tools';
+      if (norm === 'soft_skills' || norm === 'soft skills') return 'Methodische & Soziale Kompetenzen';
+    }
+    return catName.charAt(0).toUpperCase() + catName.slice(1).replace(/_/g, ' ');
+  };
+
+  const handleMoveSkillInCategory = (skillId: string, direction: 'up' | 'down') => {
+    setEditableSkills(prev => {
+      const targetSkill = prev.find(s => s.id === skillId);
+      if (!targetSkill) return prev;
+
+      const catNormalized = (targetSkill.category || '').toLowerCase().trim();
+      const categorySkills = prev.filter(s => (s.category || '').toLowerCase().trim() === catNormalized);
+      const idx = categorySkills.findIndex(s => s.id === skillId);
+
+      if (direction === 'up' && idx === 0) return prev;
+      if (direction === 'down' && idx === categorySkills.length - 1) return prev;
+
+      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+      const itemToSwap = categorySkills[targetIdx];
+
+      const realIdx1 = prev.findIndex(s => s.id === skillId);
+      const realIdx2 = prev.findIndex(s => s.id === itemToSwap.id);
+
+      const updated = [...prev];
+      const temp = updated[realIdx1];
+      updated[realIdx1] = updated[realIdx2];
+      updated[realIdx2] = temp;
+      return updated;
+    });
   };
 
   const handleAddExperienceBullet = (expIdx: number, bulletIdx: number = -1) => {
@@ -1611,9 +1667,6 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         setCurrentVersion(ver);
         initializeVersionFields(ver);
         setApplicationTracked(!!ver.application);
-
-        // Instantly generate tailored cover letter context
-        handleGenerateLetter(ver.target_company, ver.target_role);
       }
     } catch (err) {
       console.error('Tailoring failed:', err);
@@ -1649,20 +1702,34 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     }
   };
 
-  const handleGenerateLetter = async (targetCompany: string, targetRole: string) => {
+  const handleGenerateLetter = async (targetCompany?: string, targetRole?: string) => {
+    if (!jobDescription.trim()) {
+      alert('Please provide a job description first.');
+      return;
+    }
     setIsLetterLoading(true);
     try {
+      const activeCvDetails = {
+        personal_info: editablePersonalInfo,
+        summary: editableSummary,
+        work_experiences: editableExperiences,
+        projects: editableProjects,
+        skills: editableSkills,
+        educations: editableEducations
+      };
+
       const res = await api.post('/resume/cover-letter', {
         job_description: jobDescription,
-        company: targetCompany,
-        position: targetRole,
+        company: targetCompany || company || currentVersion?.target_company || '',
+        position: targetRole || position || currentVersion?.target_role || '',
         tone: letterTone,
         application_id: initialJobParams?.application_id,
         target_language: targetLanguage,
-        selected_project_ids: selectedProjectIds
+        selected_project_ids: selectedProjectIds,
+        cv_details: activeCvDetails
       });
       if (res.data && res.data.success) {
-        setLetterContent(res.data.data.content);
+        setLetterContent(res.data.content || res.data.data?.content || '');
       }
     } catch (err) {
       console.error('Letter generation failed:', err);
@@ -3652,13 +3719,14 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
     }
 
 
-    // 7. Languages Block
+    // 7. Languages Block (Dedicated Subsection)
     if (unit.type === 'skills-languages') {
       const skillsList = unit.skills || [];
+      const subTitle = targetLanguage === 'de' ? 'Sprachen' : 'Languages';
 
       return (
         <div
-          style={{ ...mergedStyles, position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', marginBottom: '8px' }}
+          style={{ ...mergedStyles, position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', marginTop: '6px', marginBottom: '8px' }}
         >
           {!isMeasuring && (
             <div className={`${styles.itemControls} no-print`} style={{ left: '-48px' }}>
@@ -3679,9 +3747,14 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             </div>
           )}
 
-          <div style={{ fontWeight: 'bold', color: 'var(--accent-color, #0f172a)', marginBottom: '4px' }}>
-            Languages
+          {/* Dedicated Subsection Sub-heading */}
+          <div style={{ fontWeight: 700, fontSize: '1.15em', color: 'var(--accent-color, #0f172a)', marginBottom: '6px' }}>
+            <AutoSizeTextarea
+              value={languagesTitle || (targetLanguage === 'de' ? 'Sprachen' : 'Languages')}
+              onChange={(val) => setLanguagesTitle(val)}
+            />
           </div>
+
           <div style={{ display: 'flex', alignItems: 'flex-start', paddingLeft: '24px', width: '100%' }}>
             <span className={styles.bulletDot} />
             <div style={{ flex: 1 }}>
@@ -3710,33 +3783,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
     if (unit.type === 'skills-category') {
       const skillsList = unit.skills || [];
       const cat = unit.category!;
-      const catLabel = cat.charAt(0).toUpperCase() + cat.slice(1).replace(/_/g, ' ');
-
-      const itSkills = editableSkills.filter(sk => (sk.category || '').toLowerCase().trim() !== 'languages');
-      const uniqueCats = Array.from(new Set(itSkills.map(sk => (sk.category || 'technical').toLowerCase().trim())));
-      const itCategories = categoryOrder.filter(c => uniqueCats.includes(c));
-      const extraCats = uniqueCats.filter(c => !itCategories.includes(c));
-      const finalCategories = [...itCategories, ...extraCats];
-
-      finalCategories.sort((a, b) => {
-        const getCategoryOrderScore = (cat: string) => {
-          const order = [
-            'programming languages',
-            'frameworks & libraries',
-            'databases',
-            'cloud & devops',
-            'development tools',
-            'testing'
-          ];
-          const idx = order.indexOf(cat.toLowerCase().trim());
-          if (idx !== -1) return idx;
-          if (cat.toLowerCase().trim() === 'languages') return 999;
-          return 100;
-        };
-        return getCategoryOrderScore(a) - getCategoryOrderScore(b);
-      });
-
-      const isFirstITCat = cat === finalCategories[0];
+      const catLabel = getLocalizedCategoryName(cat);
 
       return (
         <div
@@ -3759,14 +3806,11 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             </div>
           )}
 
-          {isFirstITCat && (
-            <div style={{ fontWeight: 'bold', color: 'var(--accent-color, #0f172a)', marginBottom: '4px' }}>
-              IT-Skills
-            </div>
-          )}
           <div style={{ display: 'flex', alignItems: 'flex-start', paddingLeft: '24px', width: '100%' }}>
             <span className={styles.bulletDot} />
-            <strong style={{ fontWeight: 'bold', marginRight: '6px', whiteSpace: 'nowrap' }}>{catLabel}:</strong>
+            <strong style={{ fontWeight: 700, marginRight: '5px', color: 'var(--text-color, #1e293b)' }}>
+              {catLabel}:
+            </strong>
             <div style={{ flex: 1 }}>
               <AutoSizeTextarea
                 value={skillsList.map(s => s.name).join(', ')}
@@ -4627,41 +4671,329 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                           )}
 
                           {secItem.type === 'skills' && (
-                            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              {/* 1. IT Skills Categories */}
+                              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                IT Skills Categories
+                              </div>
+                              {Array.from(new Set(editableSkills.filter(s => (s.category || '').toLowerCase().trim() !== 'languages').map(s => (s.category || 'technical').toLowerCase().trim()))).map((catName) => {
+                                const categorySkills = editableSkills.filter(s => (s.category || 'technical').toLowerCase().trim() === catName);
+                                const originalCategory = categorySkills[0]?.category || catName;
+                                const displayHeader = getLocalizedCategoryName(originalCategory);
+                                const isExpanded = !!expandedSkillCats[catName];
+
+                                return (
+                                  <div
+                                    key={catName}
+                                    style={{
+                                      background: 'var(--card-bg, rgba(255, 255, 255, 0.8))',
+                                      border: '1px solid var(--card-border, rgba(226, 232, 240, 0.8))',
+                                      borderRadius: 'var(--radius-md, 10px)',
+                                      overflow: 'hidden',
+                                      backdropFilter: 'blur(8px)',
+                                      boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
+                                      transition: 'all 0.2s ease'
+                                    }}
+                                  >
+                                    {/* Accordion Header Bar */}
+                                    <div
+                                      onClick={() => setExpandedSkillCats(prev => ({ ...prev, [catName]: !prev[catName] }))}
+                                      style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        padding: '10px 12px',
+                                        cursor: 'pointer',
+                                        background: isExpanded ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+                                        userSelect: 'none',
+                                        borderBottom: isExpanded ? '1px solid var(--card-border, #e2e8f0)' : 'none'
+                                      }}
+                                    >
+                                      <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--foreground, #0f172a)' }}>
+                                        {displayHeader} <span style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)', fontWeight: 500 }}>({categorySkills.length})</span>
+                                      </span>
+                                      <span style={{ fontSize: '11px', color: 'var(--primary, #6366f1)', fontWeight: 600 }}>
+                                        {isExpanded ? 'Collapse ▲' : 'Expand ▼'}
+                                      </span>
+                                    </div>
+
+                                    {/* Collapsible Content Body */}
+                                    {isExpanded && (
+                                      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {/* Category Title Rename */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                                          <label style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)', whiteSpace: 'nowrap', fontWeight: 600 }}>Title:</label>
+                                          <input
+                                            type="text"
+                                            value={displayHeader}
+                                            onChange={(e) => {
+                                              const newCatName = e.target.value;
+                                              if (!newCatName.trim()) return;
+                                              setEditableSkills(prev => prev.map(s => (s.category || 'technical').toLowerCase().trim() === catName ? { ...s, category: newCatName.trim() } : s));
+                                            }}
+                                            style={{
+                                              flex: 1,
+                                              fontSize: '11.5px',
+                                              fontWeight: 700,
+                                              padding: '4px 8px',
+                                              borderRadius: 'var(--radius-sm, 6px)',
+                                              border: '1px solid var(--card-border, #cbd5e1)',
+                                              color: 'var(--primary, #6366f1)',
+                                              background: 'var(--background, #f8fafc)'
+                                            }}
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              if (window.confirm(`Delete category "${displayHeader}" and all its skills?`)) {
+                                                setEditableSkills(prev => prev.filter(s => (s.category || 'technical').toLowerCase().trim() !== catName));
+                                              }
+                                            }}
+                                            style={{ background: 'transparent', border: 'none', color: 'var(--danger, #ef4444)', cursor: 'pointer', padding: '4px' }}
+                                            title="Delete Category"
+                                          >
+                                            <Trash size={13} />
+                                          </button>
+                                        </div>
+
+                                        {/* List of Skills with Reorder & Delete */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                          {categorySkills.map((sk, idx) => (
+                                            <div key={sk.id || idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                              <input
+                                                type="text"
+                                                value={sk.name}
+                                                onChange={(e) => {
+                                                  const val = e.target.value;
+                                                  setEditableSkills(prev => prev.map(item => item.id === sk.id ? { ...item, name: val } : item));
+                                                }}
+                                                style={{
+                                                  flex: 1,
+                                                  fontSize: '11.5px',
+                                                  padding: '4px 8px',
+                                                  borderRadius: 'var(--radius-sm, 6px)',
+                                                  border: '1px solid var(--card-border, #cbd5e1)',
+                                                  background: 'var(--background, #ffffff)',
+                                                  color: 'var(--foreground, #1e293b)'
+                                                }}
+                                              />
+                                              <button
+                                                type="button"
+                                                disabled={idx === 0}
+                                                onClick={() => handleMoveSkillInCategory(sk.id, 'up')}
+                                                style={{ opacity: idx === 0 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--muted, #64748b)', cursor: 'pointer', padding: '2px' }}
+                                                title="Move Up"
+                                              >
+                                                <ArrowUp size={12} />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                disabled={idx === categorySkills.length - 1}
+                                                onClick={() => handleMoveSkillInCategory(sk.id, 'down')}
+                                                style={{ opacity: idx === categorySkills.length - 1 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--muted, #64748b)', cursor: 'pointer', padding: '2px' }}
+                                                title="Move Down"
+                                              >
+                                                <ArrowDown size={12} />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => setEditableSkills(prev => prev.filter(item => item.id !== sk.id))}
+                                                style={{ background: 'transparent', border: 'none', color: 'var(--danger, #ef4444)', cursor: 'pointer', padding: '2px' }}
+                                                title="Remove Skill"
+                                              >
+                                                <X size={12} />
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+
+                                        {/* Add Skill to this Category */}
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const skillName = window.prompt(`Add new skill to ${displayHeader}:`, 'New Skill');
+                                            if (skillName && skillName.trim()) {
+                                              const targetCat = categorySkills[0]?.category || catName;
+                                              setEditableSkills(prev => [...prev, { id: `sk_${Date.now()}`, name: skillName.trim(), category: targetCat }]);
+                                            }
+                                          }}
+                                          style={{
+                                            marginTop: '4px',
+                                            fontSize: '11px',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: 'var(--primary, #6366f1)',
+                                            cursor: 'pointer',
+                                            padding: '4px 0',
+                                            fontWeight: 600,
+                                            textAlign: 'left',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                          }}
+                                        >
+                                          + Add skill to {displayHeader}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
                               <Button
                                 type="button"
                                 variant="ghost"
-                                style={{ fontSize: '10px', padding: '4px' }}
+                                style={{ fontSize: '11px', padding: '8px', color: 'var(--primary, #6366f1)' }}
                                 onClick={() => {
-                                  const catName = window.prompt('Enter category name (e.g. databases, cloud):');
-                                  if (catName && catName.trim()) {
-                                    setEditableSkills(prev => [...prev, {
-                                      id: `sk_${Date.now()}`,
-                                      name: 'New Skill',
-                                      category: catName.trim().toLowerCase()
-                                    }]);
+                                  const newCat = window.prompt('Enter new category name (e.g. Tools, Soft Skills):');
+                                  if (newCat && newCat.trim()) {
+                                    setEditableSkills(prev => [...prev, { id: `sk_${Date.now()}`, name: 'New Skill', category: newCat.trim() }]);
+                                    setExpandedSkillCats(prev => ({ ...prev, [newCat.trim().toLowerCase()]: true }));
                                   }
                                 }}
                               >
-                                + Add Skills Category
+                                + Add New Category
                               </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                style={{ fontSize: '10px', padding: '4px' }}
-                                onClick={() => {
-                                  const langName = window.prompt('Enter language (e.g. French (B2)):');
-                                  if (langName && langName.trim()) {
-                                    setEditableSkills(prev => [...prev, {
-                                      id: `sk_${Date.now()}`,
-                                      name: langName.trim(),
-                                      category: 'languages'
-                                    }]);
-                                  }
-                                }}
-                              >
-                                + Add Language
-                              </Button>
+
+                              {/* 2. Separate Languages Subsection Card */}
+                              {(() => {
+                                const languageSkills = editableSkills.filter(s => (s.category || '').toLowerCase().trim() === 'languages');
+                                const isExpanded = !!expandedSkillCats.languages;
+                                const displayLangTitle = languagesTitle || (targetLanguage === 'de' ? 'Sprachen' : 'Languages');
+
+                                return (
+                                  <div
+                                    style={{
+                                      marginTop: '8px',
+                                      background: 'var(--card-bg, rgba(255, 255, 255, 0.8))',
+                                      border: '1px solid var(--card-border, rgba(226, 232, 240, 0.8))',
+                                      borderRadius: 'var(--radius-md, 10px)',
+                                      overflow: 'hidden',
+                                      backdropFilter: 'blur(8px)',
+                                      boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
+                                      transition: 'all 0.2s ease'
+                                    }}
+                                  >
+                                    <div
+                                      onClick={() => setExpandedSkillCats(prev => ({ ...prev, languages: !prev.languages }))}
+                                      style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        padding: '10px 12px',
+                                        cursor: 'pointer',
+                                        background: isExpanded ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.04)',
+                                        userSelect: 'none',
+                                        borderBottom: isExpanded ? '1px solid var(--card-border, #e2e8f0)' : 'none'
+                                      }}
+                                    >
+                                      <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--primary, #4f46e5)' }}>
+                                        🌐 {displayLangTitle} <span style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)', fontWeight: 500 }}>({languageSkills.length})</span>
+                                      </span>
+                                      <span style={{ fontSize: '11px', color: 'var(--primary, #6366f1)', fontWeight: 600 }}>
+                                        {isExpanded ? 'Collapse ▲' : 'Expand ▼'}
+                                      </span>
+                                    </div>
+
+                                    {isExpanded && (
+                                      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                                          <label style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)', whiteSpace: 'nowrap', fontWeight: 600 }}>Title:</label>
+                                          <input
+                                            type="text"
+                                            value={displayLangTitle}
+                                            onChange={(e) => setLanguagesTitle(e.target.value)}
+                                            style={{
+                                              flex: 1,
+                                              fontSize: '11.5px',
+                                              fontWeight: 700,
+                                              padding: '4px 8px',
+                                              borderRadius: 'var(--radius-sm, 6px)',
+                                              border: '1px solid var(--card-border, #cbd5e1)',
+                                              color: 'var(--primary, #4f46e5)',
+                                              background: 'var(--background, #f8fafc)'
+                                            }}
+                                          />
+                                        </div>
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                          {languageSkills.map((sk, idx) => (
+                                            <div key={sk.id || idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                              <input
+                                                type="text"
+                                                value={sk.name}
+                                                onChange={(e) => {
+                                                  const val = e.target.value;
+                                                  setEditableSkills(prev => prev.map(item => item.id === sk.id ? { ...item, name: val } : item));
+                                                }}
+                                                style={{
+                                                  flex: 1,
+                                                  fontSize: '11.5px',
+                                                  padding: '4px 8px',
+                                                  borderRadius: 'var(--radius-sm, 6px)',
+                                                  border: '1px solid var(--card-border, #cbd5e1)',
+                                                  background: 'var(--background, #ffffff)',
+                                                  color: 'var(--foreground, #1e293b)'
+                                                }}
+                                              />
+                                              <button
+                                                type="button"
+                                                disabled={idx === 0}
+                                                onClick={() => handleMoveSkillInCategory(sk.id, 'up')}
+                                                style={{ opacity: idx === 0 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--muted, #64748b)', cursor: 'pointer', padding: '2px' }}
+                                                title="Move Up"
+                                              >
+                                                <ArrowUp size={12} />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                disabled={idx === languageSkills.length - 1}
+                                                onClick={() => handleMoveSkillInCategory(sk.id, 'down')}
+                                                style={{ opacity: idx === languageSkills.length - 1 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--muted, #64748b)', cursor: 'pointer', padding: '2px' }}
+                                                title="Move Down"
+                                              >
+                                                <ArrowDown size={12} />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => setEditableSkills(prev => prev.filter(item => item.id !== sk.id))}
+                                                style={{ background: 'transparent', border: 'none', color: 'var(--danger, #ef4444)', cursor: 'pointer', padding: '2px' }}
+                                                title="Remove Language"
+                                              >
+                                                <X size={12} />
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const langName = window.prompt('Add new language (e.g. German (Native)):', 'French (B2)');
+                                            if (langName && langName.trim()) {
+                                              setEditableSkills(prev => [...prev, { id: `lang_${Date.now()}`, name: langName.trim(), category: 'languages' }]);
+                                            }
+                                          }}
+                                          style={{
+                                            marginTop: '4px',
+                                            fontSize: '11px',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: 'var(--primary, #4f46e5)',
+                                            cursor: 'pointer',
+                                            padding: '4px 0',
+                                            fontWeight: 600,
+                                            textAlign: 'left'
+                                          }}
+                                        >
+                                          + Add Language
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           )}
                         </div>
@@ -4692,6 +5024,33 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             ) : (
               // Cover Letter Design Options
               <div className={`${styles.styleControlsForm} glass-card`}>
+                <h3>Cover Letter Generator</h3>
+                <p style={{ fontSize: '11.5px', color: '#64748b', marginBottom: '12px', lineHeight: '1.4' }}>
+                  Generate a cover letter based on your active tailored/edited CV canvas content and job description.
+                </p>
+
+                <Button
+                  type="button"
+                  onClick={() => handleGenerateLetter(company, position)}
+                  isLoading={isLetterLoading}
+                  style={{
+                    width: '100%',
+                    marginBottom: '16px',
+                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <Sparkles size={16} />
+                  <span>{letterContent ? 'Regenerate Cover Letter' : 'Generate Cover Letter from Tailored CV'}</span>
+                </Button>
+
                 <h3>Cover Letter Style</h3>
 
                 <div className={styles.slidersTwinGrid}>

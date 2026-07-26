@@ -85,17 +85,16 @@ class ResumeTailorView(APIView):
         if application_id:
             application = Application.objects.filter(user=user, id=application_id).first()
 
-        # 2. Extract Job Details if not provided
+        # 2. Extract Job Details if missing
         if not company or not position:
             job_details = AIService.parse_job_description(job_description, api_key=api_key)
             company = company or job_details.get('company', 'Target Company')
             position = position or job_details.get('position', 'Role Candidate')
         else:
-            parsed_details = AIService.parse_job_description(job_description, api_key=api_key)
             job_details = {
                 "company": company,
                 "position": position,
-                "keywords": parsed_details.get('keywords', [])
+                "keywords": []
             }
 
         # Sync unedited job description to the application if linked
@@ -104,19 +103,21 @@ class ResumeTailorView(APIView):
                 application.job_description = job_description
                 application.save()
 
-        # 4. Tailor Resume Details
+        # 3. Single-Pass DeepSeek Tailoring & ATS Auditing
         tailored_result = AIService.tailor_resume(profile_serialized, job_details, api_key=api_key, target_language=target_language, aggressive_mode=aggressive_mode)
 
-        # 4b. Analyze ATS Score & Gaps on the TAILORED Resume Output using DeepSeek AI
-        tailored_profile_data = {
-            "personal_info": profile_serialized.get('personal_info', {}),
-            "summary": tailored_result.get('tailored_summary', ''),
-            "work_experiences": tailored_result.get('tailored_experiences', []),
-            "skills": tailored_result.get('tailored_skills', profile_serialized.get('skills', [])),
-            "projects": tailored_result.get('tailored_projects', profile_serialized.get('projects', [])),
-            "educations": profile_serialized.get('educations', [])
-        }
-        ats_report = AIService.analyze_ats(tailored_profile_data, job_details, api_key=api_key)
+        # Retrieve single-pass ats_report or fallback if missing
+        ats_report = tailored_result.get('ats_report')
+        if not ats_report or not isinstance(ats_report, dict) or 'score' not in ats_report:
+            tailored_profile_data = {
+                "personal_info": profile_serialized.get('personal_info', {}),
+                "summary": tailored_result.get('tailored_summary', ''),
+                "work_experiences": tailored_result.get('tailored_experiences', []),
+                "skills": tailored_result.get('tailored_skills', profile_serialized.get('skills', [])),
+                "projects": tailored_result.get('tailored_projects', profile_serialized.get('projects', [])),
+                "educations": profile_serialized.get('educations', [])
+            }
+            ats_report = AIService.analyze_ats(tailored_profile_data, job_details, api_key=api_key)
 
         # Agent 4: Run deterministic hallucination validator
         validation_alerts = AIService.validate_hallucinations(
@@ -222,21 +223,25 @@ class CoverLetterGenerateView(APIView):
             "keywords": []
         }
 
-        # Gather profile
-        personal_info = PersonalInfo.objects.filter(user=user).first()
-        projects_qs = Project.objects.filter(user=user)
-        if selected_project_ids is not None and isinstance(selected_project_ids, list):
-            projects_qs = projects_qs.filter(id__in=selected_project_ids)
+        # Gather profile or use active tailored canvas details
+        cv_details = request.data.get('cv_details', None)
+        if cv_details and isinstance(cv_details, dict):
+            profile_serialized = cv_details
+        else:
+            personal_info = PersonalInfo.objects.filter(user=user).first()
+            projects_qs = Project.objects.filter(user=user)
+            if selected_project_ids is not None and isinstance(selected_project_ids, list):
+                projects_qs = projects_qs.filter(id__in=selected_project_ids)
 
-        profile_data = {
-            'personal_info': personal_info or PersonalInfo(user=user, full_name=user.full_name or "", email=user.email),
-            'work_experiences': WorkExperience.objects.filter(user=user),
-            'projects': projects_qs,
-            'skills': Skill.objects.filter(user=user),
-            'educations': Education.objects.filter(user=user),
-            'certifications': Certification.objects.filter(user=user),
-        }
-        profile_serialized = FullProfileSerializer(profile_data).data
+            profile_data = {
+                'personal_info': personal_info or PersonalInfo(user=user, full_name=user.full_name or "", email=user.email),
+                'work_experiences': WorkExperience.objects.filter(user=user),
+                'projects': projects_qs,
+                'skills': Skill.objects.filter(user=user),
+                'educations': Education.objects.filter(user=user),
+                'certifications': Certification.objects.filter(user=user),
+            }
+            profile_serialized = FullProfileSerializer(profile_data).data
 
         # Call AI
         letter_content = AIService.write_cover_letter(profile_serialized, job_details, tone, length, api_key=api_key, target_language=target_language)
@@ -254,7 +259,8 @@ class CoverLetterGenerateView(APIView):
 
         return Response({
             "success": True,
-            "data": CoverLetterVersionSerializer(cover_letter).data
+            "data": CoverLetterVersionSerializer(cover_letter).data,
+            "content": letter_content
         }, status=status.HTTP_201_CREATED)
 
 class ResumeRephraseView(APIView):
