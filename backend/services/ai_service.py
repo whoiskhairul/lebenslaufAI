@@ -22,7 +22,7 @@ class AIService:
         }
         
         payload = {
-            "model": "deepseek-chat", # standard chat model
+            "model": os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat'),
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}

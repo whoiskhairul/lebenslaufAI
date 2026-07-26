@@ -104,11 +104,19 @@ class ResumeTailorView(APIView):
                 application.job_description = job_description
                 application.save()
 
-        # 3. Analyze ATS Score & Gaps
-        ats_report = AIService.analyze_ats(profile_serialized, job_details, api_key=api_key)
-
         # 4. Tailor Resume Details
         tailored_result = AIService.tailor_resume(profile_serialized, job_details, api_key=api_key, target_language=target_language, aggressive_mode=aggressive_mode)
+
+        # 4b. Analyze ATS Score & Gaps on the TAILORED Resume Output using DeepSeek AI
+        tailored_profile_data = {
+            "personal_info": profile_serialized.get('personal_info', {}),
+            "summary": tailored_result.get('tailored_summary', ''),
+            "work_experiences": tailored_result.get('tailored_experiences', []),
+            "skills": tailored_result.get('tailored_skills', profile_serialized.get('skills', [])),
+            "projects": tailored_result.get('tailored_projects', profile_serialized.get('projects', [])),
+            "educations": profile_serialized.get('educations', [])
+        }
+        ats_report = AIService.analyze_ats(tailored_profile_data, job_details, api_key=api_key)
 
         # Agent 4: Run deterministic hallucination validator
         validation_alerts = AIService.validate_hallucinations(
@@ -286,7 +294,6 @@ class ATSScoreCheckView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        user = request.user
         job_description = request.data.get('job_description', '')
         company = request.data.get('company', '')
         position = request.data.get('position', '')
@@ -299,17 +306,10 @@ class ATSScoreCheckView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
-
-        job_details = {
-            "company": company or 'Target Company',
-            "position": position or 'Role Candidate',
-            "keywords": []
-        }
-
-        # Analyze ATS score for the updated CV payload without re-tailoring
-        ats_report = AIService.analyze_ats(cv_details, job_details, api_key=api_key)
+        ats_report = AIService.analyze_ats(cv_details, job_description, api_key=api_key)
 
         return Response({
             "success": True,
             "ats_report": ats_report
         }, status=status.HTTP_200_OK)
+
