@@ -22,7 +22,7 @@ class AIService:
         }
         
         payload = {
-            "model": "deepseek-chat", # standard chat model
+            "model": os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat'),
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}
@@ -197,15 +197,18 @@ class AIService:
         profile_text = json.dumps(profile_data, default=str)
         job_text = json.dumps(job_data, default=str)
         
+        is_german = target_language in ['de', 'deutsch', 'german']
         lang_instruction = (
-            "IMPORTANT: Translate and write ALL tailored content (tailored_summary, tailored_experiences bullets) in GERMAN (Deutsch).\n"
-            if target_language in ['de', 'deutsch', 'german']
-            else "Write ALL tailored content in ENGLISH.\n"
+            "CRITICAL GERMAN LANGUAGE REQUIREMENT:\n"
+            "- Translate and write ALL tailored summary, ALL experience bullet points, and ALL project bullet points in GERMAN (Deutsch).\n"
+            "- Provide German section header names in 'tailored_section_names': summary -> 'Zusammenfassung', experience -> 'Berufserfahrung', projects -> 'Projekte', education -> 'Ausbildung', skills -> 'Kenntnisse'.\n\n"
+            if is_german
+            else "Write ALL tailored summary, experience bullets, and project bullets in ENGLISH.\n\n"
         )
 
         aggressive_instruction = (
             "AGGRESSIVE ATS OPTIMIZATION ENABLED:\n"
-            "- Actively weave key missing technical terms, tools, methodologies, and frameworks from the JOB_DESCRIPTION into experience bullet points and professional summary where contextually appropriate to maximize ATS score.\n"
+            "- Actively weave key missing technical terms, tools, methodologies, and frameworks from the JOB_DESCRIPTION into experience bullet points, project bullet points, and professional summary where contextually appropriate to maximize ATS score.\n"
             "- Ensure sentences remain natural, highly impressive, and professional.\n\n"
             if aggressive_mode
             else "STANDARD PROFILE ALIGNMENT (STRICT):\n"
@@ -214,10 +217,11 @@ class AIService:
         )
         
         system_prompt = (
-            "You are a professional Resume Writer.\n"
+            "You are an expert Resume Writer and ATS Auditor.\n"
             f"{lang_instruction}"
             f"{aggressive_instruction}"
-            "Tailor the user's resume summary and experience bullets to match the job description.\n"
+            "Tailor the user's resume summary, experience bullets, and project bullets to match the job description.\n"
+            "Simultaneously audit the tailored resume against the job description and calculate an accurate ATS match report.\n"
             "CRITICAL: Do NOT invent/fabricate skills, jobs, dates, or degrees.\n"
             "Return ONLY a JSON object matching this schema:\n"
             "{\n"
@@ -228,6 +232,33 @@ class AIService:
             "       \"bullets\": [\"string\"]\n"
             "     }\n"
             "  ],\n"
+            "  \"tailored_projects\": [\n"
+            "     {\n"
+            "       \"id\": \"string (UUID matches project.id)\",\n"
+            "       \"bullets\": [\"string\"]\n"
+            "     }\n"
+            "  ],\n"
+            "  \"tailored_section_names\": {\n"
+            "     \"summary\": \"string\",\n"
+            "     \"experience\": \"string\",\n"
+            "     \"projects\": \"string\",\n"
+            "     \"education\": \"string\",\n"
+            "     \"skills\": \"string\"\n"
+            "  },\n"
+            "  \"ats_report\": {\n"
+            "     \"score\": 0-100,\n"
+            "     \"matched_keywords\": [\"string\"],\n"
+            "     \"missing_keywords\": [\"string\"],\n"
+            "     \"all_missing\": [\n"
+            "        {\"name\": \"string\", \"category\": \"hard_skills\" | \"tools\" | \"soft_skills\"}\n"
+            "     ],\n"
+            "     \"breakdown\": {\n"
+            "        \"keywords\": 0-100,\n"
+            "        \"structure\": 0-100,\n"
+            "        \"bullets\": 0-100\n"
+            "     },\n"
+            "     \"suggestions\": [\"string\"]\n"
+            "  },\n"
             "  \"explanations\": [\n"
             "     {\n"
             "       \"section\": \"summary\" | \"experience_id\",\n"
@@ -249,7 +280,8 @@ class AIService:
             try:
                 res = json.loads(result_text)
                 res['tailored_skills'] = sorted_skills
-                res['tailored_projects'] = sorted_projects
+                if not res.get('tailored_projects'):
+                    res['tailored_projects'] = sorted_projects
                 return res
             except ValueError:
                 pass
