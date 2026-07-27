@@ -12,7 +12,10 @@ interface AppShellProps {
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavigate }) => {
-  const { fullName, email, logout, theme, setTheme } = useAuthStore();
+  const { user, logout, theme, setTheme } = useAuthStore();
+  const fullName = user?.full_name || user?.email?.split('@')[0] || 'User';
+  const email = user?.email || '';
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('sidebar_collapsed') === 'true';

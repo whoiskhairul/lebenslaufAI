@@ -1233,18 +1233,18 @@
 
 .ppName {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: calc(var(--base-font-size, 13px) * 1.2 * var(--heading-size-mult, 1.0));
+  font-size: calc(var(--base-font-size, 13px) * 1.85 * var(--heading-size-mult, 1.0));
   font-weight: 800;
   color: var(--accent-color, #0f172a);
-  margin: 0 0 0 0;
+  margin: 0 0 4px 0;
   letter-spacing: -0.02em;
   text-align: left;
 }
 
 .ppTitle {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: calc(var(--base-font-size, 13px) * 0.7 * var(--heading-size-mult, 1.0));
-  font-weight: 500;
+  font-size: calc(var(--base-font-size, 13px) * 0.92 * var(--heading-size-mult, 1.0));
+  font-weight: 600;
   color: var(--accent-color, #3b82f6);
   margin: 0 0 12px 0;
   text-transform: capitalize;
@@ -1267,8 +1267,8 @@
 .ppContactItem {
   display: flex;
   align-items: flex-start;
-  font-size: calc(var(--base-font-size, 13px) * 0.78);
-  line-height: var(--line-height-mult, 1.4);
+  font-size: calc(var(--base-font-size, 13px) * 0.85);
+  line-height: var(--line-height-mult, 1.45);
 }
 
 .ppContactLabel {
@@ -1335,7 +1335,7 @@
 }
 
 .ppDateRange {
-  font-size: calc(var(--base-font-size, 13px) * 0.95);
+  font-size: calc(var(--base-font-size, 13px) * 0.92);
   font-weight: 700;
   color: #475569;
 }
@@ -1356,7 +1356,7 @@
 .ppJobMeta {
   display: flex;
   gap: 8px;
-  font-size: calc(var(--base-font-size, 13px) * 0.9);
+  font-size: calc(var(--base-font-size, 13px) * 0.92);
   color: #64748b;
   margin-bottom: var(--space-2);
 }
@@ -1416,16 +1416,16 @@
 
 .germanName {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: calc(var(--base-font-size, 13px) * 1.45 * var(--heading-size-mult, 1.0));
-  font-weight: 600;
+  font-size: calc(var(--base-font-size, 13px) * 1.85 * var(--heading-size-mult, 1.0));
+  font-weight: 700;
   color: #0f172a;
-  margin: 0 0 1px 0;
+  margin: 0 0 2px 0;
   text-align: left;
 }
 
 .germanTitle {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: calc(var(--base-font-size, 13px) * 0.85 * var(--heading-size-mult, 1.0));
+  font-size: calc(var(--base-font-size, 13px) * 0.92 * var(--heading-size-mult, 1.0));
   font-weight: 500;
   color: #64748b;
   margin: 0;
@@ -1471,7 +1471,7 @@
 .germanContactItem {
   display: flex;
   align-items: flex-start;
-  font-size: calc(var(--base-font-size, 13px) * 0.8);
+  font-size: calc(var(--base-font-size, 13px) * 0.85);
 }
 
 .germanContactLabel {
