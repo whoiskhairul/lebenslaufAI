@@ -6,6 +6,10 @@ import { Dashboard } from './views/Dashboard';
 import { MasterProfile } from './views/MasterProfile';
 import { Editor } from './views/EditorNew';
 import { Settings } from './views/Settings';
+import { LoginPage } from './views/auth/LoginPage';
+import { RegisterPage } from './views/auth/RegisterPage';
+import { AccountSecurityPage } from './views/auth/AccountSecurityPage';
+import { navigateTo } from './utils/navigation';
 import './css/globals.css';
 
 export const App: React.FC = () => {
@@ -13,16 +17,17 @@ export const App: React.FC = () => {
   const [currentPath, setCurrentPath] = useState('dashboard');
   const [routeParams, setRouteParams] = useState<{ appId?: string; tab?: string }>({});
 
-  const parseHash = () => {
-    const hash = window.location.hash || '#dashboard';
-    const cleanHash = hash.replace(/^#/, '');
-    const [path, queryString] = cleanHash.split('?');
-    
-    const params = new URLSearchParams(queryString || '');
+  const parseRoute = () => {
+    const pathname = window.location.pathname.replace(/^\//, '');
+    const hash = (window.location.hash || '').replace(/^#/, '');
+    const rawPath = pathname || hash || 'dashboard';
+
+    const [cleanPath, queryString] = rawPath.split('?');
+    const params = new URLSearchParams(queryString || window.location.search);
     const appId = params.get('appId') || undefined;
     const tab = params.get('tab') || undefined;
-    
-    return { path, appId, tab };
+
+    return { path: cleanPath, appId, tab };
   };
 
   useEffect(() => {
@@ -30,48 +35,55 @@ export const App: React.FC = () => {
   }, [initAuth]);
 
   useEffect(() => {
-    const handleHashChange = () => {
-      const { path, appId, tab } = parseHash();
-      const validPaths = ['dashboard', 'master-profile', 'editor', 'settings'];
-      const targetPath = validPaths.includes(path) ? path : 'dashboard';
-      
-      setCurrentPath(targetPath);
+    const handleLocationChange = () => {
+      const { path, appId, tab } = parseRoute();
+      setCurrentPath(path);
       setRouteParams({ appId, tab });
     };
 
-    window.addEventListener('hashchange', handleHashChange);
-    handleHashChange(); // initial parse
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    handleLocationChange();
 
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
   }, []);
 
-  const handleNavigateToEditor = (params?: { company?: string; position?: string; desc?: string; application_id?: string }) => {
+  const handleNavigateToEditor = (params?: { application_id?: string }) => {
     if (params?.application_id) {
-      window.location.hash = `editor?appId=${params.application_id}`;
+      navigateTo(`/editor?appId=${params.application_id}`);
     } else {
-      window.location.hash = 'editor';
+      navigateTo('/editor');
     }
   };
 
+  // 1. Unauthenticated Route Resolution
   if (!isAuthenticated) {
+    if (currentPath === 'login') return <LoginPage />;
+    if (currentPath === 'register') return <RegisterPage />;
     return <Landing />;
   }
 
+  // 2. Authenticated Route Resolution (Normalize invalid or auth paths to 'dashboard')
+  const validAuthenticatedViews = ['dashboard', 'master-profile', 'editor', 'security', 'settings'];
+  const activeView = validAuthenticatedViews.includes(currentPath) ? currentPath : 'dashboard';
+
   return (
-    <AppShell activeView={currentPath} onNavigate={(view) => {
-      window.location.hash = view;
-    }}>
-      {currentPath === 'dashboard' && (
+    <AppShell activeView={activeView} onNavigate={(view) => navigateTo(view)}>
+      {activeView === 'dashboard' && (
         <Dashboard onNavigateToEditor={handleNavigateToEditor} activeAppId={routeParams.appId} />
       )}
-      {currentPath === 'master-profile' && <MasterProfile />}
-      {currentPath === 'editor' && (
+      {activeView === 'master-profile' && <MasterProfile />}
+      {activeView === 'editor' && (
         <Editor initialJobParams={{
           application_id: routeParams.appId,
           tab: routeParams.tab
         }} />
       )}
-      {currentPath === 'settings' && <Settings />}
+      {activeView === 'security' && <AccountSecurityPage />}
+      {activeView === 'settings' && <Settings />}
     </AppShell>
   );
 };

@@ -961,8 +961,34 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         if (profileObj) {
           if (profileObj.personal_info) {
             setMasterProfileInfo(profileObj.personal_info);
+            setEditablePersonalInfo({
+              full_name: profileObj.personal_info.full_name || '',
+              title: profileObj.personal_info.title || '',
+              email: profileObj.personal_info.email || '',
+              phone: profileObj.personal_info.phone || '',
+              location: profileObj.personal_info.location || '',
+              date_of_birth: profileObj.personal_info.date_of_birth || '',
+              nationality: profileObj.personal_info.nationality || '',
+              linkedin: profileObj.personal_info.linkedin || '',
+              github: profileObj.personal_info.github || '',
+              website: profileObj.personal_info.website || '',
+              image_url: profileObj.personal_info.image_url || ''
+            });
+            if (profileObj.personal_info.summary) {
+              setEditableSummary(profileObj.personal_info.summary);
+            }
           }
-          if (profileObj.projects) {
+          if (profileObj.work_experiences && profileObj.work_experiences.length > 0) {
+            setEditableExperiences(profileObj.work_experiences);
+          }
+          if (profileObj.skills && profileObj.skills.length > 0) {
+            setEditableSkills(profileObj.skills);
+          }
+          if (profileObj.educations && profileObj.educations.length > 0) {
+            setEditableEducations(profileObj.educations);
+          }
+          if (profileObj.projects && profileObj.projects.length > 0) {
+            setEditableProjects(profileObj.projects);
             const projs = profileObj.projects.map((p: any) => ({
               id: p.id,
               title: p.title || 'Untitled Project',
@@ -979,6 +1005,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     };
     fetchMasterProfile();
   }, []);
+
 
   // Keyboard focus relocation hook for bullet list manipulation
   useEffect(() => {
@@ -3748,7 +3775,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
           )}
 
           {/* Dedicated Subsection Sub-heading */}
-          <div style={{ fontWeight: 700, fontSize: '1.15em', color: 'var(--accent-color, #0f172a)', marginBottom: '6px' }}>
+          <div style={{ fontWeight: 700, fontSize: '1.05em', color: 'var(--accent-color, #0f172a)', marginBottom: '4px' }}>
             <AutoSizeTextarea
               value={languagesTitle || (targetLanguage === 'de' ? 'Sprachen' : 'Languages')}
               onChange={(val) => setLanguagesTitle(val)}

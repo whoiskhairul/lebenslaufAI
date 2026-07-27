@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
 import api from '../services/api';
+import { navigateTo } from '../utils/navigation';
 import {
   Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, ExternalLink, ShieldAlert, Sparkles, CheckSquare, Info, FileText
 } from 'lucide-react';
 import styles from './Dashboard.module.css';
+
 
 interface Application {
   id: string;
@@ -154,13 +156,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
     if (!window.confirm('Are you sure you want to remove this job tracking card?')) return;
     try {
       await api.delete(`/applications/${appId}`);
-      window.location.hash = 'dashboard';
+      setIsDetailsOpen(false);
+      setSelectedApp(null);
+      navigateTo('/dashboard');
       fetchApplications();
       fetchAtsScores();
     } catch (err) {
       console.error('Failed to delete application:', err);
     }
   };
+
 
   const handleDeleteVersion = async (versionId: string) => {
     if (!window.confirm('Are you sure you want to delete this tailored CV version?')) return;
@@ -284,10 +289,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                           draggable
                           onDragStart={(e) => handleDragStart(e, app.id)}
                           onClick={() => {
-                            window.location.hash = `dashboard?appId=${app.id}`;
+                            setSelectedApp(app);
+                            setIsDetailsOpen(true);
+                            navigateTo(`/dashboard?appId=${app.id}`);
                           }}
                           style={{ cursor: 'pointer' }}
                         >
+
+
                           <div className={styles.cardHeader}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                               <h4>{app.position}</h4>
@@ -382,14 +391,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
 
       {/* Slide-out Application Details Side Panel */}
       {isDetailsOpen && selectedApp && (
-        <div className={styles.modalOverlay} onClick={() => { window.location.hash = 'dashboard'; }}>
+        <div className={styles.modalOverlay} onClick={() => { setIsDetailsOpen(false); setSelectedApp(null); navigateTo('/dashboard'); }}>
           <div className={`${styles.detailsSidebar} glass`} onClick={(e) => e.stopPropagation()}>
             <div className={styles.sidebarHeader}>
               <h3>Application Command Center</h3>
-              <Button variant="ghost" onClick={() => { window.location.hash = 'dashboard'; }} className={styles.closeBtn}>
+              <Button variant="ghost" onClick={() => { setIsDetailsOpen(false); setSelectedApp(null); navigateTo('/dashboard'); }} className={styles.closeBtn}>
                 X
               </Button>
             </div>
+
 
             <div className={styles.sidebarContent}>
               <div className={styles.sidebarField}>

@@ -1,63 +1,135 @@
 import { create } from 'zustand';
 
-interface UserDetails {
-  userId: string;
+export interface UserProfile {
+  bio?: string;
+  job_title?: string;
+  target_industry?: string;
+  phone_number?: string;
+  location?: string;
+  website?: string;
+  github_url?: string;
+  linkedin_url?: string;
+}
+
+export interface User {
+  id: string;
   email: string;
-  fullName: string;
+  full_name?: string;
+  avatar?: string;
+  timezone?: string;
+  locale?: string;
+  two_factor_enabled: boolean;
+  email_verified: boolean;
+  account_locked_until?: string | null;
+  last_login_ip?: string | null;
+  date_joined?: string;
+  profile?: UserProfile;
+}
+
+export interface UserSession {
+  id: string;
+  session_key: string;
+  ip_address?: string;
+  user_agent?: string;
+  device_info?: string;
+  created_at: string;
+  last_activity: string;
+  is_active: boolean;
+  is_current: boolean;
 }
 
 interface AuthState {
-  token: string | null;
-  userId: string | null;
-  email: string | null;
-  fullName: string | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  sessionKey: string | null;
+  user: User | null;
   isAuthenticated: boolean;
+  twoFactorRequired: boolean;
+  pendingEmail: string | null;
   theme: 'light' | 'dark';
   
   // Actions
-  login: (token: string, details: UserDetails) => void;
+  setAuth: (accessToken: string, refreshToken: string, user: User, sessionKey?: string) => void;
+  setTokens: (accessToken: string, refreshToken?: string) => void;
+  setUser: (user: User) => void;
+  setTwoFactorRequired: (required: boolean, email?: string) => void;
   logout: () => void;
   setTheme: (theme: 'light' | 'dark') => void;
   initAuth: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  token: null,
-  userId: null,
-  email: null,
-  fullName: null,
+export const useAuthStore = create<AuthState>((set) => ({
+  accessToken: null,
+  refreshToken: null,
+  sessionKey: null,
+  user: null,
   isAuthenticated: false,
-  theme: 'dark', // default to premium dark mode
+  twoFactorRequired: false,
+  pendingEmail: null,
+  theme: 'dark',
 
-  login: (token, details) => {
-    localStorage.setItem('auth_token', token);
-    localStorage.setItem('user_id', details.userId);
-    localStorage.setItem('user_email', details.email);
-    localStorage.setItem('user_name', details.fullName);
-    
+  setAuth: (accessToken, refreshToken, user, sessionKey) => {
+    // Purge any stale user state from previous logins
+    const currentTheme = localStorage.getItem('app_theme') || 'dark';
+    localStorage.clear();
+    localStorage.setItem('app_theme', currentTheme);
+
+    localStorage.setItem('access_token', accessToken);
+    localStorage.setItem('auth_token', accessToken);
+    localStorage.setItem('refresh_token', refreshToken);
+    localStorage.setItem('user_data', JSON.stringify(user));
+    if (sessionKey) localStorage.setItem('session_key', sessionKey);
+
     set({
-      token,
-      userId: details.userId,
-      email: details.email,
-      fullName: details.fullName,
-      isAuthenticated: true
+      accessToken,
+      refreshToken,
+      sessionKey: sessionKey || null,
+      user,
+      isAuthenticated: true,
+      twoFactorRequired: false,
+      pendingEmail: null,
     });
+  },
+
+  setTokens: (accessToken, refreshToken) => {
+    localStorage.setItem('access_token', accessToken);
+    localStorage.setItem('auth_token', accessToken);
+    if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
+    set((state) => ({
+      accessToken,
+      refreshToken: refreshToken || state.refreshToken,
+    }));
+  },
+
+
+  setUser: (user) => {
+    localStorage.setItem('user_data', JSON.stringify(user));
+    set({ user });
+  },
+
+  setTwoFactorRequired: (required, email) => {
+    set({ twoFactorRequired: required, pendingEmail: email || null });
   },
 
   logout: () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_id');
-    localStorage.removeItem('user_email');
-    localStorage.removeItem('user_name');
-    
+    const currentTheme = localStorage.getItem('app_theme') || 'dark';
+    localStorage.clear();
+    localStorage.setItem('app_theme', currentTheme);
+
     set({
-      token: null,
-      userId: null,
-      email: null,
-      fullName: null,
-      isAuthenticated: false
+      accessToken: null,
+      refreshToken: null,
+      sessionKey: null,
+      user: null,
+      isAuthenticated: false,
+      twoFactorRequired: false,
+      pendingEmail: null,
     });
+
+    window.history.pushState({}, '', '/login');
+    window.dispatchEvent(new Event('popstate'));
   },
+
 
   setTheme: (theme) => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -66,24 +138,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   initAuth: () => {
-    const token = localStorage.getItem('auth_token');
-    const userId = localStorage.getItem('user_id');
-    const email = localStorage.getItem('user_email');
-    const fullName = localStorage.getItem('user_name') || '';
+    const accessToken = localStorage.getItem('access_token');
+    const refreshToken = localStorage.getItem('refresh_token');
+    const sessionKey = localStorage.getItem('session_key');
+    const rawUserData = localStorage.getItem('user_data');
     const storedTheme = localStorage.getItem('app_theme') as 'light' | 'dark' | null;
     
     const theme = storedTheme || 'dark';
     document.documentElement.setAttribute('data-theme', theme);
 
-    if (token && userId && email) {
-      set({
-        token,
-        userId,
-        email,
-        fullName,
-        isAuthenticated: true,
-        theme
-      });
+    if (accessToken && rawUserData) {
+      try {
+        const user = JSON.parse(rawUserData);
+        set({
+          accessToken,
+          refreshToken,
+          sessionKey,
+          user,
+          isAuthenticated: true,
+          theme
+        });
+      } catch (e) {
+        localStorage.removeItem('user_data');
+        set({ theme });
+      }
     } else {
       set({ theme });
     }
