@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
 import api from '../services/api';
+import { useAuthStore } from '../store/authStore';
 import {
   User, Briefcase, FolderGit2, Dumbbell, GraduationCap, Award, Trash2, Plus, Edit3, Check, X, Upload, Brain, Wand2, Sparkles, Lock
 } from 'lucide-react';
 import styles from './MasterProfile.module.css';
+
 
 interface PersonalInfo {
   id?: string;
@@ -73,7 +75,9 @@ interface Certification {
 }
 
 export const MasterProfile: React.FC = () => {
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'info' | 'experience' | 'projects' | 'skills' | 'education' | 'certs'>('info');
+
   const [profile, setProfile] = useState<{
     personal_info: PersonalInfo;
     work_experiences: WorkExperience[];
@@ -347,7 +351,11 @@ export const MasterProfile: React.FC = () => {
     try {
       const res = await api.get('/master-profile/full');
       if (res.data && res.data.success) {
-        setProfile(res.data.data);
+        const loadedProfile = res.data.data;
+        if (loadedProfile.personal_info && !loadedProfile.personal_info.image_url && user?.avatar) {
+          loadedProfile.personal_info.image_url = user.avatar;
+        }
+        setProfile(loadedProfile);
       }
     } catch (err) {
       console.error('Failed to load profile:', err);
@@ -355,6 +363,7 @@ export const MasterProfile: React.FC = () => {
       setIsLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchProfile();

@@ -3,10 +3,12 @@ import { createPortal } from 'react-dom';
 import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
 import api from '../services/api';
+import { useAuthStore } from '../store/authStore';
 import {
   Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Brain, Award, Save, RefreshCw, GripVertical, Trash, Plus, Settings, ArrowUp, ArrowDown
 } from 'lucide-react';
 import styles from './EditorNew.module.css';
+
 import { ATSDashboard, ATSReport, Proposal } from '../components/ATSDashboard';
 import { Snapshot } from '../components/VersionSnapshotDrawer';
 
@@ -972,7 +974,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
               linkedin: profileObj.personal_info.linkedin || '',
               github: profileObj.personal_info.github || '',
               website: profileObj.personal_info.website || '',
-              image_url: profileObj.personal_info.image_url || ''
+              image_url: profileObj.personal_info.image_url || useAuthStore.getState().user?.avatar || ''
+
             });
             if (profileObj.personal_info.summary) {
               setEditableSummary(profileObj.personal_info.summary);

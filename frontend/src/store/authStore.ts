@@ -14,8 +14,10 @@ export interface UserProfile {
 export interface User {
   id: string;
   email: string;
+  username?: string;
   full_name?: string;
   avatar?: string;
+
   timezone?: string;
   locale?: string;
   two_factor_enabled: boolean;
