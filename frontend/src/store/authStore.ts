@@ -60,17 +60,49 @@ interface AuthState {
   initAuth: () => void;
 }
 
+const getInitialState = () => {
+  const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
+  const sessionKey = typeof window !== 'undefined' ? localStorage.getItem('session_key') : null;
+  const rawUserData = typeof window !== 'undefined' ? localStorage.getItem('user_data') : null;
+  const storedTheme = (typeof window !== 'undefined' ? localStorage.getItem('app_theme') : null) as 'light' | 'dark' | null;
+  
+  const theme = storedTheme || 'dark';
+  if (typeof document !== 'undefined') {
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+
+  let user = null;
+  let isAuthenticated = false;
+
+  if (accessToken && rawUserData) {
+    try {
+      user = JSON.parse(rawUserData);
+      isAuthenticated = true;
+    } catch (e) {
+      if (typeof window !== 'undefined') localStorage.removeItem('user_data');
+    }
+  }
+
+  return {
+    accessToken,
+    refreshToken,
+    sessionKey,
+    user,
+    isAuthenticated,
+    twoFactorRequired: false,
+    pendingEmail: null,
+    theme
+  };
+};
+
+const initialState = getInitialState();
+
 export const useAuthStore = create<AuthState>((set) => ({
-  accessToken: null,
-  refreshToken: null,
-  sessionKey: null,
-  user: null,
-  isAuthenticated: false,
-  twoFactorRequired: false,
-  pendingEmail: null,
-  theme: 'dark',
+  ...initialState,
 
   setAuth: (accessToken, refreshToken, user, sessionKey) => {
+
     // Purge any stale user state from previous logins
     const currentTheme = localStorage.getItem('app_theme') || 'dark';
     localStorage.clear();

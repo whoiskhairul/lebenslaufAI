@@ -51,7 +51,7 @@ export const DemoSection: React.FC = () => {
               <div className={styles.atsCard}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#f8fafc' }}>Target Job Match</span>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#34d399' }}>94%</span>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#34d399' }}>72%</span>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.3rem' }}>
                   Senior Full-Stack Engineer at TechCorp

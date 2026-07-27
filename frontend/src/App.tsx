@@ -12,23 +12,27 @@ import { AccountSecurityPage } from './views/auth/AccountSecurityPage';
 import { navigateTo } from './utils/navigation';
 import './css/globals.css';
 
+const parseRoute = () => {
+  const pathname = window.location.pathname.replace(/^\//, '');
+  const hash = (window.location.hash || '').replace(/^#/, '');
+  const rawPath = pathname || hash || 'dashboard';
+
+  const [cleanPath, queryString] = rawPath.split('?');
+  const params = new URLSearchParams(queryString || window.location.search);
+  const appId = params.get('appId') || undefined;
+  const tab = params.get('tab') || undefined;
+
+  return { path: cleanPath, appId, tab };
+};
+
 export const App: React.FC = () => {
   const { isAuthenticated, initAuth } = useAuthStore();
-  const [currentPath, setCurrentPath] = useState('dashboard');
-  const [routeParams, setRouteParams] = useState<{ appId?: string; tab?: string }>({});
+  
+  // Synchronously parse route on initial mount to avoid 1st frame flash
+  const initialRoute = parseRoute();
+  const [currentPath, setCurrentPath] = useState(initialRoute.path);
+  const [routeParams, setRouteParams] = useState({ appId: initialRoute.appId, tab: initialRoute.tab });
 
-  const parseRoute = () => {
-    const pathname = window.location.pathname.replace(/^\//, '');
-    const hash = (window.location.hash || '').replace(/^#/, '');
-    const rawPath = pathname || hash || 'dashboard';
-
-    const [cleanPath, queryString] = rawPath.split('?');
-    const params = new URLSearchParams(queryString || window.location.search);
-    const appId = params.get('appId') || undefined;
-    const tab = params.get('tab') || undefined;
-
-    return { path: cleanPath, appId, tab };
-  };
 
   useEffect(() => {
     initAuth();
