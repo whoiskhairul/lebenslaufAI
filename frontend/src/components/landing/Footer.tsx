@@ -59,9 +59,9 @@ export const Footer: React.FC = () => {
             <ul className={styles.linkList}>
               <li><a href="/login" onClick={(e) => navigateTo('/login', e)}>Sign In</a></li>
               <li><a href="/register" onClick={(e) => navigateTo('/register', e)}>Sign Up Free</a></li>
-              <li><a href="/reset-password" onClick={(e) => navigateTo('/reset-password', e)}>Reset Password</a></li>
               <li><a href="/security" onClick={(e) => navigateTo('/security', e)}>Account Security</a></li>
             </ul>
+
           </div>
 
           <div>

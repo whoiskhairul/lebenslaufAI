@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { ATSDashboardSkeleton } from './skeleton/ATSDashboardSkeleton';
 import {
   Brain, Sparkles, Plus, RefreshCw, CheckCircle2, XCircle, X
 } from 'lucide-react';
@@ -244,7 +245,11 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
   const [keywordFilter, setKeywordFilter] = useState<'all' | 'matched' | 'missing'>('all');
   const [modalSkill, setModalSkill] = useState<string | null>(null);
 
-  const score = report?.score ?? 0;
+  if (!report) {
+    return <ATSDashboardSkeleton />;
+  }
+
+  const score = report.score;
 
   const defaultCategories = ['technical', 'frameworks', 'tools', 'databases', 'cloud', 'soft_skills', 'languages'];
   const userCats = (existingCategories || []).map(c => c.toLowerCase().trim()).filter(Boolean);

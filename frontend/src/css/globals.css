@@ -1,13 +1,17 @@
 @import './variables.css';
 
 /* CSS Reset and Global Styles */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   min-height: 100vh;
 }
@@ -24,7 +28,12 @@ body {
   overflow-y: auto;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-headers);
   font-weight: 700;
   line-height: 1.2;
@@ -40,7 +49,10 @@ a:hover {
   color: var(--primary-hover);
 }
 
-input, textarea, select, button {
+input,
+textarea,
+select,
+button {
   font-family: inherit;
   font-size: inherit;
   color: inherit;
@@ -78,6 +90,7 @@ button {
     opacity: 0;
     transform: translateY(8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -124,14 +137,17 @@ button {
   @page {
     margin: 0 !important;
   }
+
   body {
     background: #ffffff !important;
     color: #000000 !important;
     margin: 0 !important;
   }
+
   .no-print {
     display: none !important;
   }
+
   main {
     margin: 0 !important;
     padding: 0 !important;

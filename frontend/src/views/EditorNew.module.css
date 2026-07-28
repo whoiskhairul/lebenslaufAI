@@ -39,16 +39,51 @@
 /* Sidebar Styling - Sleek Glassmorphism */
 .controlPanel {
   position: relative;
-  width: clamp(420px, 32vw, 520px);
-  min-width: 420px;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   flex-shrink: 0;
   overflow-y: auto;
   height: 100%;
-  padding-right: var(--space-2);
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 16px 20px 28px 16px;
+  box-sizing: border-box;
+}
+
+.resizerHandle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 10px;
+  cursor: col-resize;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  touch-action: none;
+  transition: background 0.15s ease;
+}
+
+.resizerHandle::after {
+  content: '';
+  width: 4px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--card-border, rgba(226, 232, 240, 0.8));
+  transition: all 0.2s ease;
+}
+
+.resizerHandle:hover::after,
+.resizerHandleActive::after {
+  background: var(--primary, #6366f1);
+  height: 56px;
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.6);
+}
+
+.resizerHandle:hover,
+.resizerHandleActive {
+  background: rgba(99, 102, 241, 0.08);
 }
 
 .formGrid,
@@ -101,11 +136,11 @@
 }
 
 .form {
-  padding: var(--space-5);
+  padding: 0.5rem 0.75rem;
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .form h3,
@@ -799,44 +834,67 @@
   z-index: 20;
 }
 
-.sectionHeaderWrapper {
+.sectionHeaderWrapper,
+.ppHeader,
+.germanHeader,
+.resumeSection {
   position: relative;
 }
 
-.sectionHeaderWrapper:hover .sectionControls {
+.sectionHeaderWrapper:hover .sectionControls,
+.ppHeader:hover .sectionControls,
+.germanHeader:hover .sectionControls,
+.resumeSection:hover .sectionControls {
   opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
 }
 
 .sectionControls {
   position: absolute;
-  left: -48px;
+  left: -40px;
   top: -2px;
   display: flex;
-  gap: 2px;
+  align-items: center;
+  gap: 4px;
   opacity: 0;
-  transition: opacity 0.2s ease;
-  z-index: 20;
+  visibility: hidden;
+  transform: translateY(-2px) scale(0.92);
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0.22s ease;
+  z-index: 30;
 }
 
 .itemSortBtn {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: white;
-  border: 1px solid #cbd5e1;
-  color: #64748b;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #4f46e5;
   cursor: pointer;
-  font-size: 10px;
-  font-weight: bold;
   padding: 0;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.18), 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .itemSortBtn:hover:not(:disabled) {
-  background: #f1f5f9;
-  color: var(--primary);
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #4f46e5;
+  transform: scale(1.14);
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.35);
+}
+
+.itemSortBtn:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 .itemSortBtn:disabled {
@@ -846,23 +904,29 @@
 
 .deleteBlockBtn,
 .dragHandleBtn {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: white;
-  border: 1px solid #cbd5e1;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
   color: #64748b;
   cursor: pointer;
   padding: 0;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .deleteBlockBtn:hover {
-  color: var(--danger);
-  border-color: rgba(239, 68, 68, 0.2);
-  background: rgba(239, 68, 68, 0.05);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+  background: #fef2f2;
+  transform: scale(1.12);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.25);
 }
 
 .resumeItem:hover .itemControls,

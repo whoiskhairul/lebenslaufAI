@@ -5,18 +5,20 @@
   right: 0;
   z-index: 1000;
   padding: 1rem 2rem;
-  transition: all 0.3s ease;
+  transition: background 0.3s ease, padding 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
   background: transparent;
+  border-bottom: 1px solid transparent;
 }
 
 .scrolled {
   background: rgba(15, 15, 18, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
   padding: 0.75rem 2rem;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
+
 
 .container {
   max-width: 1280px;

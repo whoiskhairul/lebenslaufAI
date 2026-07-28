@@ -192,11 +192,13 @@
 }
 
 .scoreLabel {
-  font-size: 0.75rem;
+  font-size: 0.70rem;
   color: #a78bfa;
   font-weight: 600;
   letter-spacing: 0.05em;
   margin-top: 0.2rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
 }
 
 .metricsList {
@@ -231,13 +233,16 @@
     gap: 3rem;
     text-align: center;
   }
+
   .subheadline {
     margin-left: auto;
     margin-right: auto;
   }
+
   .ctaGroup {
     justify-content: center;
   }
+
   .headline {
     font-size: 2.8rem;
   }

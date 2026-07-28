@@ -1,5 +1,7 @@
+import os
 import io
 import base64
+
 import uuid
 import pyotp
 import qrcode
@@ -545,6 +547,8 @@ class SocialOAuthRedirectView(APIView):
         if target_url:
             return redirect(target_url)
         return Response({"error": "Invalid provider."}, status=status.HTTP_400_BAD_REQUEST)
+
+
 
 
 class SocialCallbackRedirectView(APIView):
