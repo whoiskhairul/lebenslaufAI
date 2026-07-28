@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
 import api from '../services/api';
+import { SettingsSkeleton } from '../components/skeleton/SettingsSkeleton';
 import {
   User as UserIcon, Shield, Key, Moon, Sun, Eye, EyeOff, Sparkles, CheckCircle2, AlertTriangle, Lock, LogOut, Laptop, Check, Image, Trash2, Link
 } from 'lucide-react';
@@ -11,6 +12,7 @@ import styles from './Settings.module.css';
 export const Settings: React.FC = () => {
   const { user, setUser, theme, setTheme } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'preferences'>('profile');
+  const [isLoading, setIsLoading] = useState(true);
 
   // Profile Form states
   const [fullName, setFullName] = useState(user?.full_name || '');
@@ -45,9 +47,14 @@ export const Settings: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    const key = localStorage.getItem('deepseek_api_key') || '';
-    setApiKey(key);
-    fetchSessions();
+    const init = async () => {
+      setIsLoading(true);
+      const key = localStorage.getItem('deepseek_api_key') || '';
+      setApiKey(key);
+      await fetchSessions();
+      setIsLoading(false);
+    };
+    init();
   }, []);
 
   const fetchSessions = async () => {
@@ -169,7 +176,11 @@ export const Settings: React.FC = () => {
         </button>
       </div>
 
-      {/* TAB 1: PROFILE DETAILS */}
+      {isLoading ? (
+        <SettingsSkeleton />
+      ) : (
+        <>
+          {/* TAB 1: PROFILE DETAILS */}
       {activeTab === 'profile' && (
         <div className={`${styles.card} glass-card`}>
           <div className={styles.sectionHeader}>
@@ -463,6 +474,8 @@ export const Settings: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

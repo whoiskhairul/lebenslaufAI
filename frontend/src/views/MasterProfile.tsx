@@ -3,6 +3,7 @@ import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
+import { MasterProfileSkeleton } from '../components/skeleton/MasterProfileSkeleton';
 import {
   User, Briefcase, FolderGit2, Dumbbell, GraduationCap, Award, Trash2, Plus, Edit3, Check, X, Upload, Brain, Wand2, Sparkles, Lock
 } from 'lucide-react';
@@ -656,7 +657,7 @@ export const MasterProfile: React.FC = () => {
         {/* Content Viewport */}
         <div className={`${styles.viewport} glass-card`}>
           {isLoading ? (
-            <div className={styles.loader}>Loading credentials...</div>
+            <MasterProfileSkeleton />
           ) : (
             <>
               {msg.text && (

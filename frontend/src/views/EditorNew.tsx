@@ -355,6 +355,56 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Resizable Control Panel State
+  const [panelWidth, setPanelWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('editor_panel_width');
+    return saved ? parseInt(saved, 10) : 450;
+  });
+  const [isResizingPanel, setIsResizingPanel] = useState<boolean>(false);
+  const controlPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isResizingPanel) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!controlPanelRef.current) return;
+      const rect = controlPanelRef.current.getBoundingClientRect();
+      let newWidth = e.clientX - rect.left;
+
+      // Bounds: Min 340px, Max 680px (or 48% of viewport)
+      const MIN_WIDTH = 340;
+      const MAX_WIDTH = Math.min(680, window.innerWidth * 0.48);
+
+      if (newWidth < MIN_WIDTH) newWidth = MIN_WIDTH;
+      if (newWidth > MAX_WIDTH) newWidth = MAX_WIDTH;
+
+      setPanelWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingPanel(false);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [isResizingPanel]);
+
+  useEffect(() => {
+    localStorage.setItem('editor_panel_width', panelWidth.toString());
+  }, [panelWidth]);
+
 
   // Close active section settings popover when clicking outside
   useEffect(() => {
@@ -2669,7 +2719,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
       const isHeaderSettingsOpen = activeSectionSettings === 'header';
 
       const headerControls = !isMeasuring && (
-        <div className={`${styles.sectionControls} no-print`} style={{ top: '4px', right: '4px', left: 'auto' }}>
+        <div className={`${styles.sectionControls} no-print`} style={{ top: '4px', left: '-36px', right: 'auto' }}>
           <button
             type="button"
             className={styles.itemSortBtn}
@@ -2681,7 +2731,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               setActiveSectionSettings(isHeaderSettingsOpen ? null : 'header');
             }}
           >
-            <Settings size={10} />
+            <Settings size={13} />
           </button>
         </div>
       );
@@ -3012,7 +3062,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   setActiveSectionSettings(isSettingsOpen ? null : unit.sectionId!);
                 }}
               >
-                <Settings size={10} />
+                <Settings size={13} />
               </button>
               <button
                 type="button"
@@ -4069,7 +4119,19 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
       <div className={styles.workspace}>
         {/* Sidebar Controls Area */}
-        <div className={`${styles.controlPanel} no-print`}>
+        <div
+          ref={controlPanelRef}
+          className={`${styles.controlPanel} no-print`}
+          style={{ width: `${panelWidth}px`, minWidth: `${panelWidth}px` }}
+        >
+          <div
+            className={`${styles.resizerHandle} ${isResizingPanel ? styles.resizerHandleActive : ''}`}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsResizingPanel(true);
+            }}
+            title="Click and drag to adjust control panel width"
+          />
           <div className={styles.controlPanelTabs}>
             <button
               type="button"
@@ -4130,7 +4192,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   <div className={styles.selectGroup}>
                     <label htmlFor="editorTemplate">Layout Template</label>
                     <select id="editorTemplate" value={template} onChange={(e) => setTemplate(e.target.value)}>
-                      <option value="pixel_perfect_pdf">Pixel Perfect CV Template</option>
+                      <option value="pixel_perfect_pdf">German Styled Template </option>
                       <option value="modern_minimalist" disabled>More templates Coming soon</option>
                     </select>
 

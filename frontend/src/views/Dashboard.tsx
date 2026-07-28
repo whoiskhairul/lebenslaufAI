@@ -3,6 +3,8 @@ import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { navigateTo } from '../utils/navigation';
+import { KanbanCardSkeleton } from '../components/skeleton/DashboardSkeleton';
+import { Skeleton } from '../components/skeleton/Skeleton';
 import {
   Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, ExternalLink, ShieldAlert, Sparkles, CheckSquare, Info, FileText
 } from 'lucide-react';
@@ -36,6 +38,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
   // Selected Card Details Sidebar State
@@ -88,8 +91,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
   };
 
   useEffect(() => {
-    fetchApplications();
-    fetchAtsScores();
+    const initData = async () => {
+      setIsInitialLoading(true);
+      await Promise.all([fetchApplications(), fetchAtsScores()]);
+      setIsInitialLoading(false);
+    };
+    initData();
   }, []);
 
   useEffect(() => {
@@ -148,7 +155,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
         setSelectedApp(prev => prev ? { ...prev, status: newStatus } : null);
       }
     } catch (err) {
-      console.error('Failed to update status:', err);
+      console.error(err);
     }
   };
 
@@ -165,7 +172,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
       console.error('Failed to delete application:', err);
     }
   };
-
 
   const handleDeleteVersion = async (versionId: string) => {
     if (!window.confirm('Are you sure you want to delete this tailored CV version?')) return;
@@ -190,18 +196,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
     }
   };
 
-  // Metrics calculators (Section 8)
+  // Metrics calculators
   const totalApps = applications.length;
   const interviewApps = applications.filter(a => a.status === 'interview').length;
   const offerApps = applications.filter(a => a.status === 'offer').length;
 
-  // Average Match Score
   const scoreValues = Object.values(atsScores);
   const avgMatchScore = scoreValues.length > 0
     ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
-    : '--'; // baseline default
+    : '--';
 
-  // Conversion rate (offers / total)
   const conversionRate = totalApps > 0 ? Math.round((offerApps / totalApps) * 100) : 0;
 
   const columns = [
@@ -215,7 +219,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
 
   return (
     <div className={styles.container}>
-      {/* Top Banner Row */}
+      {/* Top Banner Row - Renders immediately! */}
       <div className={styles.headerRow}>
         <div>
           <h2 className={styles.title}>Career Command Center</h2>
@@ -227,27 +231,41 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
         </Button>
       </div>
 
-      {/* Analytics Panel */}
+      {/* Analytics Panel - Values show inline skeleton while loading */}
       <div className={styles.metricsGrid}>
         <div className={`${styles.metricCard} glass-card`}>
           <p className={styles.metricLabel}>Total Applications</p>
-          <p className={styles.metricVal}>{totalApps}</p>
+          <p className={styles.metricVal}>
+            {isInitialLoading ? <Skeleton variant="text" width={40} height={28} /> : totalApps}
+          </p>
         </div>
         <div className={`${styles.metricCard} glass-card`}>
           <p className={styles.metricLabel}>Average Match Score</p>
-          <p className={styles.metricVal}>{avgMatchScore === '--' ? avgMatchScore : `${avgMatchScore}%`}</p>
+          <p className={styles.metricVal}>
+            {isInitialLoading ? (
+              <Skeleton variant="text" width={55} height={28} />
+            ) : avgMatchScore === '--' ? (
+              avgMatchScore
+            ) : (
+              `${avgMatchScore}%`
+            )}
+          </p>
         </div>
         <div className={`${styles.metricCard} glass-card`}>
           <p className={styles.metricLabel}>Upcoming Interviews</p>
-          <p className={styles.metricVal}>{interviewApps}</p>
+          <p className={styles.metricVal}>
+            {isInitialLoading ? <Skeleton variant="text" width={40} height={28} /> : interviewApps}
+          </p>
         </div>
         <div className={`${styles.metricCard} glass-card`}>
           <p className={styles.metricLabel}>Conversion Rate</p>
-          <p className={styles.metricVal}>{conversionRate}%</p>
+          <p className={styles.metricVal}>
+            {isInitialLoading ? <Skeleton variant="text" width={50} height={28} /> : `${conversionRate}%`}
+          </p>
         </div>
       </div>
 
-      {/* Kanban Board Container */}
+      {/* Kanban Board Container - Board layout & headers render immediately */}
       <div className={styles.boardScroll}>
         <div className={styles.board}>
           {columns.map((col) => {
@@ -273,11 +291,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                     <span className={styles.dot} style={{ backgroundColor: col.color }}></span>
                     <h3>{col.label}</h3>
                   </div>
-                  <span className={styles.countBadge}>{colApps.length}</span>
+                  <span className={styles.countBadge}>
+                    {isInitialLoading ? <Skeleton variant="text" width={16} height={14} /> : colApps.length}
+                  </span>
                 </div>
 
                 <div className={styles.cardsContainer}>
-                  {colApps.length === 0 ? (
+                  {isInitialLoading ? (
+                    <>
+                      <KanbanCardSkeleton />
+                      <KanbanCardSkeleton />
+                    </>
+                  ) : colApps.length === 0 ? (
                     <div className={styles.emptyState}>No items</div>
                   ) : (
                     colApps.map((app) => {
