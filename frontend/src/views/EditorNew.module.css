@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Kaushan+Script&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap');
 
 .container {
   display: flex;
@@ -548,10 +548,133 @@
   color: var(--text-color, #334155);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   position: relative;
-  overflow: visible;
+  overflow: hidden;
   transition: transform 0.1s ease;
   page-break-after: always;
   page-break-inside: avoid;
+  font-family: var(--font-override, inherit);
+}
+
+/* Quick Spacing & Density Presets Styling */
+.presetCard {
+  background: var(--card-bg, rgba(255, 255, 255, 0.8));
+  border: 1px solid var(--card-border, rgba(226, 232, 240, 0.8));
+  border-radius: var(--radius-lg, 12px);
+  padding: 16px;
+  margin-bottom: 20px;
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.04));
+}
+
+.presetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.presetLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--foreground, #1e293b);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.presetGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 768px) {
+  .presetGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.presetTile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--card-bg, #ffffff);
+  border: 1.5px solid var(--card-border, #e2e8f0);
+  border-radius: var(--radius-md, 10px);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+  min-height: 72px;
+}
+
+.presetTile:hover {
+  border-color: var(--primary, #6366f1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.15);
+}
+
+.presetTileActive {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.06) 100%);
+  border-color: var(--primary, #6366f1);
+  box-shadow: 0 0 0 1px var(--primary, #6366f1), 0 4px 14px rgba(99, 102, 241, 0.18);
+}
+
+.presetTileTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.presetIcon {
+  color: var(--muted, #64748b);
+  transition: color 0.2s ease;
+}
+
+.presetTileActive .presetIcon {
+  color: var(--primary, #6366f1);
+}
+
+.presetCheck {
+  color: var(--primary, #6366f1);
+  background: rgba(99, 102, 241, 0.15);
+  border-radius: 50%;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.presetTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--foreground, #0f172a);
+  line-height: 1.2;
+}
+
+.presetSubtitle {
+  font-size: 10px;
+  color: var(--muted, #64748b);
+  margin-top: 2px;
+  line-height: 1.2;
+}
+
+.pageContainer h1,
+.pageContainer h2,
+.pageContainer h3,
+.pageContainer h4,
+.pageContainer h5,
+.pageContainer h6,
+.pageContainer input,
+.pageContainer textarea,
+.pageContainer select,
+.pageContainer button {
+  font-family: inherit;
 }
 
 /* Page Separation Gaps */
@@ -1215,6 +1338,7 @@
   padding-bottom: 4px;
   margin-bottom: var(--space-3);
   text-align: left;
+  font-family: inherit;
 }
 
 .resumeItem {
@@ -1274,7 +1398,7 @@
 
 /* A. Pixel Perfect CV Template */
 .pixelPerfectLayout {
-  font-family: 'Arial', 'Helvetica Neue', Helvetica, sans-serif;
+  font-family: var(--font-override, 'Arial', 'Helvetica Neue', Helvetica, sans-serif);
   color: #1e293b;
 }
 
@@ -1296,21 +1420,23 @@
 }
 
 .ppName {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: calc(var(--base-font-size, 13px) * 1.85 * var(--heading-size-mult, 1.0));
+  font-family: inherit;
+  font-size: calc(var(--base-font-size, 13px) * 1.55);
   font-weight: 800;
   color: var(--accent-color, #0f172a);
-  margin: 0 0 4px 0;
+  margin: 0 0 1px 0;
+  line-height: 1.15;
   letter-spacing: -0.02em;
   text-align: left;
 }
 
 .ppTitle {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: calc(var(--base-font-size, 13px) * 0.92 * var(--heading-size-mult, 1.0));
+  font-family: inherit;
+  font-size: calc(var(--base-font-size, 13px) * 0.95);
   font-weight: 600;
-  color: var(--accent-color, #3b82f6);
-  margin: 0 0 12px 0;
+  color: var(--accent-color, #3d7ee6);
+  margin: 0 0 16px 0;
+  line-height: 1.2;
   text-transform: capitalize;
   text-align: left;
 }
@@ -1320,6 +1446,7 @@
   grid-template-columns: 1fr 1fr;
   gap: var(--space-2) var(--space-4);
   max-width: 550px;
+  padding-left: 12px;
 }
 
 .ppContactCol {
@@ -1375,15 +1502,16 @@
 }
 
 .ppSectionTitle {
-  font-size: calc(var(--base-font-size, 13px) * 1.15 * var(--heading-size-mult, 1.0));
+  font-size: calc(var(--base-font-size, 13px) * 1.25);
   font-weight: 700;
   color: var(--accent-color, #0f172a);
-  border-bottom: 1px solid var(--accent-color, #0f172a);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
   padding-bottom: 3px;
   margin: 0 0 var(--space-3) 0;
   text-transform: uppercase;
   text-align: left;
   letter-spacing: 0.02em;
+  font-family: inherit;
 }
 
 .ppSectionRow {
@@ -1408,8 +1536,20 @@
   text-align: left;
 }
 
-.ppJobTitle,
-.ppDegree,
+.ppJobTitle {
+  font-size: calc(var(--base-font-size, 13px) * 0.92);
+  font-weight: 700;
+  color: #3d7ee6;
+  margin: 0 0 2px 0;
+}
+
+.ppDegree {
+  font-size: calc(var(--base-font-size, 13px) * 1.05);
+  font-weight: 700;
+  color: #3d7ee6;
+  margin: 0 0 2px 0;
+}
+
 .ppProjectTitle {
   font-size: calc(var(--base-font-size, 13px) * 1.05);
   font-weight: 700;
@@ -1457,7 +1597,7 @@
 
 /* B. German-Style CV Template Layout */
 .germanLayout {
-  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-family: var(--font-override, 'Helvetica Neue', Arial, sans-serif);
   color: #1e293b;
 }
 
@@ -1479,20 +1619,22 @@
 }
 
 .germanName {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: calc(var(--base-font-size, 13px) * 1.85 * var(--heading-size-mult, 1.0));
+  font-family: inherit;
+  font-size: calc(var(--base-font-size, 13px) * 1.55);
   font-weight: 700;
   color: #0f172a;
-  margin: 0 0 2px 0;
+  margin: 0 0 1px 0;
+  line-height: 1.15;
   text-align: left;
 }
 
 .germanTitle {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: calc(var(--base-font-size, 13px) * 0.92 * var(--heading-size-mult, 1.0));
+  font-family: inherit;
+  font-size: calc(var(--base-font-size, 13px) * 0.95);
   font-weight: 500;
   color: #64748b;
-  margin: 0;
+  margin: 0 0 16px 0;
+  line-height: 1.2;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   text-align: left;
@@ -1521,7 +1663,7 @@
   display: grid;
   grid-template-columns: 1.2fr 1fr;
   gap: var(--space-2) var(--space-6);
-  padding: var(--space-3) 0;
+  padding: var(--space-3) 0 var(--space-3) 12px;
   border-bottom: 1px solid #e2e8f0;
   margin-bottom: var(--space-6);
 }
@@ -1552,14 +1694,15 @@
 }
 
 .germanSectionTitle {
-  font-size: calc(var(--base-font-size, 13px) * 1.15 * var(--heading-size-mult, 1.0));
+  font-size: calc(var(--base-font-size, 13px) * 1.25);
   font-weight: 700;
   color: var(--accent-color, #1e293b);
-  border-bottom: 1.5px solid #1e293b;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
   padding-bottom: 2px;
   margin: 0 0 var(--space-3) 0;
   text-transform: uppercase;
   text-align: left;
+  font-family: inherit;
 }
 
 .germanRow {
@@ -1575,7 +1718,7 @@
 }
 
 .germanDateRange {
-  font-size: calc(var(--base-font-size, 13px) * 0.95);
+  font-size: calc(var(--base-font-size, 13px) * 0.92);
   color: #475569;
   font-weight: 600;
 }
@@ -1584,11 +1727,17 @@
   text-align: left;
 }
 
-.germanDegree,
 .germanJobTitle {
+  font-size: calc(var(--base-font-size, 13px) * 0.92);
+  font-weight: 700;
+  color: #3d7ee6;
+  margin: 0 0 2px 0;
+}
+
+.germanDegree {
   font-size: 1.02em;
   font-weight: 700;
-  color: #0f172a;
+  color: #3d7ee6;
   margin: 0 0 2px 0;
 }
 
@@ -1620,9 +1769,8 @@
 }
 
 
-/* C. Modern Minimalist Template */
 .resumePaper.modern_minimalist {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-override, 'Inter', sans-serif);
   color: #334155;
 }
 
@@ -1634,7 +1782,7 @@
 }
 
 .resumePaper.modern_minimalist .resumeHeader h2 {
-  font-family: 'Inter', sans-serif;
+  font-family: inherit;
   color: var(--accent-color, #0f172a);
   font-size: calc(var(--base-font-size, 13px) * 1.5 * var(--heading-size-mult, 1.0));
   font-weight: 600;
@@ -1642,7 +1790,7 @@
 }
 
 .resumePaper.modern_minimalist .resumeTitle {
-  font-family: 'Inter', sans-serif;
+  font-family: inherit;
   font-size: calc(var(--base-font-size, 13px) * 0.9 * var(--heading-size-mult, 1.0));
   font-weight: 500;
   color: var(--accent-color, #3b82f6);
@@ -1650,7 +1798,7 @@
 }
 
 .resumePaper.modern_minimalist .resumeSectionTitle {
-  font-family: 'Outfit', sans-serif;
+  font-family: inherit;
   border-bottom: 1.5px solid #e2e8f0;
   color: var(--accent-color, #475569);
 }
@@ -1666,9 +1814,8 @@
 }
 
 
-/* D. Executive Professional Template */
 .resumePaper.executive_professional {
-  font-family: 'Lora', Georgia, serif;
+  font-family: var(--font-override, 'Lora', Georgia, serif);
   color: #1a202c;
   background: #fffdf9;
 }
@@ -1681,7 +1828,7 @@
 }
 
 .resumePaper.executive_professional .resumeHeader h2 {
-  font-family: 'Merriweather', serif;
+  font-family: inherit;
   color: var(--accent-color, #0f172a);
   font-size: calc(var(--base-font-size, 13px) * 1.5 * var(--heading-size-mult, 1.0));
   font-weight: 600;
@@ -1689,7 +1836,7 @@
 }
 
 .resumePaper.executive_professional .resumeSectionTitle {
-  font-family: 'Merriweather', serif;
+  font-family: inherit;
   color: var(--accent-color, #1e3a8a);
   border-bottom: 1.5px solid var(--accent-color, #1e3a8a);
   text-transform: uppercase;
@@ -1698,16 +1845,15 @@
 .resumePaper.executive_professional .resumeTitle {
   color: var(--accent-color, #1e3a8a);
   font-style: italic;
-  font-family: 'Merriweather', serif;
+  font-family: inherit;
   font-size: calc(var(--base-font-size, 13px) * 0.9 * var(--heading-size-mult, 1.0));
   font-weight: 500;
   margin: 0 0 12px 0;
 }
 
 
-/* E. Creative Tech Template */
 .resumePaper.creative_tech {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-override, 'Inter', sans-serif);
   color: #1e293b;
 }
 
@@ -1719,7 +1865,7 @@
 }
 
 .resumePaper.creative_tech .resumeHeader h2 {
-  font-family: 'Inter', sans-serif;
+  font-family: inherit;
   color: var(--accent-color, #0f172a);
   font-size: calc(var(--base-font-size, 13px) * 1.5 * var(--heading-size-mult, 1.0));
   font-weight: 600;
@@ -1727,7 +1873,7 @@
 }
 
 .resumePaper.creative_tech .resumeSectionTitle {
-  font-family: 'Fira Code', 'JetBrains Mono', monospace;
+  font-family: inherit;
   color: var(--accent-color, #10b981);
   border-bottom: 1.5px solid #e2e8f0;
   text-transform: lowercase;
@@ -1736,7 +1882,7 @@
 }
 
 .resumePaper.creative_tech .resumeTitle {
-  font-family: 'Inter', sans-serif;
+  font-family: inherit;
   color: var(--accent-color, #10b981);
   font-size: calc(var(--base-font-size, 13px) * 0.9 * var(--heading-size-mult, 1.0));
   font-weight: 500;
@@ -2524,4 +2670,59 @@
   100% {
     background-position: -200% 0;
   }
+}
+
+/* Layout Density Presets Theme-Adaptive Panel */
+.presetCard {
+  margin-bottom: 16px;
+  background: var(--card-bg, rgba(248, 250, 252, 0.8));
+  border: 1px solid var(--card-border, #e2e8f0);
+  border-radius: var(--radius-md, 8px);
+  padding: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.presetLabel {
+  font-size: var(--text-xs, 12px);
+  font-weight: 600;
+  color: var(--muted, #64748b);
+  margin-bottom: 8px;
+  display: block;
+}
+
+.presetGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.presetBtn {
+  padding: 8px 6px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--card-border, #cbd5e1);
+  background: var(--card-bg, #ffffff);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--foreground, #334155);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.presetBtn:hover {
+  border-color: var(--primary, #6366f1);
+  color: var(--primary, #6366f1);
+  background: var(--muted-light, rgba(99, 102, 241, 0.08));
+}
+
+.presetBtnTight {
+  border-color: rgba(99, 102, 241, 0.5) !important;
+  background: rgba(99, 102, 241, 0.12) !important;
+  color: var(--primary, #4f46e5) !important;
+}
+
+.presetBtnUltra {
+  border-color: rgba(139, 92, 246, 0.5) !important;
+  background: rgba(139, 92, 246, 0.16) !important;
+  color: #8b5cf6 !important;
 }

@@ -5,12 +5,20 @@ import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import {
-  Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Brain, Award, Save, RefreshCw, GripVertical, Trash, Plus, Settings, ArrowUp, ArrowDown
+  Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Brain, Award, Save, RefreshCw, GripVertical, Trash, Plus, Settings, ArrowUp, ArrowDown, Maximize2, Minimize2, LayoutGrid, Layers, Sliders
 } from 'lucide-react';
 import styles from './EditorNew.module.css';
 
 import { ATSDashboard, ATSReport, Proposal } from '../components/ATSDashboard';
 import { Snapshot } from '../components/VersionSnapshotDrawer';
+
+const templateClassMap: { [key: string]: string } = {
+  pixel_perfect_pdf: 'pixelPerfectLayout',
+  german_style_cv: 'germanLayout',
+  modern_minimalist: 'modern_minimalist',
+  executive_professional: 'executive_professional',
+  creative_tech: 'creative_tech'
+};
 
 
 // TypeScript Types
@@ -199,10 +207,13 @@ const AutoSizeTextarea: React.FC<{
   value: string;
   onChange: (val: string) => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onBlur?: () => void;
   className?: string;
   placeholder?: string;
   id?: string;
-}> = ({ value, onChange, onKeyDown, className, placeholder, id }) => {
+  singleLine?: boolean;
+  style?: React.CSSProperties;
+}> = ({ value, onChange, onKeyDown, onBlur, className, placeholder, id, singleLine, style }) => {
   const isMeasuring = React.useContext(MeasuringContext);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [localVal, setLocalVal] = useState(value);
@@ -215,8 +226,8 @@ const AutoSizeTextarea: React.FC<{
       <div
         className={className}
         style={{
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word',
+          whiteSpace: singleLine ? 'nowrap' : 'pre-wrap',
+          wordBreak: singleLine ? 'keep-all' : 'break-word',
           width: '100%',
           display: 'block',
           fontSize: 'inherit',
@@ -226,7 +237,8 @@ const AutoSizeTextarea: React.FC<{
           color: 'inherit',
           padding: '2px 0',
           minHeight: '1.2em',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          ...style
         }}
       >
         {value || placeholder || ' '}
@@ -257,16 +269,18 @@ const AutoSizeTextarea: React.FC<{
         } catch (_) { }
       }
     }
-  }, [localVal]);
+  }, [localVal, value, style?.fontSize, style?.lineHeight, style?.fontWeight, (style as any)?.headingSizeMult]);
 
   useEffect(() => {
-    const handleStyleChange = () => {
+    const handleResizeOrStyle = () => {
       adjustHeight();
-      setTimeout(adjustHeight, 40);
+      requestAnimationFrame(adjustHeight);
     };
-    window.addEventListener('cv-style-change', handleStyleChange);
+    window.addEventListener('resize', handleResizeOrStyle);
+    window.addEventListener('cv-style-change', handleResizeOrStyle);
     return () => {
-      window.removeEventListener('cv-style-change', handleStyleChange);
+      window.removeEventListener('resize', handleResizeOrStyle);
+      window.removeEventListener('cv-style-change', handleResizeOrStyle);
     };
   }, []);
 
@@ -299,6 +313,7 @@ const AutoSizeTextarea: React.FC<{
       onChange={handleChange}
       onSelect={handleSelect}
       onKeyDown={onKeyDown}
+      onBlur={onBlur}
       className={className}
       placeholder={placeholder}
       rows={1}
@@ -316,9 +331,87 @@ const AutoSizeTextarea: React.FC<{
         fontSize: 'inherit',
         fontWeight: 'inherit',
         lineHeight: 'inherit',
-        textAlign: 'inherit'
+        textAlign: 'inherit',
+        whiteSpace: singleLine ? 'nowrap' : undefined,
+        wordBreak: singleLine ? 'keep-all' : undefined,
+        ...style
       }}
     />
+  );
+};
+
+// Helper for rendering section title with partial / multi-color formatting
+const renderFormattedTitle = (title: string, primaryColor?: string, secondaryColor?: string) => {
+  if (!title) return null;
+
+  // 1. Color tag syntax e.g. <color:#3b82f6>Summary</color>
+  if (title.includes('<color:')) {
+    const parts: React.ReactNode[] = [];
+    const regex = /<color:(#[0-9a-fA-F]{3,8}|[a-zA-Z]+)>(.*?)<\/color>/g;
+    let lastIdx = 0;
+    let match;
+    while ((match = regex.exec(title)) !== null) {
+      if (match.index > lastIdx) {
+        parts.push(title.substring(lastIdx, match.index));
+      }
+      parts.push(
+        <span key={match.index} style={{ color: match[1] }}>
+          {match[2]}
+        </span>
+      );
+      lastIdx = regex.lastIndex;
+    }
+    if (lastIdx < title.length) {
+      parts.push(title.substring(lastIdx));
+    }
+    return <>{parts}</>;
+  }
+
+  // 2. Dual-color split mode (1st word vs rest of title)
+  if (secondaryColor) {
+    const words = title.trim().split(/\s+/);
+    if (words.length > 1) {
+      const firstWord = words[0];
+      const rest = words.slice(1).join(' ');
+      return (
+        <>
+          <span style={{ color: primaryColor || 'inherit' }}>{firstWord}</span>{' '}
+          <span style={{ color: secondaryColor }}>{rest}</span>
+        </>
+      );
+    }
+  }
+
+  return null;
+};
+
+const renderFormattedLanguageList = (text: string) => {
+  if (!text) return null;
+  const items = text.split(',').map(s => s.trim()).filter(Boolean);
+  return (
+    <>
+      {items.map((item, idx) => {
+        const parenIdx = item.indexOf('(');
+        if (parenIdx !== -1) {
+          const langName = item.substring(0, parenIdx).trim();
+          const rest = item.substring(parenIdx);
+          return (
+            <span key={idx}>
+              <strong style={{ fontWeight: 700 }}>{langName}</strong>{' '}
+              <span style={{ fontWeight: 400 }}>{rest}</span>
+              {idx < items.length - 1 ? ', ' : ''}
+            </span>
+          );
+        } else {
+          return (
+            <span key={idx}>
+              <strong style={{ fontWeight: 700 }}>{item}</strong>
+              {idx < items.length - 1 ? ', ' : ''}
+            </span>
+          );
+        }
+      })}
+    </>
   );
 };
 
@@ -352,6 +445,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const [headerStyles, setHeaderStyles] = useState<any>({});
   const [activeSectionSettings, setActiveSectionSettings] = useState<string | null>(null);
   const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
+  const [editingSectionTitleId, setEditingSectionTitleId] = useState<string | null>(null);
+  const [editingLanguagesId, setEditingLanguagesId] = useState<string | null>(null);
 
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -363,17 +458,14 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const [isResizingPanel, setIsResizingPanel] = useState<boolean>(false);
   const controlPanelRef = useRef<HTMLDivElement>(null);
 
+  // Mouse drag handler for panel resizing
   useEffect(() => {
     if (!isResizingPanel) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!controlPanelRef.current) return;
-      const rect = controlPanelRef.current.getBoundingClientRect();
-      let newWidth = e.clientX - rect.left;
-
-      // Bounds: Min 340px, Max 680px (or 48% of viewport)
-      const MIN_WIDTH = 340;
-      const MAX_WIDTH = Math.min(680, window.innerWidth * 0.48);
+      const MIN_WIDTH = 320;
+      const MAX_WIDTH = Math.min(800, window.innerWidth - 350);
+      let newWidth = e.clientX;
 
       if (newWidth < MIN_WIDTH) newWidth = MIN_WIDTH;
       if (newWidth > MAX_WIDTH) newWidth = MAX_WIDTH;
@@ -441,20 +533,26 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     alignment: string;
     pageMargin?: number;
     bulletSpacing?: number;
+    personalDetailsOffset?: number;
+    headingSecondaryColor?: string;
     dateFormat: 'MM/YYYY' | 'MMM YYYY' | 'YYYY';
     pageSize: 'A4' | 'Letter';
+    fontFamily?: string;
   }>({
     fontSize: 13,
     headingSize: 1.4,
     lineHeight: 1.4,
     sectionSpacing: 20,
     accentColor: '#0f172a',
+    headingSecondaryColor: '#3d7ee6',
     textColor: '#334155',
     alignment: 'left',
     pageMargin: undefined,
     bulletSpacing: 4,
+    personalDetailsOffset: 16,
     dateFormat: 'MM/YYYY',
-    pageSize: 'A4'
+    pageSize: 'A4',
+    fontFamily: ''
   });
 
   // Section Ordering and Visibility Matrix
@@ -470,6 +568,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       alignment?: string;
       headingSize?: number;
       headingColor?: string;
+      headingSecondaryColor?: string;
       headingWeight?: string;
       headingStyle?: string;
       headingAlignment?: string;
@@ -506,9 +605,19 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     image_url: ''
   });
   const [editableExperiences, setEditableExperiences] = useState<Array<{ id: string; bullets: string[]; company?: string; position?: string; location?: string; start_date?: string; end_date?: string }>>([]);
-  const [editableProjects, setEditableProjects] = useState<Array<{ id: string; bullets: string[]; title?: string; role?: string; date?: string }>>([]);
+  const [editableProjects, setEditableProjects] = useState<Array<{ id: string; bullets: string[]; title?: string; role?: string; technologies?: string[] | string; date?: string }>>([]);
   const [editableEducations, setEditableEducations] = useState<Array<{ id: string; institution: string; degree?: string; field_of_study?: string; start_date?: string; end_date?: string; location?: string; bullets?: string[] }>>([]);
   const [editableSkills, setEditableSkills] = useState<Array<{ id: string; name: string; category: string }>>([]);
+
+  // Dynamic Document Title: "name of the applicant_Lebenslauf"
+  useEffect(() => {
+    const name = editablePersonalInfo.full_name?.trim();
+    if (name) {
+      document.title = `${name}_Lebenslauf`;
+    } else {
+      document.title = 'Lebenslauf';
+    }
+  }, [editablePersonalInfo.full_name]);
 
   // ATS Optimizer & Real-time Scoring States
   const [atsReport, setAtsReport] = useState<ATSReport | null>(null);
@@ -1013,35 +1122,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         if (profileObj) {
           if (profileObj.personal_info) {
             setMasterProfileInfo(profileObj.personal_info);
-            setEditablePersonalInfo({
-              full_name: profileObj.personal_info.full_name || '',
-              title: profileObj.personal_info.title || '',
-              email: profileObj.personal_info.email || '',
-              phone: profileObj.personal_info.phone || '',
-              location: profileObj.personal_info.location || '',
-              date_of_birth: profileObj.personal_info.date_of_birth || '',
-              nationality: profileObj.personal_info.nationality || '',
-              linkedin: profileObj.personal_info.linkedin || '',
-              github: profileObj.personal_info.github || '',
-              website: profileObj.personal_info.website || '',
-              image_url: profileObj.personal_info.image_url || useAuthStore.getState().user?.avatar || ''
-
-            });
-            if (profileObj.personal_info.summary) {
-              setEditableSummary(profileObj.personal_info.summary);
-            }
-          }
-          if (profileObj.work_experiences && profileObj.work_experiences.length > 0) {
-            setEditableExperiences(profileObj.work_experiences);
-          }
-          if (profileObj.skills && profileObj.skills.length > 0) {
-            setEditableSkills(profileObj.skills);
-          }
-          if (profileObj.educations && profileObj.educations.length > 0) {
-            setEditableEducations(profileObj.educations);
           }
           if (profileObj.projects && profileObj.projects.length > 0) {
-            setEditableProjects(profileObj.projects);
             const projs = profileObj.projects.map((p: any) => ({
               id: p.id,
               title: p.title || 'Untitled Project',
@@ -1051,13 +1133,47 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
             setMasterProjects(projs);
             setSelectedProjectIds(projs.map((p: any) => p.id));
           }
+
+          // Only set default editable fields if no existing version/application is loaded
+          if (!initialJobParams?.application_id) {
+            if (profileObj.personal_info) {
+              setEditablePersonalInfo({
+                full_name: profileObj.personal_info.full_name || '',
+                title: profileObj.personal_info.title || '',
+                email: profileObj.personal_info.email || '',
+                phone: profileObj.personal_info.phone || '',
+                location: profileObj.personal_info.location || '',
+                date_of_birth: profileObj.personal_info.date_of_birth || '',
+                nationality: profileObj.personal_info.nationality || '',
+                linkedin: profileObj.personal_info.linkedin || '',
+                github: profileObj.personal_info.github || '',
+                website: profileObj.personal_info.website || '',
+                image_url: profileObj.personal_info.image_url || useAuthStore.getState().user?.avatar || ''
+              });
+              if (profileObj.personal_info.summary) {
+                setEditableSummary(profileObj.personal_info.summary);
+              }
+            }
+            if (profileObj.work_experiences && profileObj.work_experiences.length > 0) {
+              setEditableExperiences(profileObj.work_experiences);
+            }
+            if (profileObj.skills && profileObj.skills.length > 0) {
+              setEditableSkills(profileObj.skills);
+            }
+            if (profileObj.educations && profileObj.educations.length > 0) {
+              setEditableEducations(profileObj.educations);
+            }
+            if (profileObj.projects && profileObj.projects.length > 0) {
+              setEditableProjects(profileObj.projects);
+            }
+          }
         }
       } catch (err) {
         console.error('Failed to load master profile:', err);
       }
     };
     fetchMasterProfile();
-  }, []);
+  }, [initialJobParams]);
 
 
   // Keyboard focus relocation hook for bullet list manipulation
@@ -1182,6 +1298,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           bullets: tailoredP?.bullets || p.bullets || [],
           title: p.title || '',
           role: p.role || '',
+          technologies: p.technologies || p.tech_stack || tailoredP?.technologies || [],
           date: p.date || ''
         };
       });
@@ -1582,12 +1699,12 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           };
 
           const addITSkillsUnits = () => {
-            finalCategories.forEach(cat => {
+            finalCategories.forEach((cat, catIdx) => {
               const catSkills = itSkills.filter(s => (s.category || 'technical') === cat);
               if (catSkills.length > 0) {
                 unitsList.push({
                   type: 'skills-category',
-                  id: `skills-category-${cat}`,
+                  id: `skills-category-${catIdx}`,
                   sectionId: sec.id,
                   category: cat,
                   skills: catSkills
@@ -1634,7 +1751,32 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       const pageHeight = customStyles.pageSize === 'A4' ? 1123 : 1056;
       const pageMargin = customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32));
 
-      const totalPrintableHeight = pageHeight - 2 * pageMargin - (120)
+      // Calculate usable inner content height
+      const printableContentHeight = pageHeight - 2 * pageMargin;
+
+      // Reserve a strict 50px buffer above the bottom footer margin to guarantee the footer area stays completely empty
+      const totalPrintableHeight = printableContentHeight - 50;
+
+      // Helper to compute unit effective height including header, section, and item slider overrides
+      const getUnitEffectiveHeight = (u: RenderableUnit): number => {
+        const baseHeight = measured[u.id] || 0;
+        if (u.type === 'header') {
+          const headerSpacing = headerStyles.spacing !== undefined ? headerStyles.spacing : 24;
+          return baseHeight + headerSpacing;
+        }
+
+        const sec = sections.find(s => s.id === u.sectionId);
+        const localStyles = sec?.customStyles || {};
+
+        if (u.type === 'section-title') {
+          const secSpacing = localStyles.spacing !== undefined ? localStyles.spacing : (customStyles.sectionSpacing || 20);
+          return baseHeight + secSpacing + 10;
+        }
+
+        const itemGap = localStyles.itemGap !== undefined ? localStyles.itemGap : 0;
+        const bulletSpacing = localStyles.bulletSpacing !== undefined ? localStyles.bulletSpacing : (customStyles.bulletSpacing !== undefined ? customStyles.bulletSpacing : 4);
+        return baseHeight + itemGap + bulletSpacing + 4;
+      };
 
       const newPages: RenderableUnit[][] = [[]];
 
@@ -1644,13 +1786,13 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
       for (let i = 0; i < unitsList.length; i++) {
         const unit = unitsList[i];
-        const unitHeight = measured[unit.id] || 0;
+        const effHeight = getUnitEffectiveHeight(unit);
 
         // Header resides exclusively on page 1 top bounds
         if (unit.type === 'header') {
           newPages[0].push(unit);
-          currentMainHeight += unitHeight;
-          currentSidebarHeight += unitHeight;
+          currentMainHeight += effHeight;
+          currentSidebarHeight += effHeight;
           continue;
         }
 
@@ -1660,32 +1802,30 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
         let shouldPushPage = false;
 
-        // Keep-With-Next check logic: If this title precedes a content element,
-        // we check if they both fit. If the content overflows, the title is pushed alongside it.
+        // Atomic Section Page Partitioning:
+        // When evaluating a section title, calculate the total effective height of all units in that section.
+        // If the entire section cannot fit on the current page, move the whole section to the next page.
         if (unit.type === 'section-title') {
-          const nextUnit = unitsList[i + 1];
-          if (nextUnit && nextUnit.sectionId === unit.sectionId) {
-            const nextUnitHeight = measured[nextUnit.id] || 0;
-            const combinedHeight = unitHeight + nextUnitHeight;
+          const sectionUnits = unitsList.filter(u => u.sectionId === unit.sectionId);
+          const totalSectionHeight = sectionUnits.reduce((sum, u) => sum + getUnitEffectiveHeight(u), 0);
 
-            if (isSidebarColumn) {
-              if (currentSidebarHeight + combinedHeight > activeColumnLimit && currentSidebarHeight > 0) {
-                shouldPushPage = true;
-              }
-            } else {
-              if (currentMainHeight + combinedHeight > activeColumnLimit && currentMainHeight > 0) {
-                shouldPushPage = true;
-              }
-            }
-          }
-        } else {
-          // Standard element sizing check
           if (isSidebarColumn) {
-            if (currentSidebarHeight + unitHeight > activeColumnLimit && currentSidebarHeight > 0) {
+            if (currentSidebarHeight + totalSectionHeight > activeColumnLimit && currentSidebarHeight > 0) {
               shouldPushPage = true;
             }
           } else {
-            if (currentMainHeight + unitHeight > activeColumnLimit && currentMainHeight > 0) {
+            if (currentMainHeight + totalSectionHeight > activeColumnLimit && currentMainHeight > 0) {
+              shouldPushPage = true;
+            }
+          }
+        } else {
+          // Standard element sizing check (for individual items if a section is larger than 1 full page)
+          if (isSidebarColumn) {
+            if (currentSidebarHeight + effHeight > activeColumnLimit && currentSidebarHeight > 0) {
+              shouldPushPage = true;
+            }
+          } else {
+            if (currentMainHeight + effHeight > activeColumnLimit && currentMainHeight > 0) {
               shouldPushPage = true;
             }
           }
@@ -1700,9 +1840,9 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         // Allocate unit into current page stack
         newPages[newPages.length - 1].push(unit);
         if (isSidebarColumn) {
-          currentSidebarHeight += unitHeight;
+          currentSidebarHeight += effHeight;
         } else {
-          currentMainHeight += unitHeight;
+          currentMainHeight += effHeight;
         }
       }
 
@@ -1713,7 +1853,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     return () => clearTimeout(timer);
   }, [
     editableSummary, editablePersonalInfo, editableExperiences, editableSkills,
-    editableProjects, editableEducations, template, sections, customStyles,
+    editableProjects, editableEducations, template, sections, customStyles, headerStyles,
     languagesFirst, categoryOrder
   ]);
 
@@ -1938,6 +2078,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       if (editorTab === 'resume') {
         const updatedDetails = {
           ...currentVersion.tailored_details,
+          skills: editableSkills,
           experiences: editableExperiences.map(e => ({
             id: e.id,
             bullets: e.bullets,
@@ -1950,7 +2091,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           original_profile: {
             ...currentVersion.tailored_details.original_profile,
             personal_info: {
-              ...currentVersion.tailored_details.original_profile.personal_info,
+              ...currentVersion.tailored_details.original_profile?.personal_info,
               ...editablePersonalInfo
             },
             work_experiences: editableExperiences.map(e => ({
@@ -2162,6 +2303,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
   const renderHeaderSettingsPopover = () => {
     const updateHeaderStyle = (key: string, value: any) => {
       setHeaderStyles((prev: any) => ({ ...prev, [key]: value }));
+      window.dispatchEvent(new Event('cv-style-change'));
     };
 
     const topPos = popoverPosition ? Math.max(60, Math.min(window.innerHeight - 480, popoverPosition.top - 10)) : 100;
@@ -2188,24 +2330,26 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
         <div className={styles.popoverBody}>
           <div className={styles.popoverControlGroup}>
-            <label><span>Name Size</span><strong>{headerStyles.nameSize || 24}px</strong></label>
+            <label><span>Name Size</span><strong>{headerStyles.nameSize || 20}px</strong></label>
             <input
               type="range"
-              min="16"
-              max="40"
-              value={headerStyles.nameSize || 24}
-              onChange={(e) => updateHeaderStyle('nameSize', parseInt(e.target.value))}
+              min="14"
+              max="36"
+              step="0.5"
+              value={headerStyles.nameSize || 20}
+              onChange={(e) => updateHeaderStyle('nameSize', parseFloat(e.target.value))}
             />
           </div>
 
           <div className={styles.popoverControlGroup}>
-            <label><span>Title Size</span><strong>{headerStyles.titleSize || 14}px</strong></label>
+            <label><span>Title Size</span><strong>{headerStyles.titleSize || 13}px</strong></label>
             <input
               type="range"
               min="10"
               max="24"
-              value={headerStyles.titleSize || 14}
-              onChange={(e) => updateHeaderStyle('titleSize', parseInt(e.target.value))}
+              step="0.5"
+              value={headerStyles.titleSize || 13}
+              onChange={(e) => updateHeaderStyle('titleSize', parseFloat(e.target.value))}
             />
           </div>
 
@@ -2215,8 +2359,9 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               type="range"
               min="8"
               max="16"
+              step="0.5"
               value={headerStyles.contactsSize || 11}
-              onChange={(e) => updateHeaderStyle('contactsSize', parseInt(e.target.value))}
+              onChange={(e) => updateHeaderStyle('contactsSize', parseFloat(e.target.value))}
             />
           </div>
 
@@ -2226,8 +2371,21 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               type="range"
               min="2"
               max="20"
+              step="0.5"
               value={headerStyles.contactsGap || 8}
-              onChange={(e) => updateHeaderStyle('contactsGap', parseInt(e.target.value))}
+              onChange={(e) => updateHeaderStyle('contactsGap', parseFloat(e.target.value))}
+            />
+          </div>
+
+          <div className={styles.popoverControlGroup}>
+            <label><span>Personal Details Top Offset</span><strong>{headerStyles.contactsMarginTop !== undefined ? headerStyles.contactsMarginTop : 16}px</strong></label>
+            <input
+              type="range"
+              min="0"
+              max="80"
+              step="0.5"
+              value={headerStyles.contactsMarginTop !== undefined ? headerStyles.contactsMarginTop : 16}
+              onChange={(e) => updateHeaderStyle('contactsMarginTop', parseFloat(e.target.value))}
             />
           </div>
 
@@ -2237,8 +2395,9 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               type="range"
               min="5"
               max="60"
+              step="0.5"
               value={headerStyles.spacing || 20}
-              onChange={(e) => updateHeaderStyle('spacing', parseInt(e.target.value))}
+              onChange={(e) => updateHeaderStyle('spacing', parseFloat(e.target.value))}
             />
           </div>
 
@@ -2255,7 +2414,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               <label>Title Color</label>
               <input
                 type="color"
-                value={headerStyles.titleColor || '#64748b'}
+                value={headerStyles.titleColor || '#3d7ee6'}
                 onChange={(e) => updateHeaderStyle('titleColor', e.target.value)}
               />
             </div>
@@ -2348,6 +2507,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
         ...s,
         customStyles: { ...s.customStyles, [key]: value }
       } : s));
+      window.dispatchEvent(new Event('cv-style-change'));
     };
 
     const topPos = popoverPosition ? Math.max(60, Math.min(window.innerHeight - 520, popoverPosition.top - 10)) : 100;
@@ -2379,8 +2539,9 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               type="range"
               min="12"
               max="32"
+              step="0.5"
               value={localStyles.headingSize || 16}
-              onChange={(e) => updateStyle('headingSize', parseInt(e.target.value))}
+              onChange={(e) => updateStyle('headingSize', parseFloat(e.target.value))}
             />
           </div>
 
@@ -2390,8 +2551,9 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               type="range"
               min="10"
               max="24"
+              step="0.5"
               value={localStyles.fontSize || 13}
-              onChange={(e) => updateStyle('fontSize', parseInt(e.target.value))}
+              onChange={(e) => updateStyle('fontSize', parseFloat(e.target.value))}
             />
           </div>
 
@@ -2401,7 +2563,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               type="range"
               min="1.0"
               max="2.5"
-              step="0.1"
+              step="0.05"
               value={localStyles.lineHeight || 1.4}
               onChange={(e) => updateStyle('lineHeight', parseFloat(e.target.value))}
             />
@@ -2413,8 +2575,9 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               type="range"
               min="5"
               max="60"
+              step="0.5"
               value={localStyles.spacing || 20}
-              onChange={(e) => updateStyle('spacing', parseInt(e.target.value))}
+              onChange={(e) => updateStyle('spacing', parseFloat(e.target.value))}
             />
           </div>
 
@@ -2424,8 +2587,9 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               type="range"
               min="0"
               max="40"
+              step="0.5"
               value={localStyles.itemGap || 12}
-              onChange={(e) => updateStyle('itemGap', parseInt(e.target.value))}
+              onChange={(e) => updateStyle('itemGap', parseFloat(e.target.value))}
             />
           </div>
 
@@ -2436,8 +2600,9 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 type="range"
                 min="0"
                 max="20"
+                step="0.5"
                 value={localStyles.bulletSpacing || 4}
-                onChange={(e) => updateStyle('bulletSpacing', parseInt(e.target.value))}
+                onChange={(e) => updateStyle('bulletSpacing', parseFloat(e.target.value))}
               />
             </div>
           )}
@@ -2747,13 +2912,14 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
         fontSize: headerStyles.titleSize ? `${headerStyles.titleSize}px` : undefined,
         fontWeight: headerStyles.titleWeight ? headerStyles.titleWeight : undefined,
         fontStyle: headerStyles.titleStyle ? headerStyles.titleStyle : undefined,
-        color: headerStyles.titleColor ? headerStyles.titleColor : undefined,
+        color: headerStyles.titleColor ? headerStyles.titleColor : '#3d7ee6',
       };
 
       const contactsStyleOverride = {
         fontSize: headerStyles.contactsSize ? `${headerStyles.contactsSize}px` : undefined,
         color: headerStyles.contactsColor ? headerStyles.contactsColor : undefined,
         gap: headerStyles.contactsGap ? `${headerStyles.contactsGap}px` : undefined,
+        marginTop: headerStyles.contactsMarginTop !== undefined ? `${headerStyles.contactsMarginTop}px` : undefined,
       };
 
       const headerContainerStyle = {
@@ -2770,12 +2936,14 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             <div className={styles.ppHeaderLeft}>
               <h1 className={styles.ppName} style={nameStyleOverride}>
                 <AutoSizeTextarea
+                  style={nameStyleOverride}
                   value={editablePersonalInfo.full_name}
                   onChange={(val) => setEditablePersonalInfo(p => ({ ...p, full_name: val }))}
                 />
               </h1>
               <h2 className={styles.ppTitle} style={titleStyleOverride}>
                 <AutoSizeTextarea
+                  style={titleStyleOverride}
                   value={editablePersonalInfo.title}
                   onChange={(val) => setEditablePersonalInfo(p => ({ ...p, title: val }))}
                 />
@@ -2870,12 +3038,14 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             <div className={styles.germanHeaderLeft}>
               <h1 className={styles.germanName} style={nameStyleOverride}>
                 <AutoSizeTextarea
+                  style={nameStyleOverride}
                   value={editablePersonalInfo.full_name}
                   onChange={(val) => setEditablePersonalInfo(p => ({ ...p, full_name: val }))}
                 />
               </h1>
               <h2 className={styles.germanTitle} style={titleStyleOverride}>
                 <AutoSizeTextarea
+                  style={titleStyleOverride}
                   value={editablePersonalInfo.title}
                   onChange={(val) => setEditablePersonalInfo(p => ({ ...p, title: val }))}
                 />
@@ -2974,12 +3144,14 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             <div className={styles.headerText}>
               <h2 style={nameStyleOverride}>
                 <AutoSizeTextarea
+                  style={nameStyleOverride}
                   value={editablePersonalInfo.full_name}
                   onChange={(val) => setEditablePersonalInfo(p => ({ ...p, full_name: val }))}
                 />
               </h2>
               <p className={styles.resumeTitle} style={titleStyleOverride}>
                 <AutoSizeTextarea
+                  style={titleStyleOverride}
                   value={editablePersonalInfo.title}
                   onChange={(val) => setEditablePersonalInfo(p => ({ ...p, title: val }))}
                 />
@@ -3078,18 +3250,35 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               </button>
             </div>
           )}
-          <h3 className={titleClass} style={{
-            fontSize: localStyles.headingSize ? `${localStyles.headingSize}px` : undefined,
-            color: localStyles.headingColor ? localStyles.headingColor : undefined,
-            fontWeight: localStyles.headingWeight ? localStyles.headingWeight : undefined,
-            fontStyle: localStyles.headingStyle ? localStyles.headingStyle : undefined,
-            textAlign: localStyles.headingAlignment ? localStyles.headingAlignment : undefined,
-          } as React.CSSProperties}>
-            <AutoSizeTextarea
-              value={unit.titleText || ''}
-              onChange={(val) => setSections(prev => prev.map(s => s.id === unit.sectionId ? { ...s, name: val } : s))}
-            />
-          </h3>
+          {(() => {
+            const formattedTitleNode = renderFormattedTitle(
+              sec?.name || unit.titleText || '',
+              localStyles.headingColor || customStyles.accentColor,
+              localStyles.headingSecondaryColor || customStyles.headingSecondaryColor || '#3d7ee6'
+            );
+            return (
+              <h3 className={titleClass} style={{
+                textTransform: 'uppercase',
+                fontSize: localStyles.headingSize ? `${localStyles.headingSize}px` : undefined,
+                color: localStyles.headingColor ? localStyles.headingColor : undefined,
+                fontWeight: localStyles.headingWeight ? localStyles.headingWeight : undefined,
+                fontStyle: localStyles.headingStyle ? localStyles.headingStyle : undefined,
+                textAlign: localStyles.headingAlignment ? localStyles.headingAlignment : undefined,
+              } as React.CSSProperties}>
+                {formattedTitleNode && editingSectionTitleId !== unit.sectionId ? (
+                  <span onClick={() => setEditingSectionTitleId(unit.sectionId!)} style={{ cursor: 'pointer', display: 'inline-block', width: '100%' }}>
+                    {formattedTitleNode}
+                  </span>
+                ) : (
+                  <AutoSizeTextarea
+                    value={unit.titleText || ''}
+                    onChange={(val) => setSections(prev => prev.map(s => s.id === unit.sectionId ? { ...s, name: val } : s))}
+                    onBlur={() => setEditingSectionTitleId(null)}
+                  />
+                )}
+              </h3>
+            );
+          })()}
 
           {!isMeasuring && isSettingsOpen && renderSectionSettingsPopover(unit.sectionId!, sec)}
         </div>
@@ -3278,13 +3467,13 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             // Classic Stacked Layout
             <div style={{ width: '100%' }}>
               <div className={styles.itemMeta}>
-                <strong>
+                <strong style={{ color: '#3d7ee6', fontSize: 'calc(var(--base-font-size, 13px) * 0.92)' }}>
                   <AutoSizeTextarea
                     value={exp.position || ''}
                     onChange={(val) => setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, position: val } : e))}
                   />
                 </strong>
-                <span>
+                <span style={{ fontSize: 'calc(var(--base-font-size, 13px) * 0.92)' }}>
                   <AutoSizeTextarea
                     value={`${exp.start_date || ''} - ${exp.end_date || ''}`}
                     onChange={(val) => {
@@ -3372,6 +3561,10 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
     if (unit.type === 'project-item') {
       const proj = unit.itemData;
       const projIdx = unit.itemIndex!;
+      const hasRole = Boolean(proj.role && proj.role.trim());
+      const techString = Array.isArray(proj.technologies)
+        ? proj.technologies.join(', ')
+        : (proj.technologies || '');
 
       return (
         <div
@@ -3424,19 +3617,31 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 </h4>
               </div>
               <div className={isPP ? styles.ppRightCol : styles.germanRightCol}>
-                <div style={{ display: 'flex', gap: '8px', fontSize: '1em', color: '#64748b', paddingTop: '0px' }}>
-                  {proj.role && (
-                    <span style={{ fontWeight: 800 }}>
+                <div style={{ display: 'flex', gap: '8px', fontSize: '1em', color: '#64748b', paddingTop: '0px', flexWrap: 'wrap', alignItems: 'baseline', width: '100%' }}>
+                  {hasRole ? (
+                    <span style={{ fontWeight: 800, flex: 1, minWidth: '100px' }}>
                       <AutoSizeTextarea
                         value={proj.role || ''}
                         onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? { ...p, role: val } : p))}
                       />
                     </span>
-                  )}
-                  {proj.role && proj.date && <span>•</span>}
-                  {proj.date && (
-                    <span>
+                  ) : (
+                    <span style={{ fontWeight: 600, flex: 1, minWidth: '100px', fontStyle: 'italic', color: '#64748b' }}>
                       <AutoSizeTextarea
+                        value={techString}
+                        placeholder="Technologies used (e.g. React, Node.js, Python)..."
+                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? {
+                          ...p,
+                          technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
+                        } : p))}
+                      />
+                    </span>
+                  )}
+                  {(hasRole || techString || proj.date) && proj.date && <span style={{ flexShrink: 0 }}>•</span>}
+                  {proj.date && (
+                    <span style={{ flexShrink: 0 }}>
+                      <AutoSizeTextarea
+                        singleLine
                         value={proj.date || ''}
                         onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? { ...p, date: val } : p))}
                       />
@@ -3507,11 +3712,22 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   />
                 </span>
               </div>
-              {proj.role && (
+              {hasRole ? (
                 <p className={styles.itemCompany}>
                   <AutoSizeTextarea
                     value={proj.role || ''}
                     onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? { ...p, role: val } : p))}
+                  />
+                </p>
+              ) : (
+                <p className={styles.itemCompany} style={{ fontStyle: 'italic', color: '#64748b' }}>
+                  <AutoSizeTextarea
+                    value={techString}
+                    placeholder="Technologies used (e.g. React, Node.js, Python)..."
+                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? {
+                      ...p,
+                      technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
+                    } : p))}
                   />
                 </p>
               )}
@@ -3626,7 +3842,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 </span>
               </div>
               <div className={isPP ? styles.ppRightCol : styles.germanRightCol}>
-                <h4 className={isPP ? styles.ppDegree : styles.germanDegree}>
+                <h4 className={isPP ? styles.ppDegree : styles.germanDegree} style={{ color: '#3d7ee6' }}>
                   <AutoSizeTextarea
                     value={`${edu.degree || ''}${edu.field_of_study ? ` in ${edu.field_of_study}` : ''}`}
                     onChange={(val) => {
@@ -3642,13 +3858,13 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   />
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <div className={isPP ? styles.ppCompany : styles.germanCompany}>
+                  <div className={isPP ? styles.ppCompany : styles.germanCompany} style={{ fontWeight: 600 }}>
                     <AutoSizeTextarea
                       value={edu.institution || ''}
                       onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, institution: val } : e))}
                     />
                   </div>
-                  <div className={isPP ? styles.ppLocation : styles.germanLocation}>
+                  <div className={isPP ? styles.ppLocation : styles.germanLocation} style={{ fontWeight: 400, opacity: 0.8 }}>
                     <AutoSizeTextarea
                       value={edu.location || ''}
                       onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, location: val } : e))}
@@ -3707,7 +3923,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             // Classic stacked education layout
             <div style={{ width: '100%' }}>
               <div className={styles.itemMeta}>
-                <strong>
+                <strong style={{ color: '#3d7ee6' }}>
                   <AutoSizeTextarea
                     value={`${edu.degree || ''}${edu.field_of_study ? ` in ${edu.field_of_study}` : ''}`}
                     onChange={(val) => {
@@ -3733,13 +3949,13 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 </span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-                <div className={styles.itemCompany}>
+                <div className={styles.itemCompany} style={{ fontWeight: 600 }}>
                   <AutoSizeTextarea
                     value={edu.institution || ''}
                     onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, institution: val } : e))}
                   />
                 </div>
-                <div style={{ fontSize: '0.85em', color: '#64748b' }}>
+                <div style={{ fontSize: '0.85em', color: '#64748b', fontWeight: 400, opacity: 0.8 }}>
                   <AutoSizeTextarea
                     value={edu.location || ''}
                     onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, location: val } : e))}
@@ -3838,21 +4054,32 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
           <div style={{ display: 'flex', alignItems: 'flex-start', paddingLeft: '24px', width: '100%' }}>
             <span className={styles.bulletDot} />
             <div style={{ flex: 1 }}>
-              <AutoSizeTextarea
-                value={skillsList.map(s => s.name).join(', ')}
-                onChange={(val) => {
-                  const names = val.split(',').map(n => n.trim()).filter(Boolean);
-                  setEditableSkills(prev => {
-                    const nonLang = prev.filter(s => (s.category || '').toLowerCase().trim() !== 'languages');
-                    const updatedLangs = names.map((name, i) => ({
-                      id: `lang_${i}_${Date.now()}`,
-                      name,
-                      category: 'languages'
-                    }));
-                    return [...nonLang, ...updatedLangs];
-                  });
-                }}
-              />
+              {(() => {
+                const rawLangs = skillsList.map(s => s.name).join(', ');
+                const formattedNode = renderFormattedLanguageList(rawLangs);
+                return formattedNode && editingLanguagesId !== unit.id ? (
+                  <div onClick={() => setEditingLanguagesId(unit.id!)} style={{ cursor: 'pointer', minHeight: '1.2em' }}>
+                    {formattedNode}
+                  </div>
+                ) : (
+                  <AutoSizeTextarea
+                    value={rawLangs}
+                    onChange={(val) => {
+                      const names = val.split(',').map(n => n.trim()).filter(Boolean);
+                      setEditableSkills(prev => {
+                        const nonLang = prev.filter(s => (s.category || '').toLowerCase().trim() !== 'languages');
+                        const updatedLangs = names.map((name, i) => ({
+                          id: `lang_${i}_${Date.now()}`,
+                          name,
+                          category: 'languages'
+                        }));
+                        return [...nonLang, ...updatedLangs];
+                      });
+                    }}
+                    onBlur={() => setEditingLanguagesId(null)}
+                  />
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -4537,7 +4764,68 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             editorTab === 'resume' ? (
               // CV Design Options
               <div className={`${styles.styleControlsForm} glass-card`}>
-                <h3>Typography & Sizing</h3>
+                <h3>Typography & Layout Presets</h3>
+
+                <div className={styles.presetCard}>
+                  <div className={styles.presetHeader}>
+                    <label className={styles.presetLabel}>
+                      <Sliders size={16} style={{ color: 'var(--primary, #6366f1)' }} />
+                      <span>Quick Spacing & Density Presets</span>
+                    </label>
+                  </div>
+                  <div className={styles.presetGrid}>
+                    {[
+                      {
+                        id: 'standard',
+                        title: 'Standard',
+                        subtitle: 'Default balance',
+                        icon: LayoutGrid,
+                        config: { fontSize: 13, headingSize: 1.4, lineHeight: 1.4, sectionSpacing: 20, bulletSpacing: 4 }
+                      },
+                      {
+                        id: 'tight',
+                        title: 'Tight',
+                        subtitle: 'Fit ~15% more',
+                        icon: Minimize2,
+                        config: { fontSize: 12, headingSize: 1.3, lineHeight: 1.3, sectionSpacing: 14, bulletSpacing: 3 }
+                      },
+                      {
+                        id: 'ultra',
+                        title: 'Ultra Tight',
+                        subtitle: 'Max density',
+                        icon: Layers,
+                        config: { fontSize: 11, headingSize: 1.2, lineHeight: 1.2, sectionSpacing: 10, bulletSpacing: 2 }
+                      }
+                    ].map(preset => {
+                      const IconComponent = preset.icon;
+                      const isActive =
+                        customStyles.fontSize === preset.config.fontSize &&
+                        customStyles.sectionSpacing === preset.config.sectionSpacing;
+
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          className={`${styles.presetTile} ${isActive ? styles.presetTileActive : ''}`}
+                          onClick={() => setCustomStyles(s => ({ ...s, ...preset.config }))}
+                        >
+                          <div className={styles.presetTileTop}>
+                            <IconComponent size={14} className={styles.presetIcon} />
+                            {isActive && (
+                              <span className={styles.presetCheck}>
+                                <Check size={10} />
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <div className={styles.presetTitle}>{preset.title}</div>
+                            <div className={styles.presetSubtitle}>{preset.subtitle}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
                 <div className={styles.slidersTwinGrid}>
                   <div className={styles.sliderGroup}>
@@ -4546,8 +4834,9 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       type="range"
                       min="10"
                       max="18"
+                      step="0.1"
                       value={customStyles.fontSize}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, fontSize: parseInt(e.target.value) }))}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, fontSize: parseFloat(e.target.value) }))}
                     />
                   </div>
 
@@ -4557,7 +4846,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       type="range"
                       min="1.0"
                       max="2.2"
-                      step="0.1"
+                      step="0.05"
                       value={customStyles.headingSize}
                       onChange={(e) => setCustomStyles(s => ({ ...s, headingSize: parseFloat(e.target.value) }))}
                     />
@@ -4571,7 +4860,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       type="range"
                       min="1.0"
                       max="2.0"
-                      step="0.1"
+                      step="0.05"
                       value={customStyles.lineHeight}
                       onChange={(e) => setCustomStyles(s => ({ ...s, lineHeight: parseFloat(e.target.value) }))}
                     />
@@ -4583,8 +4872,9 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       type="range"
                       min="10"
                       max="45"
+                      step="0.5"
                       value={customStyles.sectionSpacing}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, sectionSpacing: parseInt(e.target.value) }))}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, sectionSpacing: parseFloat(e.target.value) }))}
                     />
                   </div>
                 </div>
@@ -4596,8 +4886,9 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       type="range"
                       min="0"
                       max="15"
+                      step="0.5"
                       value={customStyles.bulletSpacing !== undefined ? customStyles.bulletSpacing : 4}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, bulletSpacing: parseInt(e.target.value) }))}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, bulletSpacing: parseFloat(e.target.value) }))}
                     />
                   </div>
 
@@ -4607,8 +4898,9 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       type="range"
                       min="20"
                       max="90"
+                      step="0.5"
                       value={customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32))}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, pageMargin: parseInt(e.target.value) }))}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, pageMargin: parseFloat(e.target.value) }))}
                     />
                   </div>
                 </div>
@@ -4623,6 +4915,14 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                     />
                   </div>
                   <div className={styles.colorPickerGroup}>
+                    <label>Title 2nd Word Color</label>
+                    <input
+                      type="color"
+                      value={customStyles.headingSecondaryColor || '#3d7ee6'}
+                      onChange={(e) => setCustomStyles(s => ({ ...s, headingSecondaryColor: e.target.value }))}
+                    />
+                  </div>
+                  <div className={styles.colorPickerGroup}>
                     <label>Text Color</label>
                     <input
                       type="color"
@@ -4630,6 +4930,25 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       onChange={(e) => setCustomStyles(s => ({ ...s, textColor: e.target.value }))}
                     />
                   </div>
+                </div>
+
+                <div className={styles.selectGroup} style={{ marginTop: '12px' }}>
+                  <label htmlFor="globalFontFamily">Font Family</label>
+                  <select
+                    id="globalFontFamily"
+                    value={customStyles.fontFamily || ''}
+                    onChange={(e) => setCustomStyles(s => ({ ...s, fontFamily: e.target.value }))}
+                    style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--card-border)', background: 'var(--card-bg)', color: 'var(--foreground)' }}
+                  >
+                    <option value="">Template Default</option>
+                    <option value="'Aptos', 'Calibri', sans-serif">Aptos</option>
+                    <option value="'Inter', sans-serif">Inter</option>
+                    <option value="'Calibri', 'Segoe UI', sans-serif">Calibri</option>
+                    <option value="'Helvetica Neue', 'Helvetica', 'Arial', sans-serif">Helvetica</option>
+                    <option value="'Source Sans 3', 'Source Sans Pro', sans-serif">Source Sans 3</option>
+                    <option value="'IBM Plex Sans', sans-serif">IBM Plex Sans</option>
+                    <option value="'Arial', sans-serif">Arial</option>
+                  </select>
                 </div>
 
                 <hr style={{ margin: 'var(--space-2) 0', borderColor: 'var(--card-border)' }} />
@@ -4768,7 +5087,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                               <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                 IT Skills Categories
                               </div>
-                              {Array.from(new Set(editableSkills.filter(s => (s.category || '').toLowerCase().trim() !== 'languages').map(s => (s.category || 'technical').toLowerCase().trim()))).map((catName) => {
+                              {Array.from(new Set(editableSkills.filter(s => (s.category || '').toLowerCase().trim() !== 'languages').map(s => (s.category || 'technical').toLowerCase().trim()))).map((catName, catIdx) => {
                                 const categorySkills = editableSkills.filter(s => (s.category || 'technical').toLowerCase().trim() === catName);
                                 const originalCategory = categorySkills[0]?.category || catName;
                                 const displayHeader = getLocalizedCategoryName(originalCategory);
@@ -4776,7 +5095,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                                 return (
                                   <div
-                                    key={catName}
+                                    key={`skill_cat_panel_${catIdx}`}
                                     style={{
                                       background: 'var(--card-bg, rgba(255, 255, 255, 0.8))',
                                       border: '1px solid var(--card-border, rgba(226, 232, 240, 0.8))',
@@ -5428,7 +5747,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 <MeasuringContext.Provider value={true}>
                   <div
                     ref={hiddenCanvasRef}
-                    className={`${styles.pageContainer} ${styles[template]} no-print`}
+                    className={`${styles.pageContainer} ${styles[templateClassMap[template] || template] || ''} no-print`}
                     style={{
                       position: 'absolute',
                       left: '-9999px',
@@ -5448,7 +5767,8 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       '--bullet-spacing': `${customStyles.bulletSpacing || 4}px`,
                       '--accent-color': customStyles.accentColor,
                       '--text-color': customStyles.textColor,
-                      '--text-alignment': customStyles.alignment
+                      '--text-alignment': customStyles.alignment,
+                      '--font-override': customStyles.fontFamily || undefined
                     } as React.CSSProperties}
                   >
                     {template === 'creative_tech' ? (
@@ -5537,7 +5857,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                           <React.Fragment key={pageIdx}>
                             {pageIdx > 0 && <div className={`${styles.pageBreakLine} no-print`}>PAGE {pageIdx + 1}</div>}
                             <div
-                              className={`${styles.pageContainer} ${styles[template]}`}
+                              className={`${styles.pageContainer} ${styles[templateClassMap[template] || template] || ''}`}
                               style={{
                                 width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`,
                                 height: `${customStyles.pageSize === 'A4' ? 1123 : 1056}px`,
@@ -5554,7 +5874,8 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                 '--bullet-spacing': `${customStyles.bulletSpacing || 4}px`,
                                 '--accent-color': customStyles.accentColor,
                                 '--text-color': customStyles.textColor,
-                                '--text-alignment': customStyles.alignment
+                                '--text-alignment': customStyles.alignment,
+                                '--font-override': customStyles.fontFamily || undefined
                               } as React.CSSProperties}
                             >
                               {/* Standard single column or split grid column templates */}
