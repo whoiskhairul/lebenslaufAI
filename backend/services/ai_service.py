@@ -39,13 +39,28 @@ class AIService:
                 "https://api.deepseek.com/v1/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=30
+                timeout=16
             )
             if response.status_code == 200:
                 result = response.json()
                 return result['choices'][0]['message']['content']
             else:
                 print(f"DeepSeek API Error: {response.status_code} - {response.text}")
+                return None
+        except requests.exceptions.Timeout:
+            print("DeepSeek API read timed out. Retrying once...")
+            try:
+                response = requests.post(
+                    "https://api.deepseek.com/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=16
+                )
+                if response.status_code == 200:
+                    result = response.json()
+                    return result['choices'][0]['message']['content']
+            except Exception as retry_err:
+                print(f"DeepSeek retry failed: {retry_err}")
                 return None
         except Exception as e:
             print(f"DeepSeek HTTP request failed: {e}")
@@ -437,25 +452,50 @@ class AIService:
 
     @staticmethod
     def _mock_analyze_ats(profile, job):
-        job_keywords = job.get('keywords', ['React', 'TypeScript', 'PostgreSQL'])
-        skills = profile.get('skills', [])
-        profile_skills = [s.get('name', '').lower() for s in skills]
-        
+        if isinstance(job, dict):
+            job_keywords = job.get('keywords', ['React', 'TypeScript', 'PostgreSQL'])
+        elif isinstance(job, str):
+            import re
+            found = re.findall(r'\b[A-Za-z0-9+#\.-]{3,}\b', job)
+            common_tech = {'react', 'python', 'javascript', 'typescript', 'sql', 'postgresql', 'docker', 'aws', 'node.js', 'html', 'css', 'git', 'django', 'fastapi', 'devops', 'c++', 'java'}
+            job_keywords = [w for w in set(found) if w.lower() in common_tech]
+            if not job_keywords:
+                job_keywords = ['React', 'TypeScript', 'Python', 'SQL']
+        else:
+            job_keywords = ['React', 'TypeScript', 'PostgreSQL']
+
+        if isinstance(profile, dict):
+            skills = profile.get('skills', [])
+            profile_skills = []
+            if isinstance(skills, list):
+                for s in skills:
+                    if isinstance(s, dict):
+                        profile_skills.append(str(s.get('name', '')).lower())
+                    elif isinstance(s, str):
+                        profile_skills.append(s.lower())
+            profile_str = json.dumps(profile, default=str).lower()
+        elif isinstance(profile, str):
+            profile_str = profile.lower()
+            profile_skills = []
+        else:
+            profile_str = ""
+            profile_skills = []
+
         matched = []
         missing = []
-        
+
         for keyword in job_keywords:
-            if keyword.lower() in profile_skills or any(keyword.lower() in s for s in profile_skills):
+            kw_lower = keyword.lower()
+            if kw_lower in profile_skills or any(kw_lower in s for s in profile_skills) or kw_lower in profile_str:
                 matched.append(keyword)
             else:
                 missing.append(keyword)
-                
-        # Base score on keyword matches
+
         if not job_keywords:
             score = 75
         else:
-            score = int((len(matched) / len(job_keywords)) * 60) + 30 # standard offset
-            
+            score = int((len(matched) / len(job_keywords)) * 60) + 30
+
         suggestions = []
         for miss in missing:
             suggestions.append(f"Incorporate direct experience or projects utilizing '{miss}' to satisfy core requirements.")
@@ -471,19 +511,25 @@ class AIService:
 
     @staticmethod
     def _mock_tailor_resume(profile, job):
-        # Generate tailored summary
-        name = profile.get('personal_info', {}).get('full_name', 'Professional Developer')
+        if not isinstance(profile, dict):
+            profile = {}
+        if not isinstance(job, dict):
+            job = {'position': 'Software Engineer', 'company': 'Target Company', 'keywords': ['React', 'PostgreSQL']}
+
+        p_info = profile.get('personal_info', {}) if isinstance(profile.get('personal_info'), dict) else {}
+        name = p_info.get('full_name', 'Professional Developer')
         title = job.get('position', 'Software Engineer')
         company = job.get('company', 'Target Company')
-        keywords = ", ".join(job.get('keywords', ['React', 'PostgreSQL'])[:3])
-        
+        job_kw_list = job.get('keywords', ['React', 'PostgreSQL'])
+        keywords = ", ".join(job_kw_list[:3]) if isinstance(job_kw_list, list) else 'React, PostgreSQL'
+
         tailored_summary = (
             f"Results-oriented {title} with a proven track record of designing high-impact web architectures. "
             f"Equipped with direct experience in {keywords}. Eager to contribute to {company}'s technical roadmap "
             "by delivering clean code and optimal system designs."
         )
 
-        experiences = profile.get('work_experiences', [])
+        experiences = profile.get('work_experiences', []) if isinstance(profile.get('work_experiences'), list) else []
         tailored_experiences = []
         explanations = [
             {
@@ -494,27 +540,27 @@ class AIService:
             }
         ]
 
-        # Tailor bullets slightly by inserting keywords
-        job_keywords = job.get('keywords', ['React', 'PostgreSQL'])
+        job_keywords = job.get('keywords', ['React', 'PostgreSQL']) if isinstance(job.get('keywords'), list) else ['React', 'PostgreSQL']
         for idx, exp in enumerate(experiences):
+            if not isinstance(exp, dict):
+                continue
             exp_id = exp.get('id')
-            raw_bullets = exp.get('bullets', [])
+            raw_bullets = exp.get('bullets', []) if isinstance(exp.get('bullets'), list) else []
             new_bullets = []
-            
+
             for bullet in raw_bullets:
-                # Inject a keyword if not present to simulate tailoring
-                if idx == 0 and job_keywords and not any(kw.lower() in bullet.lower() for kw in job_keywords):
+                if idx == 0 and job_keywords and not any(kw.lower() in str(bullet).lower() for kw in job_keywords):
                     kw_to_inject = job_keywords[0]
-                    bullet_modified = f"{bullet.rstrip('.')} leveraging {kw_to_inject} architectures for optimal delivery."
+                    bullet_modified = f"{str(bullet).rstrip('.')} leveraging {kw_to_inject} architectures for optimal delivery."
                     new_bullets.append(bullet_modified)
                 else:
-                    new_bullets.append(bullet)
-                    
+                    new_bullets.append(str(bullet))
+
             tailored_experiences.append({
                 "id": exp_id,
                 "bullets": new_bullets
             })
-            
+
             explanations.append({
                 "section": exp_id,
                 "confidence_score": 90,
@@ -530,36 +576,42 @@ class AIService:
 
     @staticmethod
     def _mock_write_cover_letter(profile, job, tone, length):
-        p_info = profile.get('personal_info', {})
+        if not isinstance(profile, dict):
+            profile = {}
+        if not isinstance(job, dict):
+            job = {'position': 'Software Engineer', 'company': 'Target Company', 'keywords': ['React', 'PostgreSQL']}
+
+        p_info = profile.get('personal_info', {}) if isinstance(profile.get('personal_info'), dict) else {}
         name = p_info.get('full_name', 'Jane Doe')
         email = p_info.get('email', 'jane@example.com')
         phone = p_info.get('phone', '555-0199')
-        
+
         company = job.get('company', 'Target Company')
         position = job.get('position', 'Software Engineer')
-        keywords = ", ".join(job.get('keywords', ['React', 'PostgreSQL'])[:2])
-        
+        job_kw_list = job.get('keywords', ['React', 'PostgreSQL'])
+        keywords = ", ".join(job_kw_list[:2]) if isinstance(job_kw_list, list) else 'React, PostgreSQL'
+
         intro_salutation = f"Dear Hiring Team at {company},"
-        
+
         body_startup = (
             f"I was incredibly excited to see the opening for the {position} role. "
             f"My master profile aligns perfectly with your team's stack—particularly with my experience in {keywords}. "
             "I love building premium products from scratch and adapting quickly in collaborative environments. "
             "I'm eager to bring this energy to your engineering goals."
         )
-        
+
         body_corp = (
             f"I am writing to express my formal interest in the position of {position} at {company}. "
             f"With a robust background in scalable development and a solid mastery of {keywords}, "
             "I am confident in my capacity to enhance your enterprise operations. I look forward to "
             "discussing how my engineering philosophy matches your corporate benchmarks."
         )
-        
+
         body = body_corp if tone == "corporate" else body_startup
-        
+
         from datetime import datetime
         today_str = datetime.now().strftime("%B %d, %Y")
-        
+
         letter = f"""{name}
 {email} | {phone}
 
