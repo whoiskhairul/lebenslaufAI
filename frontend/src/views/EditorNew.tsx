@@ -5,7 +5,7 @@ import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import {
-  Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Brain, Award, Save, RefreshCw, GripVertical, Trash, Plus, Settings, ArrowUp, ArrowDown, Maximize2, Minimize2, LayoutGrid, Layers, Sliders
+  Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Brain, Award, Save, RefreshCw, GripVertical, Trash, Plus, Settings, ArrowUp, ArrowDown, Maximize2, Minimize2, LayoutGrid, Layers, Sliders, ChevronUp, ChevronDown
 } from 'lucide-react';
 import styles from './EditorNew.module.css';
 
@@ -212,8 +212,9 @@ const AutoSizeTextarea: React.FC<{
   placeholder?: string;
   id?: string;
   singleLine?: boolean;
+  autoFocus?: boolean;
   style?: React.CSSProperties;
-}> = ({ value, onChange, onKeyDown, onBlur, className, placeholder, id, singleLine, style }) => {
+}> = ({ value, onChange, onKeyDown, onBlur, className, placeholder, id, singleLine, autoFocus = false, style }) => {
   const isMeasuring = React.useContext(MeasuringContext);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [localVal, setLocalVal] = useState(value);
@@ -251,6 +252,12 @@ const AutoSizeTextarea: React.FC<{
       setLocalVal(value);
     }
   }, [value]);
+
+  useEffect(() => {
+    if (autoFocus && textareaRef.current && document.activeElement !== textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [autoFocus]);
 
   const adjustHeight = () => {
     if (textareaRef.current) {
@@ -305,54 +312,72 @@ const AutoSizeTextarea: React.FC<{
     selectionRef.current = { start: target.selectionStart, end: target.selectionEnd };
   };
 
+  const handleWrapperClick = (e: React.MouseEvent) => {
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
+
   return (
-    <textarea
-      id={id}
-      ref={textareaRef}
-      value={localVal}
-      onChange={handleChange}
-      onSelect={handleSelect}
-      onKeyDown={onKeyDown}
-      onBlur={onBlur}
-      className={className}
-      placeholder={placeholder}
-      rows={1}
+    <div
+      onClick={handleWrapperClick}
       style={{
-        overflow: 'hidden',
-        resize: 'none',
+        display: singleLine ? 'inline-block' : 'block',
         width: '100%',
-        border: 'none',
-        background: 'transparent',
-        outline: 'none',
-        padding: 0,
-        margin: 0,
-        color: 'inherit',
-        fontFamily: 'inherit',
-        fontSize: 'inherit',
-        fontWeight: 'inherit',
-        lineHeight: 'inherit',
-        textAlign: 'inherit',
-        whiteSpace: singleLine ? 'nowrap' : undefined,
-        wordBreak: singleLine ? 'keep-all' : undefined,
-        ...style
+        cursor: 'text',
+        minHeight: '1.2em'
       }}
-    />
+    >
+      <textarea
+        id={id}
+        ref={textareaRef}
+        value={localVal}
+        onChange={handleChange}
+        onSelect={handleSelect}
+        onKeyDown={onKeyDown}
+        onBlur={onBlur}
+        className={`${className || ''} ${styles.canvasFieldEdit}`}
+        placeholder={placeholder}
+        rows={1}
+        style={{
+          overflow: 'hidden',
+          resize: 'none',
+          width: '100%',
+          display: 'block',
+          border: 'none',
+          background: 'transparent',
+          outline: 'none',
+          padding: 0,
+          margin: 0,
+          color: 'inherit',
+          fontFamily: 'inherit',
+          fontSize: 'inherit',
+          fontWeight: 'inherit',
+          lineHeight: 'inherit',
+          textAlign: 'inherit',
+          whiteSpace: singleLine ? 'nowrap' : undefined,
+          wordBreak: singleLine ? 'keep-all' : undefined,
+          ...style
+        }}
+      />
+    </div>
   );
 };
 
 // Helper for rendering section title with partial / multi-color formatting
 const renderFormattedTitle = (title: string, primaryColor?: string, secondaryColor?: string) => {
   if (!title) return null;
+  const upperTitle = title.toUpperCase();
 
   // 1. Color tag syntax e.g. <color:#3b82f6>Summary</color>
-  if (title.includes('<color:')) {
+  if (upperTitle.includes('<COLOR:')) {
     const parts: React.ReactNode[] = [];
-    const regex = /<color:(#[0-9a-fA-F]{3,8}|[a-zA-Z]+)>(.*?)<\/color>/g;
+    const regex = /<COLOR:(#[0-9A-FA-F]{3,8}|[a-zA-Z]+)>(.*?)<\/COLOR>/g;
     let lastIdx = 0;
     let match;
-    while ((match = regex.exec(title)) !== null) {
+    while ((match = regex.exec(upperTitle)) !== null) {
       if (match.index > lastIdx) {
-        parts.push(title.substring(lastIdx, match.index));
+        parts.push(upperTitle.substring(lastIdx, match.index));
       }
       parts.push(
         <span key={match.index} style={{ color: match[1] }}>
@@ -361,15 +386,15 @@ const renderFormattedTitle = (title: string, primaryColor?: string, secondaryCol
       );
       lastIdx = regex.lastIndex;
     }
-    if (lastIdx < title.length) {
-      parts.push(title.substring(lastIdx));
+    if (lastIdx < upperTitle.length) {
+      parts.push(upperTitle.substring(lastIdx));
     }
     return <>{parts}</>;
   }
 
   // 2. Dual-color split mode (1st word vs rest of title)
   if (secondaryColor) {
-    const words = title.trim().split(/\s+/);
+    const words = upperTitle.trim().split(/\s+/);
     if (words.length > 1) {
       const firstWord = words[0];
       const rest = words.slice(1).join(' ');
@@ -380,9 +405,10 @@ const renderFormattedTitle = (title: string, primaryColor?: string, secondaryCol
         </>
       );
     }
+    return <span style={{ color: primaryColor || 'inherit' }}>{upperTitle}</span>;
   }
 
-  return null;
+  return <span style={{ color: primaryColor || 'inherit' }}>{upperTitle}</span>;
 };
 
 const renderFormattedLanguageList = (text: string) => {
@@ -447,6 +473,19 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
   const [editingSectionTitleId, setEditingSectionTitleId] = useState<string | null>(null);
   const [editingLanguagesId, setEditingLanguagesId] = useState<string | null>(null);
+  const [hoveredSectionId, setHoveredSectionId] = useState<string | null>(null);
+
+  // Enhanced Section Controls State (AI Polish & Side-by-Side Review)
+  const [openSectionAiModalId, setOpenSectionAiModalId] = useState<string | null>(null);
+  const [sectionAiScope, setSectionAiScope] = useState<string>('all');
+  const [sectionAiPrompt, setSectionAiPrompt] = useState<string>('');
+  const [isGeneratingSectionAi, setIsGeneratingSectionAi] = useState<boolean>(false);
+  const [sectionAiProposal, setSectionAiProposal] = useState<{
+    sectionId: string;
+    originalText: string;
+    proposedText: string;
+    payload: any;
+  } | null>(null);
 
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -982,84 +1021,9 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     return () => document.removeEventListener('mousedown', handleClosePopover);
   }, [openAiPopoverId]);
 
-  // Unified Hover AI Controls Renderer for Canvas Text Blocks
-  const renderHoverAiControls = (key: string, currentText: string, customChips?: { label: string; prompt: string }[]) => {
-    const isPopoverOpen = openAiPopoverId === key;
-    const isPending = isRephrasing[key];
-
-    const defaultChips = customChips || [
-      { label: "Punchier", prompt: "Make concise with strong action verbs" },
-      { label: "Metrics & Impact", prompt: "Highlight quantifiable metrics and technical results" },
-      { label: "ATS Polish", prompt: "Optimize key industry terminology for ATS screening" }
-    ];
-
-    return (
-      <>
-        <div className={`${styles.hoverAiBar} ${isPopoverOpen || isPending ? styles.hoverAiBarShow : ''} no-print`}>
-          <button
-            type="button"
-            className={styles.hoverAiBtn}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleAiRewriteBlock(key, currentText);
-            }}
-            disabled={isPending}
-            title="1-Click AI Auto Rewrite"
-          >
-            <Wand2 size={10} /> {isPending ? 'Rewriting...' : 'AI Rewrite'}
-          </button>
-          <button
-            type="button"
-            className={`${styles.hoverAiPromptBtn} ${isPopoverOpen ? styles.hoverAiPromptBtnActive : ''}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpenAiPopoverId(isPopoverOpen ? null : key);
-            }}
-            title="Custom AI Instruction Prompt"
-          >
-            <Sparkles size={10} /> Prompt
-          </button>
-        </div>
-
-        {isPopoverOpen && (
-          <div className={`${styles.inlineAiPopover} no-print`} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.popoverHeader}>
-              <span><Wand2 size={12} /> AI Rewrite Assistant</span>
-              <button type="button" onClick={() => setOpenAiPopoverId(null)} className={styles.popoverClose}>
-                <X size={12} />
-              </button>
-            </div>
-            <div className={styles.popoverChips}>
-              {defaultChips.map((chip, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => handleAiRewriteBlock(key, currentText, chip.prompt)}
-                >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-            <div className={styles.popoverInputRow}>
-              <input
-                type="text"
-                placeholder="e.g. Focus on technical leadership..."
-                value={rephrasePrompt[key] || ''}
-                onChange={(e) => setRephrasePrompt(prev => ({ ...prev, [key]: e.target.value }))}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleAiRewriteBlock(key, currentText);
-                  }
-                }}
-              />
-              <button type="button" onClick={() => handleAiRewriteBlock(key, currentText)}>
-                Send
-              </button>
-            </div>
-          </div>
-        )}
-      </>
-    );
+  // Unified Hover AI Controls Renderer for Canvas Text Blocks (Integrated into Section AI Polish)
+  const renderHoverAiControls = (_key?: string, _currentText?: string, _customChips?: any[]) => {
+    return null;
   };
 
   // Canvas viewport scale settings
@@ -1356,6 +1320,304 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   // ----------------------------------------------------
   // LIST OPERATIONS AND CANVAS HANDLERS
   // ----------------------------------------------------
+
+  // Section Reordering Handler
+  const handleMoveSection = (sectionId: string, direction: 'up' | 'down') => {
+    setSections(prev => {
+      const idx = prev.findIndex(s => s.id === sectionId);
+      if (idx === -1) return prev;
+      if (direction === 'up' && idx === 0) return prev;
+      if (direction === 'down' && idx === prev.length - 1) return prev;
+
+      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+      const nextList = [...prev];
+      const temp = nextList[idx];
+      nextList[idx] = nextList[targetIdx];
+      nextList[targetIdx] = temp;
+      return nextList;
+    });
+  };
+
+  // Quick Add Item Handler for Section Header Action Bar
+  const handleQuickAddSectionItem = (secId: string) => {
+    const targetSec = sections.find(s => s.id === secId);
+    if (!targetSec) return;
+
+    if (targetSec.type === 'summary') {
+      setEditableSummary(prev => prev ? `${prev}\n- Driven professional with expertise in technical execution and business impact.` : '- Driven professional with expertise in technical execution and business impact.');
+    } else if (targetSec.type === 'experience') {
+      handleAddExperience();
+    } else if (targetSec.type === 'projects') {
+      handleAddProject();
+    } else if (targetSec.type === 'education') {
+      handleAddEducation();
+    } else if (targetSec.type === 'skills') {
+      const newSkill = {
+        id: `skill_${Date.now()}`,
+        name: 'New Skill',
+        category: 'Technical Skills'
+      };
+      setEditableSkills(prev => [...prev, newSkill]);
+    } else if (targetSec.type === 'custom') {
+      handleAddCustomBullet(secId);
+    }
+  };
+
+  // AI Section Polish with Side-by-Side Comparison Generator
+  // Section AI Scope Options Generator (Section, Item, or Bullet)
+  const getSectionAiScopeOptions = (sectionId: string) => {
+    const targetSec = sections.find(s => s.id === sectionId);
+    if (!targetSec) return [{ id: 'all', label: 'Entire Section (All Content)' }];
+
+    const options: Array<{ id: string; label: string }> = [
+      { id: 'all', label: `Entire ${targetSec.name} Section` }
+    ];
+
+    if (targetSec.type === 'experience') {
+      editableExperiences.forEach((exp, expIdx) => {
+        const entryId = `entry_${exp.id}`;
+        options.push({
+          id: entryId,
+          label: `🏢 Job #${expIdx + 1}: ${exp.position || 'Position'} @ ${exp.company || 'Company'}`
+        });
+        (exp.bullets || []).forEach((bullet, bIdx) => {
+          options.push({
+            id: `bullet_${exp.id}_${bIdx}`,
+            label: `  ↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+          });
+        });
+      });
+    } else if (targetSec.type === 'projects') {
+      editableProjects.forEach((proj, projIdx) => {
+        const entryId = `entry_${proj.id}`;
+        options.push({
+          id: entryId,
+          label: `🚀 Project #${projIdx + 1}: ${proj.title || 'Project'}`
+        });
+        (proj.bullets || []).forEach((bullet, bIdx) => {
+          options.push({
+            id: `bullet_${proj.id}_${bIdx}`,
+            label: `  ↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+          });
+        });
+      });
+    } else if (targetSec.type === 'education') {
+      editableEducations.forEach((edu, eduIdx) => {
+        const entryId = `entry_${edu.id}`;
+        options.push({
+          id: entryId,
+          label: `🎓 Education #${eduIdx + 1}: ${edu.degree || 'Degree'} - ${edu.institution || 'Institution'}`
+        });
+        (edu.bullets || []).forEach((bullet, bIdx) => {
+          options.push({
+            id: `bullet_${edu.id}_${bIdx}`,
+            label: `  ↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+          });
+        });
+      });
+    } else if (targetSec.type === 'custom') {
+      (targetSec.bullets || []).forEach((bullet, bIdx) => {
+        options.push({
+          id: `bullet_${targetSec.id}_${bIdx}`,
+          label: `↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+        });
+      });
+    }
+
+    return options;
+  };
+
+  const extractContentForScope = (sectionId: string, scope: string): string => {
+    const targetSec = sections.find(s => s.id === sectionId);
+    if (!targetSec) return '';
+
+    if (scope === 'all') {
+      if (targetSec.type === 'summary') return editableSummary;
+      if (targetSec.type === 'experience') {
+        return editableExperiences.map(e => `${e.position || 'Position'} at ${e.company || 'Company'}\n${(e.bullets || []).join('\n')}`).join('\n\n');
+      }
+      if (targetSec.type === 'projects') {
+        return editableProjects.map(p => `${p.title || 'Project'}\n${(p.bullets || []).join('\n')}`).join('\n\n');
+      }
+      if (targetSec.type === 'education') {
+        return editableEducations.map(e => `${e.degree || 'Degree'} - ${e.institution || 'School'}\n${(e.bullets || []).join('\n')}`).join('\n\n');
+      }
+      if (targetSec.type === 'skills') {
+        return editableSkills.map(s => `${s.category}: ${s.name}`).join('\n');
+      }
+      if (targetSec.type === 'custom') {
+        return (targetSec.bullets || []).join('\n');
+      }
+    }
+
+    if (scope.startsWith('entry_')) {
+      const itemId = scope.replace('entry_', '');
+      if (targetSec.type === 'experience') {
+        const exp = editableExperiences.find(e => e.id === itemId);
+        return exp ? (exp.bullets || []).join('\n') : '';
+      }
+      if (targetSec.type === 'projects') {
+        const proj = editableProjects.find(p => p.id === itemId);
+        return proj ? (proj.bullets || []).join('\n') : '';
+      }
+      if (targetSec.type === 'education') {
+        const edu = editableEducations.find(e => e.id === itemId);
+        return edu ? (edu.bullets || []).join('\n') : '';
+      }
+    }
+
+    if (scope.startsWith('bullet_')) {
+      const parts = scope.replace('bullet_', '').split('_');
+      const itemId = parts[0];
+      const bulletIdx = parseInt(parts[1], 10);
+
+      if (targetSec.type === 'experience') {
+        const exp = editableExperiences.find(e => e.id === itemId);
+        return exp && exp.bullets ? (exp.bullets[bulletIdx] || '') : '';
+      }
+      if (targetSec.type === 'projects') {
+        const proj = editableProjects.find(p => p.id === itemId);
+        return proj && proj.bullets ? (proj.bullets[bulletIdx] || '') : '';
+      }
+      if (targetSec.type === 'education') {
+        const edu = editableEducations.find(e => e.id === itemId);
+        return edu && edu.bullets ? (edu.bullets[bulletIdx] || '') : '';
+      }
+      if (targetSec.type === 'custom') {
+        return targetSec.bullets ? (targetSec.bullets[bulletIdx] || '') : '';
+      }
+    }
+
+    return '';
+  };
+
+  // AI Section/Entry/Bullet Polish Generator
+  const handleGenerateSectionAi = async (sectionId: string, customInstruction?: string, scopeOverride?: string) => {
+    const targetSec = sections.find(s => s.id === sectionId);
+    if (!targetSec) return;
+
+    const activeScope = scopeOverride || sectionAiScope || 'all';
+    const contentToRewrite = extractContentForScope(sectionId, activeScope);
+
+    if (!contentToRewrite.trim()) return;
+
+    setIsGeneratingSectionAi(true);
+
+    try {
+      const instruction = customInstruction || sectionAiPrompt || 'Enhance impact with strong action verbs, professional tone, and ATS keyword relevance.';
+
+      const res = await api.post('/api/tailor/rewrite', {
+        text: contentToRewrite,
+        prompt: instruction,
+        job_description: jobDescription || undefined,
+        target_role: position || undefined
+      });
+
+      const proposed = res.data?.rewritten_text || res.data?.result || res.data?.text || contentToRewrite;
+
+      setSectionAiProposal({
+        sectionId,
+        originalText: contentToRewrite,
+        proposedText: proposed,
+        payload: { sectionId, type: targetSec.type, scope: activeScope, proposed }
+      });
+    } catch (err) {
+      console.error('Section AI polish failed:', err);
+    } finally {
+      setIsGeneratingSectionAi(false);
+    }
+  };
+
+  const handleApplySectionAiProposal = () => {
+    if (!sectionAiProposal) return;
+    const { sectionId, type, scope, proposed } = sectionAiProposal.payload;
+
+    if (scope === 'all') {
+      if (type === 'summary') {
+        setEditableSummary(proposed);
+      } else if (type === 'custom') {
+        const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+        setSections(prev => prev.map(s => s.id === sectionId ? { ...s, bullets } : s));
+      } else if (type === 'experience') {
+        const blocks = proposed.split('\n\n');
+        setEditableExperiences(prev => prev.map((exp, idx) => {
+          const block = blocks[idx] || blocks[0];
+          if (!block) return exp;
+          const bullets = block.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter((b: string) => b && !b.toLowerCase().includes(' at '));
+          return bullets.length > 0 ? { ...exp, bullets } : exp;
+        }));
+      } else if (type === 'projects') {
+        const blocks = proposed.split('\n\n');
+        setEditableProjects(prev => prev.map((proj, idx) => {
+          const block = blocks[idx] || blocks[0];
+          if (!block) return proj;
+          const bullets = block.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter((b: string) => b && !b.includes('('));
+          return bullets.length > 0 ? { ...proj, bullets } : proj;
+        }));
+      } else if (type === 'education') {
+        const blocks = proposed.split('\n\n');
+        setEditableEducations(prev => prev.map((edu, idx) => {
+          const block = blocks[idx] || blocks[0];
+          if (!block) return edu;
+          const bullets = block.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter((b: string) => b && !b.includes('-'));
+          return bullets.length > 0 ? { ...edu, bullets } : edu;
+        }));
+      }
+    } else if (scope.startsWith('entry_')) {
+      const itemId = scope.replace('entry_', '');
+      const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+      if (bullets.length > 0) {
+        if (type === 'experience') {
+          setEditableExperiences(prev => prev.map(e => e.id === itemId ? { ...e, bullets } : e));
+        } else if (type === 'projects') {
+          setEditableProjects(prev => prev.map(p => p.id === itemId ? { ...p, bullets } : p));
+        } else if (type === 'education') {
+          setEditableEducations(prev => prev.map(e => e.id === itemId ? { ...e, bullets } : e));
+        }
+      }
+    } else if (scope.startsWith('bullet_')) {
+      const parts = scope.replace('bullet_', '').split('_');
+      const itemId = parts[0];
+      const bulletIdx = parseInt(parts[1], 10);
+      const cleanBullet = proposed.trim().replace(/^[-•*]\s*/, '');
+
+      if (cleanBullet) {
+        if (type === 'experience') {
+          setEditableExperiences(prev => prev.map(exp => {
+            if (exp.id !== itemId) return exp;
+            const updated = [...exp.bullets];
+            updated[bulletIdx] = cleanBullet;
+            return { ...exp, bullets: updated };
+          }));
+        } else if (type === 'projects') {
+          setEditableProjects(prev => prev.map(proj => {
+            if (proj.id !== itemId) return proj;
+            const updated = [...proj.bullets];
+            updated[bulletIdx] = cleanBullet;
+            return { ...proj, bullets: updated };
+          }));
+        } else if (type === 'education') {
+          setEditableEducations(prev => prev.map(edu => {
+            if (edu.id !== itemId) return edu;
+            const updated = [...(edu.bullets || [])];
+            updated[bulletIdx] = cleanBullet;
+            return { ...edu, bullets: updated };
+          }));
+        } else if (type === 'custom') {
+          setSections(prev => prev.map(s => {
+            if (s.id !== sectionId) return s;
+            const updated = [...(s.bullets || [])];
+            updated[bulletIdx] = cleanBullet;
+            return { ...s, bullets: updated };
+          }));
+        }
+      }
+    }
+
+    setSectionAiProposal(null);
+    setOpenSectionAiModalId(null);
+    setSectionAiPrompt('');
+  };
 
   // Work Experience Operations
   const handleAddExperience = () => {
@@ -1751,31 +2013,13 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       const pageHeight = customStyles.pageSize === 'A4' ? 1123 : 1056;
       const pageMargin = customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32));
 
-      // Calculate usable inner content height
+      // Usable inner content height with 24px strict footer protection zone
       const printableContentHeight = pageHeight - 2 * pageMargin;
+      const totalPrintableHeight = printableContentHeight - 24;
 
-      // Reserve a strict 50px buffer above the bottom footer margin to guarantee the footer area stays completely empty
-      const totalPrintableHeight = printableContentHeight - 50;
-
-      // Helper to compute unit effective height including header, section, and item slider overrides
+      // Helper to compute unit effective height directly from true measured DOM height
       const getUnitEffectiveHeight = (u: RenderableUnit): number => {
-        const baseHeight = measured[u.id] || 0;
-        if (u.type === 'header') {
-          const headerSpacing = headerStyles.spacing !== undefined ? headerStyles.spacing : 24;
-          return baseHeight + headerSpacing;
-        }
-
-        const sec = sections.find(s => s.id === u.sectionId);
-        const localStyles = sec?.customStyles || {};
-
-        if (u.type === 'section-title') {
-          const secSpacing = localStyles.spacing !== undefined ? localStyles.spacing : (customStyles.sectionSpacing || 20);
-          return baseHeight + secSpacing + 10;
-        }
-
-        const itemGap = localStyles.itemGap !== undefined ? localStyles.itemGap : 0;
-        const bulletSpacing = localStyles.bulletSpacing !== undefined ? localStyles.bulletSpacing : (customStyles.bulletSpacing !== undefined ? customStyles.bulletSpacing : 4);
-        return baseHeight + itemGap + bulletSpacing + 4;
+        return measured[u.id] || 0;
       };
 
       const newPages: RenderableUnit[][] = [[]];
@@ -2330,7 +2574,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
         <div className={styles.popoverBody}>
           <div className={styles.popoverControlGroup}>
-            <label><span>Name Size</span><strong>{headerStyles.nameSize || 20}px</strong></label>
+            <label><span>Name Size</span><strong>{headerStyles.nameSize || 23}px</strong></label>
             <input
               type="range"
               min="14"
@@ -2705,21 +2949,69 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               </button>
             )}
             {sec?.type === 'projects' && (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditableProjects(prev => [...prev, {
-                    id: `proj_${Date.now()}`,
-                    title: 'Project Title',
-                    role: 'Your Role / Contributions',
-                    date: 'Date Range',
-                    bullets: ['Add key detail or outcome...']
-                  }]);
-                }}
-                className={styles.popoverAddBtn}
-              >
-                + Add Project
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditableProjects(prev => [...prev, {
+                      id: `proj_${Date.now()}`,
+                      title: 'Project Title',
+                      role: 'Your Role / Contributions',
+                      date: 'Date Range',
+                      bullets: ['Add key detail or outcome...']
+                    }]);
+                  }}
+                  className={styles.popoverAddBtn}
+                >
+                  + Add Project
+                </button>
+
+                <div className={styles.popoverControlGroup} style={{ marginTop: '12px' }}>
+                  <label><span style={{ fontWeight: 600, color: '#f8fafc' }}>Project Fields Manager</span></label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                    {editableProjects.map((proj, pIdx) => {
+                      const projHasRole = Boolean(proj.role && proj.role.trim());
+                      const projTechStr = Array.isArray(proj.technologies)
+                        ? proj.technologies.join(', ')
+                        : (proj.technologies || '');
+                      const projHasTech = Boolean(projTechStr && projTechStr.trim());
+
+                      return (
+                        <div key={proj.id || pIdx} style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                          <div style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            📌 {proj.title || `Project #${pIdx + 1}`}
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {!projHasRole && (
+                              <button
+                                type="button"
+                                className={styles.popoverFieldBtn}
+                                onClick={() => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, role: 'Your Role / Contribution' } : p))}
+                              >
+                                🏢 + Add Role
+                              </button>
+                            )}
+                            {!projHasTech && (
+                              <button
+                                type="button"
+                                className={styles.popoverFieldBtn}
+                                onClick={() => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, technologies: ['React', 'Node.js'] } : p))}
+                              >
+                                ⚡ + Add Tech Stack
+                              </button>
+                            )}
+                            {projHasRole && projHasTech && (
+                              <span style={{ fontSize: '11px', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                ✓ All Fields Active
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
             )}
             {sec?.type === 'education' && (
               <button
@@ -2858,6 +3150,17 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
         }
       }
     }
+
+    const handleContainerClickToFocus = (e: React.MouseEvent<HTMLElement>) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('button') || target.closest('a') || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        return;
+      }
+      const focusable = e.currentTarget.querySelector('textarea, input') as HTMLTextAreaElement | HTMLInputElement | null;
+      if (focusable) {
+        focusable.focus();
+      }
+    };
 
     const mergedStyles = {
       '--section-font-size': localStyles.fontSize ? `${localStyles.fontSize}px` : undefined,
@@ -3218,11 +3521,67 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
     // 2. Section Title
     if (unit.type === 'section-title') {
       const isSettingsOpen = activeSectionSettings === unit.sectionId;
+      const secIdx = sections.findIndex(s => s.id === unit.sectionId);
+      const isFirst = secIdx <= 0;
+      const isLast = secIdx >= sections.length - 1 || secIdx === -1;
+      const isSectionHovered = hoveredSectionId === unit.sectionId || activeSectionSettings === unit.sectionId;
+
       return (
-        <div className={styles.sectionHeaderWrapper} style={mergedStyles}>
+        <div
+          className={`${styles.sectionHeaderWrapper} ${isSectionHovered ? styles.sectionHoverActive : ''}`}
+          style={mergedStyles}
+          onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
+          onMouseLeave={() => setHoveredSectionId(null)}
+        >
           {/* Section Reordering Canvas overlay controls */}
           {!isMeasuring && (
-            <div className={`${styles.sectionControls} no-print`}>
+            <div className={`${styles.sectionControls} ${isSectionHovered ? styles.sectionControlsShow : ''} no-print`}>
+              <button
+                type="button"
+                className={styles.moveSecBtn}
+                title="Move Section Up"
+                disabled={isFirst}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleMoveSection(unit.sectionId!, 'up');
+                }}
+              >
+                <ChevronUp size={12} />
+              </button>
+              <button
+                type="button"
+                className={styles.moveSecBtn}
+                title="Move Section Down"
+                disabled={isLast}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleMoveSection(unit.sectionId!, 'down');
+                }}
+              >
+                <ChevronDown size={12} />
+              </button>
+              <button
+                type="button"
+                className={styles.quickAddBtn}
+                title="Quick Add Entry to Section"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleQuickAddSectionItem(unit.sectionId!);
+                }}
+              >
+                <Plus size={12} />
+              </button>
+              <button
+                type="button"
+                className={styles.aiSectionBtn}
+                title="AI Polish & Section Tailor"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenSectionAiModalId(unit.sectionId!);
+                }}
+              >
+                <Sparkles size={12} />
+              </button>
               <button
                 type="button"
                 className={styles.itemSortBtn}
@@ -3234,13 +3593,14 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   setActiveSectionSettings(isSettingsOpen ? null : unit.sectionId!);
                 }}
               >
-                <Settings size={13} />
+                <Settings size={12} />
               </button>
               <button
                 type="button"
                 className={styles.deleteBlockBtn}
                 title="Hide Section"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (window.confirm(`Hide section "${unit.titleText}"? You can re-enable it in the sidebar.`)) {
                     setSections(prev => prev.map(s => s.id === unit.sectionId ? { ...s, visible: false } : s));
                   }
@@ -3271,6 +3631,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   </span>
                 ) : (
                   <AutoSizeTextarea
+                    autoFocus
                     value={unit.titleText || ''}
                     onChange={(val) => setSections(prev => prev.map(s => s.id === unit.sectionId ? { ...s, name: val } : s))}
                     onBlur={() => setEditingSectionTitleId(null)}
@@ -3289,12 +3650,14 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
     // 3. Summary Content
     if (unit.type === 'summary') {
       const summaryAlerts = getAlertsFor('summary');
+      const isSectionHovered = hoveredSectionId === unit.sectionId;
       return (
         <div
-          className={`${styles.summaryBox} ${styles.canvasHoverBlock} ${!reviewedActions['summary'] ? styles.aiHighlighted : ''}`}
+          onClick={handleContainerClickToFocus}
+          className={`${styles.summaryBox} ${styles.canvasHoverBlock} ${isSectionHovered ? styles.sectionHoverActive : ''} ${!reviewedActions['summary'] ? styles.aiHighlighted : ''}`}
           style={mergedStyles}
-          onMouseEnter={() => handleMouseEnterSuggestion('summary')}
-          onMouseLeave={handleMouseLeaveSuggestion}
+          onMouseEnter={() => { handleMouseEnterSuggestion('summary'); setHoveredSectionId(unit.sectionId || null); }}
+          onMouseLeave={() => { handleMouseLeaveSuggestion(); setHoveredSectionId(null); }}
         >
           {renderHoverAiControls('summary', editableSummary, [
             { label: "Punchier", prompt: "Make concise and punchier with strong executive tone" },
@@ -3324,11 +3687,14 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
       const expIdx = unit.itemIndex!;
       const expAlerts = getAlertsFor(exp.id);
       const hasAIChange = !reviewedActions[exp.id];
+      const isSectionHovered = hoveredSectionId === unit.sectionId;
 
       return (
         <div
-          className={`${isPP ? styles.ppSectionRow : (isGerman ? styles.germanRow : styles.resumeItem)}`}
+          className={`${isPP ? styles.ppSectionRow : (isGerman ? styles.germanRow : styles.resumeItem)} ${isSectionHovered ? styles.sectionHoverActive : ''}`}
           style={{ ...mergedStyles, position: 'relative' }}
+          onMouseEnter={() => { handleMouseEnterSuggestion(exp.id); setHoveredSectionId(unit.sectionId || null); }}
+          onMouseLeave={() => { handleMouseLeaveSuggestion(); setHoveredSectionId(null); }}
         >
           {/* Card Sort/Trash controls */}
           {!isMeasuring && (
@@ -3419,7 +3785,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       const inputId = `bullet-input-experience-${exp.id}-${bulletIdx}`;
                       const key = `exp-bullet-${expIdx}-${bulletIdx}`;
                       return (
-                        <li key={bulletIdx} className={`${isPP ? styles.ppBulletItem : styles.germanBulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
+                        <li key={bulletIdx} onClick={handleContainerClickToFocus} className={`${isPP ? styles.ppBulletItem : styles.germanBulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
                           <span className={styles.bulletDot} />
                           {renderHoverAiControls(key, bullet, [
                             { label: "Action Verbs", prompt: "Make it punchier starting with strong active verbs" },
@@ -3565,11 +3931,15 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
       const techString = Array.isArray(proj.technologies)
         ? proj.technologies.join(', ')
         : (proj.technologies || '');
+      const hasTech = Boolean(techString && techString.trim());
+      const isSectionHovered = hoveredSectionId === unit.sectionId;
 
       return (
         <div
-          className={`${isPP ? styles.ppSectionRow : (isGerman ? styles.germanRow : styles.resumeItem)}`}
+          className={`${isPP ? styles.ppSectionRow : (isGerman ? styles.germanRow : styles.resumeItem)} ${isSectionHovered ? styles.sectionHoverActive : ''}`}
           style={{ ...mergedStyles, position: 'relative' }}
+          onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
+          onMouseLeave={() => setHoveredSectionId(null)}
         >
           {!isMeasuring && (
             <div className={`${styles.itemControls} no-print`}>
@@ -3618,32 +3988,35 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               </div>
               <div className={isPP ? styles.ppRightCol : styles.germanRightCol}>
                 <div style={{ display: 'flex', gap: '8px', fontSize: '1em', color: '#64748b', paddingTop: '0px', flexWrap: 'wrap', alignItems: 'baseline', width: '100%' }}>
-                  {hasRole ? (
-                    <span style={{ fontWeight: 800, flex: 1, minWidth: '100px' }}>
+                  {hasRole && (
+                    <span style={{ fontWeight: 800, flex: 1, minWidth: '120px', cursor: 'text' }}>
                       <AutoSizeTextarea
                         value={proj.role || ''}
-                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? { ...p, role: val } : p))}
+                        placeholder="Your Role / Contributions..."
+                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
                       />
                     </span>
-                  ) : (
-                    <span style={{ fontWeight: 600, flex: 1, minWidth: '100px', fontStyle: 'italic', color: '#64748b' }}>
+                  )}
+                  {hasTech && (
+                    <span style={{ fontWeight: 600, fontStyle: 'italic', color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: '140px', cursor: 'text' }}>
+                      <span style={{ fontSize: '0.9em', color: '#94a3b8', fontStyle: 'normal', flexShrink: 0 }}>Tech:</span>
                       <AutoSizeTextarea
                         value={techString}
                         placeholder="Technologies used (e.g. React, Node.js, Python)..."
-                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? {
+                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
                           ...p,
                           technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
                         } : p))}
                       />
                     </span>
                   )}
-                  {(hasRole || techString || proj.date) && proj.date && <span style={{ flexShrink: 0 }}>•</span>}
+                  {(hasRole || hasTech) && proj.date && <span style={{ flexShrink: 0 }}>•</span>}
                   {proj.date && (
                     <span style={{ flexShrink: 0 }}>
                       <AutoSizeTextarea
                         singleLine
                         value={proj.date || ''}
-                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? { ...p, date: val } : p))}
+                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, date: val } : p))}
                       />
                     </span>
                   )}
@@ -3681,7 +4054,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                             <AutoSizeTextarea
                               id={inputId}
                               value={bullet}
-                              onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? {
+                              onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
                                 ...p,
                                 bullets: p.bullets.map((b, bI) => bI === bulletIdx ? val : b)
                               } : p))}
@@ -3702,29 +4075,32 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 <strong>
                   <AutoSizeTextarea
                     value={proj.title || ''}
-                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? { ...p, title: val } : p))}
+                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, title: val } : p))}
                   />
                 </strong>
                 <span>
                   <AutoSizeTextarea
                     value={proj.date || ''}
-                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? { ...p, date: val } : p))}
+                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, date: val } : p))}
                   />
                 </span>
               </div>
-              {hasRole ? (
-                <p className={styles.itemCompany}>
+              {hasRole && (
+                <p className={styles.itemCompany} style={{ cursor: 'text', margin: '2px 0' }}>
                   <AutoSizeTextarea
                     value={proj.role || ''}
-                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? { ...p, role: val } : p))}
+                    placeholder="Your Role / Contributions..."
+                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
                   />
                 </p>
-              ) : (
-                <p className={styles.itemCompany} style={{ fontStyle: 'italic', color: '#64748b' }}>
+              )}
+              {hasTech && (
+                <p className={styles.itemCompany} style={{ fontStyle: 'italic', color: '#64748b', cursor: 'text', display: 'flex', alignItems: 'center', gap: '4px', margin: '2px 0' }}>
+                  <span style={{ fontSize: '0.9em', color: '#94a3b8', fontStyle: 'normal', flexShrink: 0 }}>Tech:</span>
                   <AutoSizeTextarea
                     value={techString}
                     placeholder="Technologies used (e.g. React, Node.js, Python)..."
-                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? {
+                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
                       ...p,
                       technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
                     } : p))}
@@ -3736,7 +4112,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   const inputId = `bullet-input-project-${proj.id}-${bulletIdx}`;
                   const key = `proj-bullet-${projIdx}-${bulletIdx}`;
                   return (
-                    <li key={bulletIdx} className={`${styles.bulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
+                    <li key={bulletIdx} onClick={handleContainerClickToFocus} className={`${styles.bulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
                       <span className={styles.bulletDot} />
                       {renderHoverAiControls(key, bullet, [
                         { label: "Action Verbs", prompt: "Make it punchier with strong active verbs" },
@@ -3786,11 +4162,14 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
     if (unit.type === 'education-item') {
       const edu = unit.itemData;
       const eduIdx = unit.itemIndex!;
+      const isSectionHovered = hoveredSectionId === unit.sectionId;
 
       return (
         <div
-          className={`${isPP ? styles.ppSectionRow : (isGerman ? styles.germanRow : styles.resumeItem)}`}
+          className={`${isPP ? styles.ppSectionRow : (isGerman ? styles.germanRow : styles.resumeItem)} ${isSectionHovered ? styles.sectionHoverActive : ''}`}
           style={{ ...mergedStyles, position: 'relative' }}
+          onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
+          onMouseLeave={() => setHoveredSectionId(null)}
         >
           {!isMeasuring && (
             <div className={`${styles.itemControls} no-print`}>
@@ -4019,10 +4398,14 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
     if (unit.type === 'skills-languages') {
       const skillsList = unit.skills || [];
       const subTitle = targetLanguage === 'de' ? 'Sprachen' : 'Languages';
+      const isSectionHovered = hoveredSectionId === unit.sectionId;
 
       return (
         <div
+          className={isSectionHovered ? styles.sectionHoverActive : ''}
           style={{ ...mergedStyles, position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', marginTop: '6px', marginBottom: '8px' }}
+          onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
+          onMouseLeave={() => setHoveredSectionId(null)}
         >
           {!isMeasuring && (
             <div className={`${styles.itemControls} no-print`} style={{ left: '-48px' }}>
@@ -4091,10 +4474,14 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
       const skillsList = unit.skills || [];
       const cat = unit.category!;
       const catLabel = getLocalizedCategoryName(cat);
+      const isSectionHovered = hoveredSectionId === unit.sectionId;
 
       return (
         <div
+          className={isSectionHovered ? styles.sectionHoverActive : ''}
           style={{ ...mergedStyles, position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', marginBottom: '8px' }}
+          onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
+          onMouseLeave={() => setHoveredSectionId(null)}
         >
           {!isMeasuring && (
             <div className={`${styles.itemControls} no-print`} style={{ left: '-48px' }}>
@@ -4145,11 +4532,17 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
     // 9. Custom Section Items (Choice of Bullets or KeyValue formats)
     if (unit.type === 'custom-content') {
       const bulletsList = unit.bullets || [];
+      const isSectionHovered = hoveredSectionId === unit.sectionId;
 
       if (sec?.customFormat === 'keyvalue') {
         const pairs = sec.keyValuePairs || [{ key: 'Label', value: 'Detail Description' }];
         return (
-          <div style={mergedStyles}>
+          <div
+            className={isSectionHovered ? styles.sectionHoverActive : ''}
+            style={mergedStyles}
+            onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
+            onMouseLeave={() => setHoveredSectionId(null)}
+          >
             {pairs.map((pair, pIdx) => (
               <div
                 key={pIdx}
@@ -4233,13 +4626,18 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
       // Default custom formats (multi-bullet lists)
       return (
-        <div style={mergedStyles}>
+        <div
+          className={isSectionHovered ? styles.sectionHoverActive : ''}
+          style={mergedStyles}
+          onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
+          onMouseLeave={() => setHoveredSectionId(null)}
+        >
           <ul className={isPP ? styles.ppBulletsList : (isGerman ? styles.germanBulletsList : styles.bulletsList)}>
             {bulletsList.map((bullet, bulletIdx) => {
               const inputId = `bullet-input-custom-${unit.sectionId}-${bulletIdx}`;
               const key = `custom-bullet-${unit.sectionId}-${bulletIdx}`;
               return (
-                <li key={bulletIdx} className={`${isPP ? styles.ppBulletItem : (isGerman ? styles.germanBulletItem : styles.bulletItem)} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
+                <li key={bulletIdx} onClick={handleContainerClickToFocus} className={`${isPP ? styles.ppBulletItem : (isGerman ? styles.germanBulletItem : styles.bulletItem)} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
                   <span className={styles.bulletDot} />
                   {renderHoverAiControls(key, bullet, [
                     { label: "Punchier", prompt: "Make punchier with strong professional impact" },
@@ -5078,6 +5476,56 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                 <option value="bullets">Multi-bullet list</option>
                                 <option value="keyvalue">Structured Key-Value grid</option>
                               </select>
+                            </div>
+                          )}
+
+                          {secItem.type === 'projects' && (
+                            <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--card-border, rgba(255,255,255,0.1))' }}>
+                              <label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--foreground, #1e293b)', marginBottom: '8px', display: 'block' }}>
+                                Project Fields & Details Manager
+                              </label>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {editableProjects.map((proj, pIdx) => {
+                                  const projHasRole = Boolean(proj.role && proj.role.trim());
+                                  const projTechStr = Array.isArray(proj.technologies)
+                                    ? proj.technologies.join(', ')
+                                    : (proj.technologies || '');
+                                  const projHasTech = Boolean(projTechStr && projTechStr.trim());
+
+                                  return (
+                                    <div key={proj.id || pIdx} style={{ background: 'rgba(99, 102, 241, 0.05)', padding: '8px 10px', borderRadius: '6px', border: '1px solid rgba(99, 102, 241, 0.15)' }}>
+                                      <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-main, #334155)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        📌 {proj.title || `Project #${pIdx + 1}`}
+                                      </div>
+                                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                        {!projHasRole && (
+                                          <button
+                                            type="button"
+                                            className={styles.popoverFieldBtn}
+                                            onClick={() => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, role: 'Your Role / Contribution' } : p))}
+                                          >
+                                            🏢 + Add Role
+                                          </button>
+                                        )}
+                                        {!projHasTech && (
+                                          <button
+                                            type="button"
+                                            className={styles.popoverFieldBtn}
+                                            onClick={() => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, technologies: ['React', 'Node.js'] } : p))}
+                                          >
+                                            ⚡ + Add Tech Stack
+                                          </button>
+                                        )}
+                                        {projHasRole && projHasTech && (
+                                          <span style={{ fontSize: '11px', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+                                            ✓ Role & Tech Stack Active
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
                           )}
 
@@ -6053,6 +6501,129 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
           )}
         </div>
       </div>
+
+      {/* Side-by-Side Section AI Polish Review Modal */}
+      {openSectionAiModalId && (
+        <div className={styles.sectionAiModalOverlay} onClick={() => { setOpenSectionAiModalId(null); setSectionAiProposal(null); }}>
+          <div className={styles.sectionAiModalCard} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.sectionAiModalHeader}>
+              <div className={styles.sectionAiModalTitle}>
+                <Sparkles size={16} className={styles.sparkleIconGlow} />
+                <span>AI Section Polish & Job Tailor</span>
+              </div>
+              <button type="button" className={styles.popoverClose} onClick={() => { setOpenSectionAiModalId(null); setSectionAiProposal(null); }}>
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className={styles.sectionAiModalBody}>
+              <div className={styles.sectionAiPromptSection}>
+                <div className={styles.sectionAiScopeRow}>
+                  <label>Select Target Scope:</label>
+                  <select
+                    className={styles.sectionAiScopeSelect}
+                    value={sectionAiScope}
+                    onChange={(e) => {
+                      setSectionAiScope(e.target.value);
+                      setSectionAiProposal(null);
+                    }}
+                  >
+                    {getSectionAiScopeOptions(openSectionAiModalId).map(opt => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <label>Choose AI Optimization Objective or type custom prompt:</label>
+                <div className={styles.sectionAiPresetChips}>
+                  <button type="button" onClick={() => handleGenerateSectionAi(openSectionAiModalId, "Tailor to target job description with high-impact keywords")}>
+                    🎯 Tailor to Job
+                  </button>
+                  <button type="button" onClick={() => handleGenerateSectionAi(openSectionAiModalId, "Highlight quantifiable metrics and technical results")}>
+                    📊 Metrics & Impact
+                  </button>
+                  <button type="button" onClick={() => handleGenerateSectionAi(openSectionAiModalId, "Optimize key industry terminology for ATS screening")}>
+                    🔍 ATS Polish
+                  </button>
+                  <button type="button" onClick={() => handleGenerateSectionAi(openSectionAiModalId, "Make concise with strong action verbs")}>
+                    💥 Punchier
+                  </button>
+                  <button type="button" onClick={() => handleGenerateSectionAi(openSectionAiModalId, "Enhance action verbs and quantify achievements")}>
+                    ⚡ Strong Action Verbs
+                  </button>
+                  <button type="button" onClick={() => handleGenerateSectionAi(openSectionAiModalId, "Fix grammar, spelling, and executive professional tone")}>
+                    ✨ Polish Grammar & Tone
+                  </button>
+                  <button type="button" onClick={() => handleGenerateSectionAi(openSectionAiModalId, "Make concise, punchy, and remove filler words")}>
+                    📉 Condense Section
+                  </button>
+                </div>
+                <div className={styles.sectionAiInputRow}>
+                  <input
+                    type="text"
+                    placeholder="e.g. Focus on technical leadership and cloud infrastructure..."
+                    value={sectionAiPrompt}
+                    onChange={(e) => setSectionAiPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && sectionAiPrompt.trim()) {
+                        handleGenerateSectionAi(openSectionAiModalId, sectionAiPrompt);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className={styles.sectionAiSubmitBtn}
+                    disabled={isGeneratingSectionAi}
+                    onClick={() => handleGenerateSectionAi(openSectionAiModalId, sectionAiPrompt)}
+                  >
+                    {isGeneratingSectionAi ? <RefreshCw size={14} className={styles.spinIcon} /> : <Wand2 size={14} />}
+                    {isGeneratingSectionAi ? 'Generating...' : 'Generate AI Proposal'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Side-by-Side Comparison Diff View */}
+              {sectionAiProposal && (
+                <div className={styles.diffComparisonContainer}>
+                  <div className={styles.diffHeaderRow}>
+                    <span className={styles.diffOriginalBadge}>Current Section Content</span>
+                    <span className={styles.diffProposedBadge}>✨ AI Enhanced Proposal</span>
+                  </div>
+                  <div className={styles.diffGrid}>
+                    <div className={styles.diffBoxOriginal}>
+                      <pre>{sectionAiProposal.originalText || '(Section currently empty)'}</pre>
+                    </div>
+                    <div className={styles.diffBoxProposed}>
+                      <pre>{sectionAiProposal.proposedText}</pre>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className={styles.sectionAiModalFooter}>
+              <button
+                type="button"
+                className={styles.cancelAiBtn}
+                onClick={() => { setOpenSectionAiModalId(null); setSectionAiProposal(null); }}
+              >
+                Cancel
+              </button>
+              {sectionAiProposal && (
+                <button
+                  type="button"
+                  className={styles.applyAiBtn}
+                  onClick={handleApplySectionAiProposal}
+                >
+                  <Check size={14} /> Apply AI Improvements to Section
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
