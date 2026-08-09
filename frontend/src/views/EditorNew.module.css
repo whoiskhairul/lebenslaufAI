@@ -1587,18 +1587,29 @@
   background: rgba(99, 102, 241, 0.08);
 }
 
-/* AutoSizeTextarea overrides for canvas flow */
-.autoTextareaWrapper {
-  width: 100%;
+/* AutoSizeTextarea overrides & inline editing visual feedback */
+.canvasFieldEdit {
+  transition: background 0.15s ease, box-shadow 0.15s ease, border-radius 0.15s ease;
+  border-radius: 3px;
 }
 
-.autoTextareaWrapper textarea {
-  transition: background 0.15s ease;
+.canvasFieldEdit:hover {
+  background: rgba(99, 102, 241, 0.05);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  border-radius: 4px;
 }
 
-.autoTextareaWrapper textarea:focus {
-  background: rgba(99, 102, 241, 0.04);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+.canvasFieldEdit:focus {
+  background: rgba(99, 102, 241, 0.08);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+  border-radius: 4px;
+}
+
+.bulletItem:hover,
+.ppBulletItem:hover,
+.germanBulletItem:hover,
+.canvasHoverBlock:hover {
+  background: rgba(99, 102, 241, 0.03);
   border-radius: 4px;
 }
 
