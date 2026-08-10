@@ -21,425 +21,15 @@ const templateClassMap: { [key: string]: string } = {
 };
 
 
-// TypeScript Types
-interface ResumeVersion {
-  id: string;
-  title: string;
-  target_company: string;
-  target_role: string;
-  ats_score: number;
-  tailored_summary: string;
-  tailored_details: {
-    experiences: Array<{ id: string; bullets: string[] }>;
-    skills?: Array<{ id?: string; name: string; category: string; level?: string }>;
-    projects?: Array<{ id?: string; title: string; role?: string; technologies?: string[]; bullets?: string[]; link?: string; date?: string }>;
-    ats_report: {
-      score: number;
-      matched_keywords: string[];
-      missing_keywords: string[];
-      suggestions: string[];
-    };
-    original_profile: {
-      personal_info: {
-        full_name: string;
-        title: string;
-        email: string;
-        phone: string;
-        location: string;
-        summary: string;
-        links: Array<{ label: string; url: string }>;
-        date_of_birth?: string;
-        nationality?: string;
-        linkedin?: string;
-        github?: string;
-        website?: string;
-        image_url?: string;
-      };
-      work_experiences: Array<{
-        id: string;
-        company: string;
-        position: string;
-        location?: string;
-        start_date?: string;
-        end_date?: string;
-        bullets: string[];
-      }>;
-      projects: Array<{
-        id: string;
-        title: string;
-        role?: string;
-        technologies: string[];
-        bullets: string[];
-        link?: string;
-        date?: string;
-      }>;
-      skills: Array<{ id: string; name: string; category: string; level?: string }>;
-      educations?: Array<{
-        id: string;
-        institution: string;
-        degree?: string;
-        field_of_study?: string;
-        location?: string;
-        start_date?: string;
-        end_date?: string;
-        is_current?: boolean;
-        bullets?: string[];
-      }>;
-      certifications?: Array<{
-        id: string;
-        name: string;
-        authority?: string;
-        issue_date?: string;
-        credential_id?: string;
-        credential_url?: string;
-      }>;
-    };
-    customization?: {
-      sections?: any[];
-      customStyles?: any;
-      headerStyles?: any;
-    };
-  };
-  explanations: Array<{
-    section: string;
-    confidence_score: number;
-    evidence_source: string;
-    reason: string;
-  }>;
-  validation_alerts?: Array<{
-    severity: string;
-    section: string;
-    section_label: string;
-    value: string;
-    message: string;
-  }>;
-  template: string;
-  created_at: string;
-  application?: string;
-}
-
-interface EditorProps {
-  initialJobParams?: { company?: string; position?: string; desc?: string; application_id?: string; tab?: string };
-}
-
-// Flat renderable units for the virtual page partitioning algorithm
-interface RenderableUnit {
-  type: 'header' | 'section-title' | 'summary' | 'experience-item' | 'project-item' | 'education-item' | 'skills-languages' | 'skills-category' | 'custom-content' | 'contacts-static';
-  id: string;
-  sectionId?: string;
-  titleText?: string;
-  itemIndex?: number;
-  itemData?: any;
-  skills?: any[];
-  category?: string;
-  bullets?: string[];
-}
-
-// Custom Date Parser and Formatter to support MM/YYYY, MMM YYYY, YYYY formats
-const parseDate = (str: string) => {
-  if (!str) return null;
-  const s = str.trim().toLowerCase();
-  if (s === 'present' || s === 'current' || s === 'heute' || s === 'jetzt' || s === 'laufend') {
-    return 'Present';
-  }
-
-  // Try to match MM/YYYY or M/YYYY or YYYY-MM or YYYY.MM
-  let match = s.match(/^(\d{1,2})[\/\-\.](\d{4})$/);
-  if (match) {
-    return { month: parseInt(match[1]), year: parseInt(match[2]) };
-  }
-
-  match = s.match(/^(\d{4})[\/\-\.](\d{1,2})$/);
-  if (match) {
-    return { month: parseInt(match[2]), year: parseInt(match[1]) };
-  }
-
-  // Match Month Name YYYY (e.g. "May 2022", "Jan. 2020", "März 2021")
-  const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-  const germanMonths = ['jan', 'feb', 'mär', 'apr', 'mai', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dez'];
-
-  const yearMatch = s.match(/\b(\d{4})\b/);
-  if (yearMatch) {
-    const year = parseInt(yearMatch[1]);
-    for (let i = 0; i < 12; i++) {
-      if (s.includes(months[i]) || s.includes(germanMonths[i])) {
-        return { month: i + 1, year };
-      }
-    }
-    return { month: null, year };
-  }
-
-  // Raw Year only
-  const rawYearMatch = s.match(/^(\d{4})$/);
-  if (rawYearMatch) {
-    return { month: null, year: parseInt(rawYearMatch[1]) };
-  }
-
-  return null;
-};
-
-const formatDate = (dateStr: string, format: 'MM/YYYY' | 'MMM YYYY' | 'YYYY') => {
-  const parsed = parseDate(dateStr);
-  if (!parsed) return dateStr;
-  if (parsed === 'Present') return 'Present';
-
-  const { month, year } = parsed;
-  if (format === 'YYYY' || !month) {
-    return `${year}`;
-  }
-
-  if (format === 'MM/YYYY') {
-    return `${month.toString().padStart(2, '0')}/${year}`;
-  }
-
-  if (format === 'MMM YYYY') {
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${monthNames[month - 1]} ${year}`;
-  }
-
-  return dateStr;
-};
-
-const MeasuringContext = React.createContext(false);
-
-// Auto-resizing Textarea supporting clean canvas inline editing
-const AutoSizeTextarea: React.FC<{
-  value: string;
-  onChange: (val: string) => void;
-  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-  onBlur?: () => void;
-  className?: string;
-  placeholder?: string;
-  id?: string;
-  singleLine?: boolean;
-  autoFocus?: boolean;
-  style?: React.CSSProperties;
-}> = ({ value, onChange, onKeyDown, onBlur, className, placeholder, id, singleLine, autoFocus = false, style }) => {
-  const isMeasuring = React.useContext(MeasuringContext);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [localVal, setLocalVal] = useState(value);
-  const selectionRef = useRef<{ start: number | null; end: number | null }>({ start: null, end: null });
-  const isTypingRef = useRef(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  if (isMeasuring) {
-    return (
-      <div
-        className={className}
-        style={{
-          whiteSpace: singleLine ? 'nowrap' : 'pre-wrap',
-          wordBreak: singleLine ? 'keep-all' : 'break-word',
-          width: '100%',
-          display: 'block',
-          fontSize: 'inherit',
-          lineHeight: 'inherit',
-          fontFamily: 'inherit',
-          fontWeight: 'inherit',
-          color: 'inherit',
-          padding: '2px 0',
-          minHeight: '1.2em',
-          boxSizing: 'border-box',
-          ...style
-        }}
-      >
-        {value || placeholder || ' '}
-      </div>
-    );
-  }
-
-  useEffect(() => {
-    if (!isTypingRef.current) {
-      setLocalVal(value);
-    }
-  }, [value]);
-
-  useEffect(() => {
-    if (autoFocus && textareaRef.current && document.activeElement !== textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, [autoFocus]);
-
-  const adjustHeight = () => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  };
-
-  useLayoutEffect(() => {
-    adjustHeight();
-    if (textareaRef.current && document.activeElement === textareaRef.current) {
-      const { start, end } = selectionRef.current;
-      if (start !== null && end !== null) {
-        try {
-          textareaRef.current.setSelectionRange(start, end);
-        } catch (_) { }
-      }
-    }
-  }, [localVal, value, style?.fontSize, style?.lineHeight, style?.fontWeight, (style as any)?.headingSizeMult]);
-
-  useEffect(() => {
-    const handleResizeOrStyle = () => {
-      adjustHeight();
-      requestAnimationFrame(adjustHeight);
-    };
-    window.addEventListener('resize', handleResizeOrStyle);
-    window.addEventListener('cv-style-change', handleResizeOrStyle);
-    return () => {
-      window.removeEventListener('resize', handleResizeOrStyle);
-      window.removeEventListener('cv-style-change', handleResizeOrStyle);
-    };
-  }, []);
-
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    isTypingRef.current = true;
-    const newVal = e.target.value;
-    const start = e.target.selectionStart;
-    const end = e.target.selectionEnd;
-    selectionRef.current = { start, end };
-
-    setLocalVal(newVal);
-    onChange(newVal);
-
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      isTypingRef.current = false;
-    }, 400);
-  };
-
-  const handleSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
-    const target = e.currentTarget;
-    selectionRef.current = { start: target.selectionStart, end: target.selectionEnd };
-  };
-
-  const handleWrapperClick = (e: React.MouseEvent) => {
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  };
-
-  return (
-    <div
-      onClick={handleWrapperClick}
-      style={{
-        display: singleLine ? 'inline-block' : 'block',
-        width: '100%',
-        cursor: 'text',
-        minHeight: '1.2em'
-      }}
-    >
-      <textarea
-        id={id}
-        ref={textareaRef}
-        value={localVal}
-        onChange={handleChange}
-        onSelect={handleSelect}
-        onKeyDown={onKeyDown}
-        onBlur={onBlur}
-        className={`${className || ''} ${styles.canvasFieldEdit}`}
-        placeholder={placeholder}
-        rows={1}
-        style={{
-          overflow: 'hidden',
-          resize: 'none',
-          width: '100%',
-          display: 'block',
-          border: 'none',
-          background: 'transparent',
-          outline: 'none',
-          padding: 0,
-          margin: 0,
-          color: 'inherit',
-          fontFamily: 'inherit',
-          fontSize: 'inherit',
-          fontWeight: 'inherit',
-          lineHeight: 'inherit',
-          textAlign: 'inherit',
-          whiteSpace: singleLine ? 'nowrap' : undefined,
-          wordBreak: singleLine ? 'keep-all' : undefined,
-          ...style
-        }}
-      />
-    </div>
-  );
-};
-
-// Helper for rendering section title with partial / multi-color formatting
-const renderFormattedTitle = (title: string, primaryColor?: string, secondaryColor?: string) => {
-  if (!title) return null;
-  const upperTitle = title.toUpperCase();
-
-  // 1. Color tag syntax e.g. <color:#3b82f6>Summary</color>
-  if (upperTitle.includes('<COLOR:')) {
-    const parts: React.ReactNode[] = [];
-    const regex = /<COLOR:(#[0-9A-FA-F]{3,8}|[a-zA-Z]+)>(.*?)<\/COLOR>/g;
-    let lastIdx = 0;
-    let match;
-    while ((match = regex.exec(upperTitle)) !== null) {
-      if (match.index > lastIdx) {
-        parts.push(upperTitle.substring(lastIdx, match.index));
-      }
-      parts.push(
-        <span key={match.index} style={{ color: match[1] }}>
-          {match[2]}
-        </span>
-      );
-      lastIdx = regex.lastIndex;
-    }
-    if (lastIdx < upperTitle.length) {
-      parts.push(upperTitle.substring(lastIdx));
-    }
-    return <>{parts}</>;
-  }
-
-  // 2. Dual-color split mode (1st word vs rest of title)
-  if (secondaryColor) {
-    const words = upperTitle.trim().split(/\s+/);
-    if (words.length > 1) {
-      const firstWord = words[0];
-      const rest = words.slice(1).join(' ');
-      return (
-        <>
-          <span style={{ color: primaryColor || 'inherit' }}>{firstWord}</span>{' '}
-          <span style={{ color: secondaryColor }}>{rest}</span>
-        </>
-      );
-    }
-    return <span style={{ color: primaryColor || 'inherit' }}>{upperTitle}</span>;
-  }
-
-  return <span style={{ color: primaryColor || 'inherit' }}>{upperTitle}</span>;
-};
-
-const renderFormattedLanguageList = (text: string) => {
-  if (!text) return null;
-  const items = text.split(',').map(s => s.trim()).filter(Boolean);
-  return (
-    <>
-      {items.map((item, idx) => {
-        const parenIdx = item.indexOf('(');
-        if (parenIdx !== -1) {
-          const langName = item.substring(0, parenIdx).trim();
-          const rest = item.substring(parenIdx);
-          return (
-            <span key={idx}>
-              <strong style={{ fontWeight: 700 }}>{langName}</strong>{' '}
-              <span style={{ fontWeight: 400 }}>{rest}</span>
-              {idx < items.length - 1 ? ', ' : ''}
-            </span>
-          );
-        } else {
-          return (
-            <span key={idx}>
-              <strong style={{ fontWeight: 700 }}>{item}</strong>
-              {idx < items.length - 1 ? ', ' : ''}
-            </span>
-          );
-        }
-      })}
-    </>
-  );
-};
+import { ResumeVersion, EditorProps, RenderableUnit } from './editor/types/editor.types';
+import { parseDate, formatDate } from './editor/utils/dateUtils';
+import { renderFormattedTitle } from './editor/utils/titleUtils';
+import { renderFormattedLanguageList } from './editor/utils/languageUtils';
+import { AutoSizeTextarea, MeasuringContext } from './editor/components/AutoSizeTextarea';
+import { SectionAiPolishModal } from './editor/components/SectionAiPolishModal';
+import { HeaderSettingsPopover } from './editor/components/HeaderSettingsPopover';
+import { SectionSettingsPopover } from './editor/components/SectionSettingsPopover';
+import { UnitRenderer } from './editor/components/UnitRenderer';
 
 export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   // Main CV Parameters
@@ -644,9 +234,10 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     image_url: ''
   });
   const [editableExperiences, setEditableExperiences] = useState<Array<{ id: string; bullets: string[]; company?: string; position?: string; location?: string; start_date?: string; end_date?: string }>>([]);
-  const [editableProjects, setEditableProjects] = useState<Array<{ id: string; bullets: string[]; title?: string; role?: string; technologies?: string[] | string; date?: string }>>([]);
+  const [editableProjects, setEditableProjects] = useState<Array<{ id: string; bullets: string[]; title?: string; role?: string; technologies?: string[] | string; date?: string; link?: string; github_url?: string; demo_url?: string }>>([]);
   const [editableEducations, setEditableEducations] = useState<Array<{ id: string; institution: string; degree?: string; field_of_study?: string; start_date?: string; end_date?: string; location?: string; bullets?: string[] }>>([]);
   const [editableSkills, setEditableSkills] = useState<Array<{ id: string; name: string; category: string }>>([]);
+  const [expandedProjectCards, setExpandedProjectCards] = useState<Record<string, boolean>>({});
 
   // Dynamic Document Title: "name of the applicant_Lebenslauf"
   useEffect(() => {
@@ -1961,12 +1552,12 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           };
 
           const addITSkillsUnits = () => {
-            finalCategories.forEach((cat, catIdx) => {
+            finalCategories.forEach((cat) => {
               const catSkills = itSkills.filter(s => (s.category || 'technical') === cat);
               if (catSkills.length > 0) {
                 unitsList.push({
                   type: 'skills-category',
-                  id: `skills-category-${catIdx}`,
+                  id: `skills-category-${cat}`,
                   sectionId: sec.id,
                   category: cat,
                   skills: catSkills
@@ -2013,7 +1604,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       const pageHeight = customStyles.pageSize === 'A4' ? 1123 : 1056;
       const pageMargin = customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32));
 
-      // Usable inner content height with 24px strict footer protection zone
+      // Usable inner content height for allowedPageContentHeight zone with 24px buffer
       const printableContentHeight = pageHeight - 2 * pageMargin;
       const totalPrintableHeight = printableContentHeight - 24;
 
@@ -2046,32 +1637,37 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
         let shouldPushPage = false;
 
-        // Atomic Section Page Partitioning:
-        // When evaluating a section title, calculate the total effective height of all units in that section.
-        // If the entire section cannot fit on the current page, move the whole section to the next page.
+        // Strict Section Atomicity Page Partitioning:
+        // When encountering a section-title, calculate the height of this title PLUS ALL ITS SUBSEQUENT ITEMS in unitsList.
         if (unit.type === 'section-title') {
-          const sectionUnits = unitsList.filter(u => u.sectionId === unit.sectionId);
-          const totalSectionHeight = sectionUnits.reduce((sum, u) => sum + getUnitEffectiveHeight(u), 0);
+          // Find all units belonging to this section starting from this title
+          let remainingSectionHeight = 0;
+          for (let j = i; j < unitsList.length && unitsList[j].sectionId === unit.sectionId; j++) {
+            remainingSectionHeight += getUnitEffectiveHeight(unitsList[j]);
+          }
 
-          if (isSidebarColumn) {
-            if (currentSidebarHeight + totalSectionHeight > activeColumnLimit && currentSidebarHeight > 0) {
+          const currentHeight = isSidebarColumn ? currentSidebarHeight : currentMainHeight;
+
+          // If the entire section can fit on a clean blank page (remainingSectionHeight <= activeColumnLimit),
+          // but DOES NOT fit in the current page's remaining space, push the ENTIRE section to the next page!
+          if (remainingSectionHeight <= activeColumnLimit) {
+            if (currentHeight + remainingSectionHeight > activeColumnLimit && currentHeight > 0) {
               shouldPushPage = true;
             }
           } else {
-            if (currentMainHeight + totalSectionHeight > activeColumnLimit && currentMainHeight > 0) {
+            // Section itself is larger than 1 full page:
+            // At least ensure title + first content item fit on the current page, otherwise push title to next page.
+            const firstContentUnit = unitsList[i + 1] && unitsList[i + 1].sectionId === unit.sectionId ? unitsList[i + 1] : null;
+            const minHeaderGroupHeight = effHeight + (firstContentUnit ? getUnitEffectiveHeight(firstContentUnit) : 0);
+            if (currentHeight + minHeaderGroupHeight > activeColumnLimit && currentHeight > 0) {
               shouldPushPage = true;
             }
           }
         } else {
-          // Standard element sizing check (for individual items if a section is larger than 1 full page)
-          if (isSidebarColumn) {
-            if (currentSidebarHeight + effHeight > activeColumnLimit && currentSidebarHeight > 0) {
-              shouldPushPage = true;
-            }
-          } else {
-            if (currentMainHeight + effHeight > activeColumnLimit && currentMainHeight > 0) {
-              shouldPushPage = true;
-            }
+          // Individual item overflow check
+          const currentHeight = isSidebarColumn ? currentSidebarHeight : currentMainHeight;
+          if (currentHeight + effHeight > activeColumnLimit && currentHeight > 0) {
+            shouldPushPage = true;
           }
         }
 
@@ -2093,7 +1689,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       setPages(newPages);
     };
 
-    const timer = setTimeout(measureAndLayout, 100);
+    measureAndLayout();
+    const timer = setTimeout(measureAndLayout, 60);
     return () => clearTimeout(timer);
   }, [
     editableSummary, editablePersonalInfo, editableExperiences, editableSkills,
@@ -2545,542 +2142,32 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
   // On-Canvas Settings Popover for Header
   const renderHeaderSettingsPopover = () => {
-    const updateHeaderStyle = (key: string, value: any) => {
-      setHeaderStyles((prev: any) => ({ ...prev, [key]: value }));
-      window.dispatchEvent(new Event('cv-style-change'));
-    };
-
-    const topPos = popoverPosition ? Math.max(60, Math.min(window.innerHeight - 480, popoverPosition.top - 10)) : 100;
-    const leftPos = popoverPosition ? Math.max(16, popoverPosition.left - 305) : 100;
-
-    return createPortal(
-      <div
-        className={`${styles.portalPopoverCard} glass-card no-print`}
-        style={{
-          position: 'fixed',
-          top: `${topPos}px`,
-          left: `${leftPos}px`,
-          width: '290px',
-          zIndex: 999999
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className={styles.popoverHeader}>
-          <h4>Header Customizer</h4>
-          <button type="button" onClick={() => setActiveSectionSettings(null)} className={styles.popoverCloseBtn}>
-            <X size={12} />
-          </button>
-        </div>
-
-        <div className={styles.popoverBody}>
-          <div className={styles.popoverControlGroup}>
-            <label><span>Name Size</span><strong>{headerStyles.nameSize || 23}px</strong></label>
-            <input
-              type="range"
-              min="14"
-              max="36"
-              step="0.5"
-              value={headerStyles.nameSize || 20}
-              onChange={(e) => updateHeaderStyle('nameSize', parseFloat(e.target.value))}
-            />
-          </div>
-
-          <div className={styles.popoverControlGroup}>
-            <label><span>Title Size</span><strong>{headerStyles.titleSize || 13}px</strong></label>
-            <input
-              type="range"
-              min="10"
-              max="24"
-              step="0.5"
-              value={headerStyles.titleSize || 13}
-              onChange={(e) => updateHeaderStyle('titleSize', parseFloat(e.target.value))}
-            />
-          </div>
-
-          <div className={styles.popoverControlGroup}>
-            <label><span>Contacts Size</span><strong>{headerStyles.contactsSize || 11}px</strong></label>
-            <input
-              type="range"
-              min="8"
-              max="16"
-              step="0.5"
-              value={headerStyles.contactsSize || 11}
-              onChange={(e) => updateHeaderStyle('contactsSize', parseFloat(e.target.value))}
-            />
-          </div>
-
-          <div className={styles.popoverControlGroup}>
-            <label><span>Contacts Gap</span><strong>{headerStyles.contactsGap || 8}px</strong></label>
-            <input
-              type="range"
-              min="2"
-              max="20"
-              step="0.5"
-              value={headerStyles.contactsGap || 8}
-              onChange={(e) => updateHeaderStyle('contactsGap', parseFloat(e.target.value))}
-            />
-          </div>
-
-          <div className={styles.popoverControlGroup}>
-            <label><span>Personal Details Top Offset</span><strong>{headerStyles.contactsMarginTop !== undefined ? headerStyles.contactsMarginTop : 16}px</strong></label>
-            <input
-              type="range"
-              min="0"
-              max="80"
-              step="0.5"
-              value={headerStyles.contactsMarginTop !== undefined ? headerStyles.contactsMarginTop : 16}
-              onChange={(e) => updateHeaderStyle('contactsMarginTop', parseFloat(e.target.value))}
-            />
-          </div>
-
-          <div className={styles.popoverControlGroup}>
-            <label><span>Header Margin Bottom</span><strong>{headerStyles.spacing || 20}px</strong></label>
-            <input
-              type="range"
-              min="5"
-              max="60"
-              step="0.5"
-              value={headerStyles.spacing || 20}
-              onChange={(e) => updateHeaderStyle('spacing', parseFloat(e.target.value))}
-            />
-          </div>
-
-          <div className={styles.popoverInlinePickers}>
-            <div className={styles.popoverControlGroup}>
-              <label>Name Color</label>
-              <input
-                type="color"
-                value={headerStyles.nameColor || '#0f172a'}
-                onChange={(e) => updateHeaderStyle('nameColor', e.target.value)}
-              />
-            </div>
-            <div className={styles.popoverControlGroup}>
-              <label>Title Color</label>
-              <input
-                type="color"
-                value={headerStyles.titleColor || '#3d7ee6'}
-                onChange={(e) => updateHeaderStyle('titleColor', e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className={styles.popoverToggles}>
-            <button
-              type="button"
-              className={`${styles.popoverToggleBtn} ${headerStyles.nameWeight === 'normal' ? styles.popoverToggleBtnActive : ''}`}
-              onClick={() => updateHeaderStyle('nameWeight', headerStyles.nameWeight === 'normal' ? 'bold' : 'normal')}
-              title="Toggle Bold Name"
-            >
-              <strong>N-Bold</strong>
-            </button>
-            <button
-              type="button"
-              className={`${styles.popoverToggleBtn} ${headerStyles.nameStyle === 'italic' ? styles.popoverToggleBtnActive : ''}`}
-              onClick={() => updateHeaderStyle('nameStyle', headerStyles.nameStyle === 'italic' ? 'normal' : 'italic')}
-              title="Toggle Italic Name"
-            >
-              <em>N-Italic</em>
-            </button>
-            <button
-              type="button"
-              className={`${styles.popoverToggleBtn} ${headerStyles.titleWeight === 'bold' ? styles.popoverToggleBtnActive : ''}`}
-              onClick={() => updateHeaderStyle('titleWeight', headerStyles.titleWeight === 'bold' ? 'normal' : 'bold')}
-              title="Toggle Bold Title"
-            >
-              <strong>T-Bold</strong>
-            </button>
-            <button
-              type="button"
-              className={`${styles.popoverToggleBtn} ${headerStyles.titleStyle === 'italic' ? styles.popoverToggleBtnActive : ''}`}
-              onClick={() => updateHeaderStyle('titleStyle', headerStyles.titleStyle === 'italic' ? 'normal' : 'italic')}
-              title="Toggle Italic Title"
-            >
-              <em>T-Italic</em>
-            </button>
-          </div>
-
-          <div className={styles.popoverControlGroup} style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 600 }}>Profile Photo</label>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      setEditablePersonalInfo(prev => ({ ...prev, image_url: reader.result as string }));
-                    };
-                    reader.readAsDataURL(file);
-                  }
-                }}
-                style={{ fontSize: '11px', width: '130px' }}
-              />
-              {editablePersonalInfo.image_url && (
-                <button
-                  type="button"
-                  onClick={() => setEditablePersonalInfo(prev => ({ ...prev, image_url: '' }))}
-                  style={{
-                    padding: '2px 6px',
-                    fontSize: '11px',
-                    backgroundColor: '#ef4444',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>,
-      document.body
+    return (
+      <HeaderSettingsPopover
+        popoverPosition={popoverPosition}
+        headerStyles={headerStyles}
+        setHeaderStyles={setHeaderStyles}
+        onClose={() => setActiveSectionSettings(null)}
+        editablePersonalInfo={editablePersonalInfo}
+        setEditablePersonalInfo={setEditablePersonalInfo}
+      />
     );
   };
 
   // On-Canvas Settings Popover for Sections
   const renderSectionSettingsPopover = (sectionId: string, sec: any) => {
-    const localStyles = sec?.customStyles || {};
-
-    const updateStyle = (key: string, value: any) => {
-      setSections(prev => prev.map(s => s.id === sectionId ? {
-        ...s,
-        customStyles: { ...s.customStyles, [key]: value }
-      } : s));
-      window.dispatchEvent(new Event('cv-style-change'));
-    };
-
-    const topPos = popoverPosition ? Math.max(60, Math.min(window.innerHeight - 520, popoverPosition.top - 10)) : 100;
-    const leftPos = popoverPosition ? Math.max(16, popoverPosition.left - 305) : 100;
-
-    return createPortal(
-      <div
-        className={`${styles.portalPopoverCard} glass-card no-print`}
-        style={{
-          position: 'fixed',
-          top: `${topPos}px`,
-          left: `${leftPos}px`,
-          width: '290px',
-          zIndex: 999999
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className={styles.popoverHeader}>
-          <h4>Customize {sec?.name}</h4>
-          <button type="button" onClick={() => setActiveSectionSettings(null)} className={styles.popoverCloseBtn}>
-            <X size={12} />
-          </button>
-        </div>
-
-        <div className={styles.popoverBody}>
-          <div className={styles.popoverControlGroup}>
-            <label><span>Heading Size</span><strong>{localStyles.headingSize || 16}px</strong></label>
-            <input
-              type="range"
-              min="12"
-              max="32"
-              step="0.5"
-              value={localStyles.headingSize || 16}
-              onChange={(e) => updateStyle('headingSize', parseFloat(e.target.value))}
-            />
-          </div>
-
-          <div className={styles.popoverControlGroup}>
-            <label><span>Text Size</span><strong>{localStyles.fontSize || 13}px</strong></label>
-            <input
-              type="range"
-              min="10"
-              max="24"
-              step="0.5"
-              value={localStyles.fontSize || 13}
-              onChange={(e) => updateStyle('fontSize', parseFloat(e.target.value))}
-            />
-          </div>
-
-          <div className={styles.popoverControlGroup}>
-            <label><span>Line Height</span><strong>{localStyles.lineHeight || 1.4}</strong></label>
-            <input
-              type="range"
-              min="1.0"
-              max="2.5"
-              step="0.05"
-              value={localStyles.lineHeight || 1.4}
-              onChange={(e) => updateStyle('lineHeight', parseFloat(e.target.value))}
-            />
-          </div>
-
-          <div className={styles.popoverControlGroup}>
-            <label><span>Section Spacing</span><strong>{localStyles.spacing || 20}px</strong></label>
-            <input
-              type="range"
-              min="5"
-              max="60"
-              step="0.5"
-              value={localStyles.spacing || 20}
-              onChange={(e) => updateStyle('spacing', parseFloat(e.target.value))}
-            />
-          </div>
-
-          <div className={styles.popoverControlGroup}>
-            <label><span>Item Gap</span><strong>{localStyles.itemGap || 12}px</strong></label>
-            <input
-              type="range"
-              min="0"
-              max="40"
-              step="0.5"
-              value={localStyles.itemGap || 12}
-              onChange={(e) => updateStyle('itemGap', parseFloat(e.target.value))}
-            />
-          </div>
-
-          {sec?.type !== 'summary' && sec?.type !== 'skills' && (
-            <div className={styles.popoverControlGroup}>
-              <label><span>Bullet Spacing</span><strong>{localStyles.bulletSpacing || 4}px</strong></label>
-              <input
-                type="range"
-                min="0"
-                max="20"
-                step="0.5"
-                value={localStyles.bulletSpacing || 4}
-                onChange={(e) => updateStyle('bulletSpacing', parseFloat(e.target.value))}
-              />
-            </div>
-          )}
-
-          <div className={styles.popoverInlinePickers}>
-            <div className={styles.popoverControlGroup}>
-              <label>Text Color</label>
-              <input
-                type="color"
-                value={localStyles.textColor || '#334155'}
-                onChange={(e) => updateStyle('textColor', e.target.value)}
-              />
-            </div>
-            <div className={styles.popoverControlGroup}>
-              <label>Heading Color</label>
-              <input
-                type="color"
-                value={localStyles.headingColor || '#0f172a'}
-                onChange={(e) => updateStyle('headingColor', e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className={styles.popoverToggles}>
-            <button
-              type="button"
-              className={`${styles.popoverToggleBtn} ${localStyles.fontWeight === 'bold' ? styles.popoverToggleBtnActive : ''}`}
-              onClick={() => updateStyle('fontWeight', localStyles.fontWeight === 'bold' ? 'normal' : 'bold')}
-              title="Toggle Bold Body Text"
-            >
-              <strong>B</strong>
-            </button>
-            <button
-              type="button"
-              className={`${styles.popoverToggleBtn} ${localStyles.fontStyle === 'italic' ? styles.popoverToggleBtnActive : ''}`}
-              onClick={() => updateStyle('fontStyle', localStyles.fontStyle === 'italic' ? 'normal' : 'italic')}
-              title="Toggle Italic Body Text"
-            >
-              <em>I</em>
-            </button>
-
-            <button
-              type="button"
-              className={`${styles.popoverToggleBtn} ${localStyles.headingWeight === 'normal' ? styles.popoverToggleBtnActive : ''}`}
-              onClick={() => updateStyle('headingWeight', localStyles.headingWeight === 'normal' ? 'bold' : 'normal')}
-              title="Toggle Bold Heading"
-            >
-              <strong>H-B</strong>
-            </button>
-
-            <button
-              type="button"
-              className={`${styles.popoverToggleBtn} ${localStyles.headingStyle === 'italic' ? styles.popoverToggleBtnActive : ''}`}
-              onClick={() => updateStyle('headingStyle', localStyles.headingStyle === 'italic' ? 'normal' : 'italic')}
-              title="Toggle Italic Heading"
-            >
-              <em>H-I</em>
-            </button>
-          </div>
-
-          {sec?.type === 'custom' && (
-            <div className={styles.popoverControlGroup}>
-              <label><span>Format</span></label>
-              <select
-                value={sec.customFormat || 'bullets'}
-                onChange={(e) => {
-                  const val = e.target.value as 'bullets' | 'keyvalue';
-                  setSections(prev => prev.map(s => s.id === sectionId ? {
-                    ...s,
-                    customFormat: val,
-                    keyValuePairs: val === 'keyvalue' ? (s.keyValuePairs || [{ key: 'Label', value: 'Description' }]) : undefined
-                  } : s));
-                }}
-                className={styles.popoverSelect}
-              >
-                <option value="bullets">Multi-bullet list</option>
-                <option value="keyvalue">Key-Value list</option>
-              </select>
-            </div>
-          )}
-
-          <div className={styles.popoverActionsRow}>
-            {sec?.type === 'experience' && (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditableExperiences(prev => [...prev, {
-                    id: `exp_${Date.now()}`,
-                    company: 'Company Name',
-                    position: 'Job Title',
-                    location: 'City, Country',
-                    start_date: 'Start Date',
-                    end_date: 'End Date',
-                    bullets: ['Add key achievement or responsibility...']
-                  }]);
-                }}
-                className={styles.popoverAddBtn}
-              >
-                + Add Job
-              </button>
-            )}
-            {sec?.type === 'projects' && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditableProjects(prev => [...prev, {
-                      id: `proj_${Date.now()}`,
-                      title: 'Project Title',
-                      role: 'Your Role / Contributions',
-                      date: 'Date Range',
-                      bullets: ['Add key detail or outcome...']
-                    }]);
-                  }}
-                  className={styles.popoverAddBtn}
-                >
-                  + Add Project
-                </button>
-
-                <div className={styles.popoverControlGroup} style={{ marginTop: '12px' }}>
-                  <label><span style={{ fontWeight: 600, color: '#f8fafc' }}>Project Fields Manager</span></label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
-                    {editableProjects.map((proj, pIdx) => {
-                      const projHasRole = Boolean(proj.role && proj.role.trim());
-                      const projTechStr = Array.isArray(proj.technologies)
-                        ? proj.technologies.join(', ')
-                        : (proj.technologies || '');
-                      const projHasTech = Boolean(projTechStr && projTechStr.trim());
-
-                      return (
-                        <div key={proj.id || pIdx} style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                          <div style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            📌 {proj.title || `Project #${pIdx + 1}`}
-                          </div>
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            {!projHasRole && (
-                              <button
-                                type="button"
-                                className={styles.popoverFieldBtn}
-                                onClick={() => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, role: 'Your Role / Contribution' } : p))}
-                              >
-                                🏢 + Add Role
-                              </button>
-                            )}
-                            {!projHasTech && (
-                              <button
-                                type="button"
-                                className={styles.popoverFieldBtn}
-                                onClick={() => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, technologies: ['React', 'Node.js'] } : p))}
-                              >
-                                ⚡ + Add Tech Stack
-                              </button>
-                            )}
-                            {projHasRole && projHasTech && (
-                              <span style={{ fontSize: '11px', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                ✓ All Fields Active
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
-            )}
-            {sec?.type === 'education' && (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditableEducations(prev => [...prev, {
-                    id: `edu_${Date.now()}`,
-                    institution: 'School Name',
-                    degree: 'Degree',
-                    field_of_study: 'Field of Study',
-                    start_date: 'Start Date',
-                    end_date: 'End Date',
-                    location: 'City, Country',
-                    bullets: []
-                  }]);
-                }}
-                className={styles.popoverAddBtn}
-              >
-                + Add Degree
-              </button>
-            )}
-            {sec?.type === 'skills' && (
-              <button
-                type="button"
-                onClick={() => {
-                  const catName = window.prompt('Enter category name (e.g. databases, cloud):');
-                  if (catName && catName.trim()) {
-                    setEditableSkills(prev => [...prev, {
-                      id: `sk_${Date.now()}`,
-                      name: 'New Skill',
-                      category: catName.trim().toLowerCase()
-                    }]);
-                  }
-                }}
-                className={styles.popoverAddBtn}
-              >
-                + Add Category
-              </button>
-            )}
-            {sec?.type === 'custom' && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSections(prev => prev.map(s => {
-                    if (s.id === sectionId) {
-                      if (s.customFormat === 'keyvalue') {
-                        return {
-                          ...s,
-                          keyValuePairs: [...(s.keyValuePairs || []), { key: 'Label', value: 'Value details' }]
-                        };
-                      } else {
-                        return {
-                          ...s,
-                          bullets: [...(s.bullets || []), 'New custom bullet details...']
-                        };
-                      }
-                    }
-                    return s;
-                  }));
-                }}
-                className={styles.popoverAddBtn}
-              >
-                + Add Row
-              </button>
-            )}
-          </div>
-        </div>
-      </div>,
-      document.body
+    return (
+      <SectionSettingsPopover
+        sectionId={sectionId}
+        sec={sec}
+        popoverPosition={popoverPosition}
+        setSections={setSections}
+        onClose={() => setActiveSectionSettings(null)}
+        setEditableExperiences={setEditableExperiences}
+        setEditableProjects={setEditableProjects}
+        setEditableEducations={setEditableEducations}
+        openSectionAiModal={(id) => setOpenSectionAiModalId(id)}
+      />
     );
   };
 
@@ -3089,1616 +2176,66 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
   // ----------------------------------------------------
 
   const renderUnit = (unit: RenderableUnit, isMeasuring: boolean = false) => {
-    const isPP = template === 'pixel_perfect_pdf';
-    const isGerman = template === 'german_style_cv';
-    const isCreative = template === 'creative_tech';
-
-    // Local section styles cascade config overrides
-    const sec = sections.find(s => s.id === unit.sectionId);
-    const localStyles = sec?.customStyles || {};
-
-    // Spacing between sections vs gaps between items inside a section
-    let spacingStyle: React.CSSProperties = {};
-    if (unit.sectionId) {
-      const isLastItem = (() => {
-        if (sec?.type === 'summary' || sec?.type === 'custom') return true;
-        if (sec?.type === 'experience') {
-          return unit.type === 'experience-item' && unit.itemData?.id === editableExperiences[editableExperiences.length - 1]?.id;
-        }
-        if (sec?.type === 'projects') {
-          return unit.type === 'project-item' && unit.itemData?.id === editableProjects[editableProjects.length - 1]?.id;
-        }
-        if (sec?.type === 'education') {
-          return unit.type === 'education-item' && unit.itemData?.id === editableEducations[editableEducations.length - 1]?.id;
-        }
-        if (sec?.type === 'skills') {
-          const langSkills = editableSkills.filter(sk => (sk.category || '').toLowerCase().trim() === 'languages');
-          const itSkills = editableSkills.filter(sk => (sk.category || '').toLowerCase().trim() !== 'languages');
-          const uniqueCats = Array.from(new Set(itSkills.map(sk => (sk.category || 'technical').toLowerCase().trim())));
-          const itCategories = categoryOrder.filter(c => uniqueCats.includes(c));
-          const extraCats = uniqueCats.filter(c => !itCategories.includes(c));
-          const finalCategories = [...itCategories, ...extraCats];
-
-          finalCategories.sort((a, b) => {
-            const getCategoryOrderScore = (cat: string) => {
-              const order = ['programming languages', 'frameworks & libraries', 'databases', 'cloud & devops', 'development tools', 'testing'];
-              const idx = order.indexOf(cat.toLowerCase().trim());
-              if (idx !== -1) return idx;
-              if (cat.toLowerCase().trim() === 'languages') return 999;
-              return 100;
-            };
-            return getCategoryOrderScore(a) - getCategoryOrderScore(b);
-          });
-
-          const lastCat = languagesFirst
-            ? (finalCategories.length > 0 ? finalCategories[finalCategories.length - 1] : 'languages')
-            : (langSkills.length > 0 ? 'languages' : finalCategories[finalCategories.length - 1]);
-
-          if (unit.type === 'skills-languages') return lastCat === 'languages';
-          if (unit.type === 'skills-category') return lastCat === unit.category;
-        }
-        return false;
-      })();
-
-      if (isLastItem) {
-        if (localStyles.spacing !== undefined) {
-          spacingStyle = { marginBottom: `${localStyles.spacing}px` };
-        }
-      } else {
-        if (localStyles.itemGap !== undefined) {
-          spacingStyle = { marginBottom: `${localStyles.itemGap}px` };
-        }
-      }
-    }
-
-    const handleContainerClickToFocus = (e: React.MouseEvent<HTMLElement>) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('button') || target.closest('a') || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        return;
-      }
-      const focusable = e.currentTarget.querySelector('textarea, input') as HTMLTextAreaElement | HTMLInputElement | null;
-      if (focusable) {
-        focusable.focus();
-      }
-    };
-
-    const mergedStyles = {
-      '--section-font-size': localStyles.fontSize ? `${localStyles.fontSize}px` : undefined,
-      '--section-spacing': localStyles.spacing ? `${localStyles.spacing}px` : undefined,
-      '--section-alignment': localStyles.alignment || undefined,
-
-      // Inline overrides
-      fontSize: localStyles.fontSize ? `${localStyles.fontSize}px` : undefined,
-      lineHeight: localStyles.lineHeight ? `${localStyles.lineHeight}` : undefined,
-      color: localStyles.textColor ? localStyles.textColor : undefined,
-      textAlign: localStyles.alignment ? localStyles.alignment : undefined,
-      fontStyle: localStyles.fontStyle ? localStyles.fontStyle : undefined,
-      fontWeight: localStyles.fontWeight ? localStyles.fontWeight : undefined,
-      '--bullet-spacing': localStyles.bulletSpacing !== undefined ? `${localStyles.bulletSpacing}px` : undefined,
-      ...spacingStyle,
-    } as React.CSSProperties;
-
-
-    const sectionClass = isPP ? styles.ppSection : styles.resumeSection;
-    const titleClass = isPP ? styles.ppSectionTitle : (isGerman ? styles.germanSectionTitle : styles.resumeSectionTitle);
-
-    // 1. Header Block Layouts
-    if (unit.type === 'header') {
-      const isHeaderSettingsOpen = activeSectionSettings === 'header';
-
-      const headerControls = !isMeasuring && (
-        <div className={`${styles.sectionControls} no-print`} style={{ top: '4px', left: '-36px', right: 'auto' }}>
-          <button
-            type="button"
-            className={styles.itemSortBtn}
-            title="Customize Header Styles"
-            onClick={(e) => {
-              e.stopPropagation();
-              const rect = e.currentTarget.getBoundingClientRect();
-              setPopoverPosition({ top: rect.top, left: rect.left });
-              setActiveSectionSettings(isHeaderSettingsOpen ? null : 'header');
-            }}
-          >
-            <Settings size={13} />
-          </button>
-        </div>
-      );
-
-      const nameStyleOverride = {
-        fontSize: headerStyles.nameSize ? `${headerStyles.nameSize}px` : undefined,
-        fontWeight: headerStyles.nameWeight ? headerStyles.nameWeight : undefined,
-        fontStyle: headerStyles.nameStyle ? headerStyles.nameStyle : undefined,
-        color: headerStyles.nameColor ? headerStyles.nameColor : undefined,
-      };
-
-      const titleStyleOverride = {
-        fontSize: headerStyles.titleSize ? `${headerStyles.titleSize}px` : undefined,
-        fontWeight: headerStyles.titleWeight ? headerStyles.titleWeight : undefined,
-        fontStyle: headerStyles.titleStyle ? headerStyles.titleStyle : undefined,
-        color: headerStyles.titleColor ? headerStyles.titleColor : '#3d7ee6',
-      };
-
-      const contactsStyleOverride = {
-        fontSize: headerStyles.contactsSize ? `${headerStyles.contactsSize}px` : undefined,
-        color: headerStyles.contactsColor ? headerStyles.contactsColor : undefined,
-        gap: headerStyles.contactsGap ? `${headerStyles.contactsGap}px` : undefined,
-        marginTop: headerStyles.contactsMarginTop !== undefined ? `${headerStyles.contactsMarginTop}px` : undefined,
-      };
-
-      const headerContainerStyle = {
-        ...mergedStyles,
-        marginBottom: headerStyles.spacing !== undefined ? `${headerStyles.spacing}px` : undefined,
-        position: 'relative' as const,
-      };
-
-      if (isPP) {
-        return (
-          <div className={styles.ppHeader} style={headerContainerStyle}>
-            {headerControls}
-            {!isMeasuring && isHeaderSettingsOpen && renderHeaderSettingsPopover()}
-            <div className={styles.ppHeaderLeft}>
-              <h1 className={styles.ppName} style={nameStyleOverride}>
-                <AutoSizeTextarea
-                  style={nameStyleOverride}
-                  value={editablePersonalInfo.full_name}
-                  onChange={(val) => setEditablePersonalInfo(p => ({ ...p, full_name: val }))}
-                />
-              </h1>
-              <h2 className={styles.ppTitle} style={titleStyleOverride}>
-                <AutoSizeTextarea
-                  style={titleStyleOverride}
-                  value={editablePersonalInfo.title}
-                  onChange={(val) => setEditablePersonalInfo(p => ({ ...p, title: val }))}
-                />
-              </h2>
-              <div className={styles.ppContactGrid} style={contactsStyleOverride}>
-                <div className={styles.ppContactCol}>
-                  {!!editablePersonalInfo.location?.trim() && (
-                    <div className={styles.ppContactItem}>
-                      <span className={styles.ppContactLabel}>Address:</span>
-                      <span className={styles.ppContactVal}>
-                        <AutoSizeTextarea
-                          value={editablePersonalInfo.location}
-                          onChange={(val) => setEditablePersonalInfo(p => ({ ...p, location: val }))}
-                        />
-                      </span>
-                    </div>
-                  )}
-                  {!!editablePersonalInfo.email?.trim() && (
-                    <div className={styles.ppContactItem}>
-                      <span className={styles.ppContactLabel}>Email:</span>
-                      <span className={styles.ppContactVal}>
-                        <AutoSizeTextarea
-                          value={editablePersonalInfo.email}
-                          onChange={(val) => setEditablePersonalInfo(p => ({ ...p, email: val }))}
-                        />
-                      </span>
-                    </div>
-                  )}
-                  {!!editablePersonalInfo.website?.trim() && (
-                    <div className={styles.ppContactItem}>
-                      <span className={styles.ppContactLabel}>Website:</span>
-                      <span className={styles.ppContactVal}>
-                        <AutoSizeTextarea
-                          value={editablePersonalInfo.website}
-                          onChange={(val) => setEditablePersonalInfo(p => ({ ...p, website: val }))}
-                        />
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div className={styles.ppContactCol}>
-                  {!!editablePersonalInfo.phone?.trim() && (
-                    <div className={styles.ppContactItem}>
-                      <span className={styles.ppContactLabel}>Phone:</span>
-                      <span className={styles.ppContactVal}>
-                        <AutoSizeTextarea
-                          value={editablePersonalInfo.phone}
-                          onChange={(val) => setEditablePersonalInfo(p => ({ ...p, phone: val }))}
-                        />
-                      </span>
-                    </div>
-                  )}
-                  {!!editablePersonalInfo.linkedin?.trim() && (
-                    <div className={styles.ppContactItem}>
-                      <span className={styles.ppContactLabel}>LinkedIn:</span>
-                      <span className={styles.ppContactVal}>
-                        <AutoSizeTextarea
-                          value={editablePersonalInfo.linkedin}
-                          onChange={(val) => setEditablePersonalInfo(p => ({ ...p, linkedin: val }))}
-                        />
-                      </span>
-                    </div>
-                  )}
-                  {!!editablePersonalInfo.github?.trim() && (
-                    <div className={styles.ppContactItem}>
-                      <span className={styles.ppContactLabel}>GitHub:</span>
-                      <span className={styles.ppContactVal}>
-                        <AutoSizeTextarea
-                          value={editablePersonalInfo.github}
-                          onChange={(val) => setEditablePersonalInfo(p => ({ ...p, github: val }))}
-                        />
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            {editablePersonalInfo.image_url ? (
-              <div className={styles.ppHeaderRight}>
-                <img src={editablePersonalInfo.image_url} alt="Profile" className={styles.ppAvatar} />
-              </div>
-            ) : null}
-          </div>
-        );
-      }
-
-      if (isGerman) {
-        return (
-          <div className={styles.germanHeader} style={headerContainerStyle}>
-            {headerControls}
-            {!isMeasuring && isHeaderSettingsOpen && renderHeaderSettingsPopover()}
-            <div className={styles.germanHeaderLeft}>
-              <h1 className={styles.germanName} style={nameStyleOverride}>
-                <AutoSizeTextarea
-                  style={nameStyleOverride}
-                  value={editablePersonalInfo.full_name}
-                  onChange={(val) => setEditablePersonalInfo(p => ({ ...p, full_name: val }))}
-                />
-              </h1>
-              <h2 className={styles.germanTitle} style={titleStyleOverride}>
-                <AutoSizeTextarea
-                  style={titleStyleOverride}
-                  value={editablePersonalInfo.title}
-                  onChange={(val) => setEditablePersonalInfo(p => ({ ...p, title: val }))}
-                />
-              </h2>
-              <div className={styles.germanContactGrid} style={contactsStyleOverride}>
-                <div className={styles.germanContactCol}>
-                  {editablePersonalInfo.location && (
-                    <div className={styles.germanContactItem}>
-                      <span className={styles.germanContactLabel}>Anschrift:</span>
-                      <span className={styles.germanContactVal}>
-                        <AutoSizeTextarea
-                          value={editablePersonalInfo.location}
-                          onChange={(val) => setEditablePersonalInfo(p => ({ ...p, location: val }))}
-                        />
-                      </span>
-                    </div>
-                  )}
-                  {editablePersonalInfo.email && (
-                    <div className={styles.germanContactItem}>
-                      <span className={styles.germanContactLabel}>E-Mail:</span>
-                      <span className={styles.germanContactVal}>
-                        <AutoSizeTextarea
-                          value={editablePersonalInfo.email}
-                          onChange={(val) => setEditablePersonalInfo(p => ({ ...p, email: val }))}
-                        />
-                      </span>
-                    </div>
-                  )}
-                  {editablePersonalInfo.website && (
-                    <div className={styles.germanContactItem}>
-                      <span className={styles.germanContactLabel}>Website:</span>
-                      <span className={styles.germanContactVal}>
-                        <AutoSizeTextarea
-                          value={editablePersonalInfo.website}
-                          onChange={(val) => setEditablePersonalInfo(p => ({ ...p, website: val }))}
-                        />
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div className={styles.germanContactCol}>
-                  {editablePersonalInfo.phone && (
-                    <div className={styles.germanContactItem}>
-                      <span className={styles.germanContactLabel}>Telefon:</span>
-                      <span className={styles.germanContactVal}>
-                        <AutoSizeTextarea
-                          value={editablePersonalInfo.phone}
-                          onChange={(val) => setEditablePersonalInfo(p => ({ ...p, phone: val }))}
-                        />
-                      </span>
-                    </div>
-                  )}
-                  {editablePersonalInfo.linkedin && (
-                    <div className={styles.germanContactItem}>
-                      <span className={styles.germanContactLabel}>LinkedIn:</span>
-                      <span className={styles.germanContactVal}>
-                        <AutoSizeTextarea
-                          value={editablePersonalInfo.linkedin}
-                          onChange={(val) => setEditablePersonalInfo(p => ({ ...p, linkedin: val }))}
-                        />
-                      </span>
-                    </div>
-                  )}
-                  {editablePersonalInfo.github && (
-                    <div className={styles.germanContactItem}>
-                      <span className={styles.germanContactLabel}>GitHub:</span>
-                      <span className={styles.germanContactVal}>
-                        <AutoSizeTextarea
-                          value={editablePersonalInfo.github}
-                          onChange={(val) => setEditablePersonalInfo(p => ({ ...p, github: val }))}
-                        />
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            {editablePersonalInfo.image_url ? (
-              <div className={styles.germanHeaderRight}>
-                <img src={editablePersonalInfo.image_url} alt="Profilbild" className={styles.germanAvatar} />
-              </div>
-            ) : null}
-          </div>
-        );
-      }
-
-      // Classic standard stacked header fallback
-      return (
-        <div className={styles.resumeHeader} style={headerContainerStyle}>
-          {headerControls}
-          {!isMeasuring && isHeaderSettingsOpen && renderHeaderSettingsPopover()}
-          <div className={styles.headerMain}>
-            {editablePersonalInfo.image_url && (
-              <img src={editablePersonalInfo.image_url} alt="Profile" className={styles.profileAvatar} />
-            )}
-            <div className={styles.headerText}>
-              <h2 style={nameStyleOverride}>
-                <AutoSizeTextarea
-                  style={nameStyleOverride}
-                  value={editablePersonalInfo.full_name}
-                  onChange={(val) => setEditablePersonalInfo(p => ({ ...p, full_name: val }))}
-                />
-              </h2>
-              <p className={styles.resumeTitle} style={titleStyleOverride}>
-                <AutoSizeTextarea
-                  style={titleStyleOverride}
-                  value={editablePersonalInfo.title}
-                  onChange={(val) => setEditablePersonalInfo(p => ({ ...p, title: val }))}
-                />
-              </p>
-            </div>
-          </div>
-          <div className={styles.resumeContacts} style={contactsStyleOverride}>
-            {editablePersonalInfo.location && (
-              <AutoSizeTextarea
-                value={editablePersonalInfo.location}
-                onChange={(val) => setEditablePersonalInfo(p => ({ ...p, location: val }))}
-              />
-            )}
-            {editablePersonalInfo.email && (
-              <>
-                {editablePersonalInfo.location && <span>•</span>}
-                <AutoSizeTextarea
-                  value={editablePersonalInfo.email}
-                  onChange={(val) => setEditablePersonalInfo(p => ({ ...p, email: val }))}
-                />
-              </>
-            )}
-            {editablePersonalInfo.website && (
-              <>
-                {(editablePersonalInfo.location || editablePersonalInfo.email) && <span>•</span>}
-                <AutoSizeTextarea
-                  value={editablePersonalInfo.website}
-                  onChange={(val) => setEditablePersonalInfo(p => ({ ...p, website: val }))}
-                />
-              </>
-            )}
-            {editablePersonalInfo.phone && (
-              <>
-                {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website) && <span>•</span>}
-                <AutoSizeTextarea
-                  value={editablePersonalInfo.phone}
-                  onChange={(val) => setEditablePersonalInfo(p => ({ ...p, phone: val }))}
-                />
-              </>
-            )}
-            {editablePersonalInfo.linkedin && (
-              <>
-                {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website || editablePersonalInfo.phone) && <span>•</span>}
-                <AutoSizeTextarea
-                  value={editablePersonalInfo.linkedin}
-                  onChange={(val) => setEditablePersonalInfo(p => ({ ...p, linkedin: val }))}
-                />
-              </>
-            )}
-            {editablePersonalInfo.github && (
-              <>
-                {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website || editablePersonalInfo.phone || editablePersonalInfo.linkedin) && <span>•</span>}
-                <AutoSizeTextarea
-                  value={editablePersonalInfo.github}
-                  onChange={(val) => setEditablePersonalInfo(p => ({ ...p, github: val }))}
-                />
-              </>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    // 2. Section Title
-    if (unit.type === 'section-title') {
-      const isSettingsOpen = activeSectionSettings === unit.sectionId;
-      const secIdx = sections.findIndex(s => s.id === unit.sectionId);
-      const isFirst = secIdx <= 0;
-      const isLast = secIdx >= sections.length - 1 || secIdx === -1;
-      const isSectionHovered = hoveredSectionId === unit.sectionId || activeSectionSettings === unit.sectionId;
-
-      return (
-        <div
-          className={`${styles.sectionHeaderWrapper} ${isSectionHovered ? styles.sectionHoverActive : ''}`}
-          style={mergedStyles}
-          onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
-          onMouseLeave={() => setHoveredSectionId(null)}
-        >
-          {/* Section Reordering Canvas overlay controls */}
-          {!isMeasuring && (
-            <div className={`${styles.sectionControls} ${isSectionHovered ? styles.sectionControlsShow : ''} no-print`}>
-              <button
-                type="button"
-                className={styles.moveSecBtn}
-                title="Move Section Up"
-                disabled={isFirst}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleMoveSection(unit.sectionId!, 'up');
-                }}
-              >
-                <ChevronUp size={12} />
-              </button>
-              <button
-                type="button"
-                className={styles.moveSecBtn}
-                title="Move Section Down"
-                disabled={isLast}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleMoveSection(unit.sectionId!, 'down');
-                }}
-              >
-                <ChevronDown size={12} />
-              </button>
-              <button
-                type="button"
-                className={styles.quickAddBtn}
-                title="Quick Add Entry to Section"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleQuickAddSectionItem(unit.sectionId!);
-                }}
-              >
-                <Plus size={12} />
-              </button>
-              <button
-                type="button"
-                className={styles.aiSectionBtn}
-                title="AI Polish & Section Tailor"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpenSectionAiModalId(unit.sectionId!);
-                }}
-              >
-                <Sparkles size={12} />
-              </button>
-              <button
-                type="button"
-                className={styles.itemSortBtn}
-                title="Customize Section Styles"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setPopoverPosition({ top: rect.top, left: rect.left });
-                  setActiveSectionSettings(isSettingsOpen ? null : unit.sectionId!);
-                }}
-              >
-                <Settings size={12} />
-              </button>
-              <button
-                type="button"
-                className={styles.deleteBlockBtn}
-                title="Hide Section"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (window.confirm(`Hide section "${unit.titleText}"? You can re-enable it in the sidebar.`)) {
-                    setSections(prev => prev.map(s => s.id === unit.sectionId ? { ...s, visible: false } : s));
-                  }
-                }}
-              >
-                <X size={10} />
-              </button>
-            </div>
-          )}
-          {(() => {
-            const formattedTitleNode = renderFormattedTitle(
-              sec?.name || unit.titleText || '',
-              localStyles.headingColor || customStyles.accentColor,
-              localStyles.headingSecondaryColor || customStyles.headingSecondaryColor || '#3d7ee6'
-            );
-            return (
-              <h3 className={titleClass} style={{
-                textTransform: 'uppercase',
-                fontSize: localStyles.headingSize ? `${localStyles.headingSize}px` : undefined,
-                color: localStyles.headingColor ? localStyles.headingColor : undefined,
-                fontWeight: localStyles.headingWeight ? localStyles.headingWeight : undefined,
-                fontStyle: localStyles.headingStyle ? localStyles.headingStyle : undefined,
-                textAlign: localStyles.headingAlignment ? localStyles.headingAlignment : undefined,
-              } as React.CSSProperties}>
-                {formattedTitleNode && editingSectionTitleId !== unit.sectionId ? (
-                  <span onClick={() => setEditingSectionTitleId(unit.sectionId!)} style={{ cursor: 'pointer', display: 'inline-block', width: '100%' }}>
-                    {formattedTitleNode}
-                  </span>
-                ) : (
-                  <AutoSizeTextarea
-                    autoFocus
-                    value={unit.titleText || ''}
-                    onChange={(val) => setSections(prev => prev.map(s => s.id === unit.sectionId ? { ...s, name: val } : s))}
-                    onBlur={() => setEditingSectionTitleId(null)}
-                  />
-                )}
-              </h3>
-            );
-          })()}
-
-          {!isMeasuring && isSettingsOpen && renderSectionSettingsPopover(unit.sectionId!, sec)}
-        </div>
-      );
-    }
-
-
-    // 3. Summary Content
-    if (unit.type === 'summary') {
-      const summaryAlerts = getAlertsFor('summary');
-      const isSectionHovered = hoveredSectionId === unit.sectionId;
-      return (
-        <div
-          onClick={handleContainerClickToFocus}
-          className={`${styles.summaryBox} ${styles.canvasHoverBlock} ${isSectionHovered ? styles.sectionHoverActive : ''} ${!reviewedActions['summary'] ? styles.aiHighlighted : ''}`}
-          style={mergedStyles}
-          onMouseEnter={() => { handleMouseEnterSuggestion('summary'); setHoveredSectionId(unit.sectionId || null); }}
-          onMouseLeave={() => { handleMouseLeaveSuggestion(); setHoveredSectionId(null); }}
-        >
-          {renderHoverAiControls('summary', editableSummary, [
-            { label: "Punchier", prompt: "Make concise and punchier with strong executive tone" },
-            { label: "Leadership", prompt: "Highlight leadership, technical strategy, and architecture" },
-            { label: "Metrics & Impact", prompt: "Focus on quantifiable business metrics and project ROI" }
-          ])}
-
-          {isRephrasing['summary'] ? (
-            <div className={styles.canvasSkeletonBlock}>
-              <div className={styles.skeletonLine} style={{ width: '96%' }} />
-              <div className={styles.skeletonLine} style={{ width: '90%' }} />
-              <div className={styles.skeletonLine} style={{ width: '72%' }} />
-            </div>
-          ) : (
-            <AutoSizeTextarea
-              value={editableSummary}
-              onChange={(val) => setEditableSummary(val)}
-            />
-          )}
-        </div>
-      );
-    }
-
-    // 4. Experience Card Item
-    if (unit.type === 'experience-item') {
-      const exp = unit.itemData;
-      const expIdx = unit.itemIndex!;
-      const expAlerts = getAlertsFor(exp.id);
-      const hasAIChange = !reviewedActions[exp.id];
-      const isSectionHovered = hoveredSectionId === unit.sectionId;
-
-      return (
-        <div
-          className={`${isPP ? styles.ppSectionRow : (isGerman ? styles.germanRow : styles.resumeItem)} ${isSectionHovered ? styles.sectionHoverActive : ''}`}
-          style={{ ...mergedStyles, position: 'relative' }}
-          onMouseEnter={() => { handleMouseEnterSuggestion(exp.id); setHoveredSectionId(unit.sectionId || null); }}
-          onMouseLeave={() => { handleMouseLeaveSuggestion(); setHoveredSectionId(null); }}
-        >
-          {/* Card Sort/Trash controls */}
-          {!isMeasuring && (
-            <div className={`${styles.itemControls} no-print`}>
-              <button
-                type="button"
-                disabled={expIdx === 0}
-                onClick={() => handleMoveExperience(expIdx, 'up')}
-                className={styles.itemSortBtn}
-                title="Move Up"
-              >
-                <ArrowUp size={12} />
-              </button>
-              <button
-                type="button"
-                disabled={expIdx === editableExperiences.length - 1}
-                onClick={() => handleMoveExperience(expIdx, 'down')}
-                className={styles.itemSortBtn}
-                title="Move Down"
-              >
-                <ArrowDown size={12} />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAddExperienceBullet(expIdx)}
-                className={styles.itemSortBtn}
-                title="Add Bullet Point"
-              >
-                <Plus size={10} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditableExperiences(prev => prev.filter(e => e.id !== exp.id))}
-                className={styles.deleteBlockBtn}
-                title="Exclude item"
-              >
-                <Trash size={12} />
-              </button>
-            </div>
-          )}
-
-          {isPP || isGerman ? (
-            <>
-              <div className={isPP ? styles.ppLeftCol : styles.germanLeftCol}>
-                <span className={isPP ? styles.ppDateRange : styles.germanDateRange}>
-                  <AutoSizeTextarea
-                    value={`${exp.start_date || ''} - ${exp.end_date || ''}`}
-                    onChange={(val) => {
-                      const parts = val.split(' - ');
-                      setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, start_date: parts[0] || '', end_date: parts[1] || '' } : e));
-                    }}
-                  />
-                </span>
-              </div>
-              <div className={isPP ? styles.ppRightCol : styles.germanRightCol}>
-                <h4 className={isPP ? styles.ppJobTitle : styles.germanJobTitle}>
-                  <AutoSizeTextarea
-                    value={exp.position || ''}
-                    onChange={(val) => setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, position: val } : e))}
-                  />
-                </h4>
-                <div className={isPP ? styles.ppJobMeta : styles.germanJobMeta}>
-                  <span className={isPP ? styles.ppCompany : styles.germanCompany}>
-                    <AutoSizeTextarea
-                      value={`${exp.company || ''}${exp.location ? `, ${exp.location}` : ''}`}
-                      onChange={(val) => {
-                        const commaIndex = val.indexOf(',');
-                        let newComp = val;
-                        let newLoc = '';
-                        if (commaIndex !== -1) {
-                          newComp = val.substring(0, commaIndex).trim();
-                          newLoc = val.substring(commaIndex + 1).trim();
-                        }
-                        setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, company: newComp, location: newLoc } : e));
-                      }}
-                    />
-                  </span>
-                </div>
-
-                <div
-                  className={`${hasAIChange ? styles.aiHighlighted : ''}`}
-                  onMouseEnter={() => handleMouseEnterSuggestion(exp.id)}
-                  onMouseLeave={handleMouseLeaveSuggestion}
-                  style={{ width: '100%' }}
-                >
-                  <ul className={isPP ? styles.ppBulletsList : styles.germanBulletsList}>
-                    {exp.bullets.map((bullet: string, bulletIdx: number) => {
-                      const inputId = `bullet-input-experience-${exp.id}-${bulletIdx}`;
-                      const key = `exp-bullet-${expIdx}-${bulletIdx}`;
-                      return (
-                        <li key={bulletIdx} onClick={handleContainerClickToFocus} className={`${isPP ? styles.ppBulletItem : styles.germanBulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                          <span className={styles.bulletDot} />
-                          {renderHoverAiControls(key, bullet, [
-                            { label: "Action Verbs", prompt: "Make it punchier starting with strong active verbs" },
-                            { label: "Metrics & ROI", prompt: "Highlight quantifiable metrics, percentage gains, or ROI" },
-                            { label: "ATS Tech", prompt: "Inject relevant technical tools and framework details" }
-                          ])}
-                          {!isMeasuring && (
-                            <div className={`${styles.bulletControls} no-print`} style={{ right: '115px' }}>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveExperienceBullet(expIdx, bulletIdx)}
-                                className={styles.deleteBulletBtn}
-                                title="Delete bullet"
-                              >
-                                <X size={10} />
-                              </button>
-                            </div>
-                          )}
-
-                          <div className={styles.bulletContent}>
-                            {isRephrasing[key] ? (
-                              <div className={styles.canvasSkeletonBlock}>
-                                <div className={styles.skeletonLine} style={{ width: '92%' }} />
-                              </div>
-                            ) : (
-                              <AutoSizeTextarea
-                                id={inputId}
-                                value={bullet}
-                                onChange={(val) => setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? {
-                                  ...e,
-                                  bullets: e.bullets.map((b, bI) => bI === bulletIdx ? val : b)
-                                } : e))}
-                                onKeyDown={(e) => handleBulletKeyDown(e, 'experience', exp.id, expIdx, bulletIdx, exp.bullets)}
-                              />
-                            )}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              </div>
-            </>
-          ) : (
-            // Classic Stacked Layout
-            <div style={{ width: '100%' }}>
-              <div className={styles.itemMeta}>
-                <strong style={{ color: '#3d7ee6', fontSize: 'calc(var(--base-font-size, 13px) * 0.92)' }}>
-                  <AutoSizeTextarea
-                    value={exp.position || ''}
-                    onChange={(val) => setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, position: val } : e))}
-                  />
-                </strong>
-                <span style={{ fontSize: 'calc(var(--base-font-size, 13px) * 0.92)' }}>
-                  <AutoSizeTextarea
-                    value={`${exp.start_date || ''} - ${exp.end_date || ''}`}
-                    onChange={(val) => {
-                      const parts = val.split(' - ');
-                      setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, start_date: parts[0] || '', end_date: parts[1] || '' } : e));
-                    }}
-                  />
-                </span>
-              </div>
-              <div className={styles.itemCompany}>
-                <AutoSizeTextarea
-                  value={`${exp.company || ''}${exp.location ? `, ${exp.location}` : ''}`}
-                  onChange={(val) => {
-                    const commaIndex = val.indexOf(',');
-                    let newComp = val;
-                    let newLoc = '';
-                    if (commaIndex !== -1) {
-                      newComp = val.substring(0, commaIndex).trim();
-                      newLoc = val.substring(commaIndex + 1).trim();
-                    }
-                    setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, company: newComp, location: newLoc } : e));
-                  }}
-                />
-              </div>
-
-              <div
-                className={`${hasAIChange ? styles.aiHighlighted : ''}`}
-                onMouseEnter={() => handleMouseEnterSuggestion(exp.id)}
-                onMouseLeave={handleMouseLeaveSuggestion}
-                style={{ width: '100%' }}
-              >
-                <ul className={styles.bulletsList}>
-                  {exp.bullets.map((bullet: string, bulletIdx: number) => {
-                    const inputId = `bullet-input-experience-${exp.id}-${bulletIdx}`;
-                    const key = `exp-bullet-${expIdx}-${bulletIdx}`;
-                    return (
-                      <li key={bulletIdx} className={`${styles.bulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                        <span className={styles.bulletDot} />
-                        {renderHoverAiControls(key, bullet, [
-                          { label: "Action Verbs", prompt: "Make it punchier starting with strong active verbs" },
-                          { label: "Metrics & ROI", prompt: "Highlight quantifiable metrics, percentage gains, or ROI" },
-                          { label: "ATS Tech", prompt: "Inject relevant technical tools and framework details" }
-                        ])}
-                        {!isMeasuring && (
-                          <div className={`${styles.bulletControls} no-print`} style={{ right: '115px' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveExperienceBullet(expIdx, bulletIdx)}
-                              className={styles.deleteBulletBtn}
-                            >
-                              <X size={10} />
-                            </button>
-                          </div>
-                        )}
-
-                        <div className={styles.bulletContent}>
-                          {isRephrasing[key] ? (
-                            <div className={styles.canvasSkeletonBlock}>
-                              <div className={styles.skeletonLine} style={{ width: '92%' }} />
-                            </div>
-                          ) : (
-                            <AutoSizeTextarea
-                              id={inputId}
-                              value={bullet}
-                              onChange={(val) => setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? {
-                                ...e,
-                                bullets: e.bullets.map((b, bI) => bI === bulletIdx ? val : b)
-                              } : e))}
-                              onKeyDown={(e) => handleBulletKeyDown(e, 'experience', exp.id, expIdx, bulletIdx, exp.bullets)}
-                            />
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    // 5. Project Card Item
-    if (unit.type === 'project-item') {
-      const proj = unit.itemData;
-      const projIdx = unit.itemIndex!;
-      const hasRole = Boolean(proj.role && proj.role.trim());
-      const techString = Array.isArray(proj.technologies)
-        ? proj.technologies.join(', ')
-        : (proj.technologies || '');
-      const hasTech = Boolean(techString && techString.trim());
-      const isSectionHovered = hoveredSectionId === unit.sectionId;
-
-      return (
-        <div
-          className={`${isPP ? styles.ppSectionRow : (isGerman ? styles.germanRow : styles.resumeItem)} ${isSectionHovered ? styles.sectionHoverActive : ''}`}
-          style={{ ...mergedStyles, position: 'relative' }}
-          onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
-          onMouseLeave={() => setHoveredSectionId(null)}
-        >
-          {!isMeasuring && (
-            <div className={`${styles.itemControls} no-print`}>
-              <button
-                type="button"
-                disabled={projIdx === 0}
-                onClick={() => handleMoveProject(projIdx, 'up')}
-                className={styles.itemSortBtn}
-              >
-                <ArrowUp size={12} />
-              </button>
-              <button
-                type="button"
-                disabled={projIdx === editableProjects.length - 1}
-                onClick={() => handleMoveProject(projIdx, 'down')}
-                className={styles.itemSortBtn}
-              >
-                <ArrowDown size={12} />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAddProjectBullet(projIdx)}
-                className={styles.itemSortBtn}
-              >
-                <Plus size={10} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditableProjects(prev => prev.filter(p => p.id !== proj.id))}
-                className={styles.deleteBlockBtn}
-              >
-                <Trash size={12} />
-              </button>
-            </div>
-          )}
-
-          {isPP || isGerman ? (
-            <>
-              <div className={isPP ? styles.ppLeftCol : styles.germanLeftCol}>
-                <h4 className={isPP ? styles.ppProjectTitle : styles.germanDegree}>
-                  <AutoSizeTextarea
-                    value={proj.title || ''}
-                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? { ...p, title: val } : p))}
-                  />
-                </h4>
-              </div>
-              <div className={isPP ? styles.ppRightCol : styles.germanRightCol}>
-                <div style={{ display: 'flex', gap: '8px', fontSize: '1em', color: '#64748b', paddingTop: '0px', flexWrap: 'wrap', alignItems: 'baseline', width: '100%' }}>
-                  {hasRole && (
-                    <span style={{ fontWeight: 800, flex: 1, minWidth: '120px', cursor: 'text' }}>
-                      <AutoSizeTextarea
-                        value={proj.role || ''}
-                        placeholder="Your Role / Contributions..."
-                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
-                      />
-                    </span>
-                  )}
-                  {hasTech && (
-                    <span style={{ fontWeight: 600, fontStyle: 'italic', color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: '140px', cursor: 'text' }}>
-                      <span style={{ fontSize: '0.9em', color: '#94a3b8', fontStyle: 'normal', flexShrink: 0 }}>Tech:</span>
-                      <AutoSizeTextarea
-                        value={techString}
-                        placeholder="Technologies used (e.g. React, Node.js, Python)..."
-                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
-                          ...p,
-                          technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
-                        } : p))}
-                      />
-                    </span>
-                  )}
-                  {(hasRole || hasTech) && proj.date && <span style={{ flexShrink: 0 }}>•</span>}
-                  {proj.date && (
-                    <span style={{ flexShrink: 0 }}>
-                      <AutoSizeTextarea
-                        singleLine
-                        value={proj.date || ''}
-                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, date: val } : p))}
-                      />
-                    </span>
-                  )}
-                </div>
-                <ul className={isPP ? styles.ppBulletsList : styles.germanBulletsList}>
-                  {proj.bullets.map((bullet: string, bulletIdx: number) => {
-                    const inputId = `bullet-input-project-${proj.id}-${bulletIdx}`;
-                    const key = `proj-bullet-${projIdx}-${bulletIdx}`;
-                    return (
-                      <li key={bulletIdx} className={`${isPP ? styles.ppBulletItem : styles.germanBulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                        <span className={styles.bulletDot} />
-                        {renderHoverAiControls(key, bullet, [
-                          { label: "Action Verbs", prompt: "Make it punchier with strong active verbs" },
-                          { label: "Tech Stack", prompt: "Highlight modern tech stack & system architecture" },
-                          { label: "Deliverables", prompt: "Focus on technical deliverables, scope, and results" }
-                        ])}
-                        {!isMeasuring && (
-                          <div className={`${styles.bulletControls} no-print`} style={{ right: '115px' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveProjectBullet(projIdx, bulletIdx)}
-                              className={styles.deleteBulletBtn}
-                            >
-                              <X size={10} />
-                            </button>
-                          </div>
-                        )}
-
-                        <div className={styles.bulletContent}>
-                          {isRephrasing[key] ? (
-                            <div className={styles.canvasSkeletonBlock}>
-                              <div className={styles.skeletonLine} style={{ width: '92%' }} />
-                            </div>
-                          ) : (
-                            <AutoSizeTextarea
-                              id={inputId}
-                              value={bullet}
-                              onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
-                                ...p,
-                                bullets: p.bullets.map((b, bI) => bI === bulletIdx ? val : b)
-                              } : p))}
-                              onKeyDown={(e) => handleBulletKeyDown(e, 'project', proj.id, projIdx, bulletIdx, proj.bullets)}
-                            />
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            </>
-          ) : (
-            // Classic stacked projects layout
-            <div style={{ width: '100%' }}>
-              <div className={styles.itemMeta}>
-                <strong>
-                  <AutoSizeTextarea
-                    value={proj.title || ''}
-                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, title: val } : p))}
-                  />
-                </strong>
-                <span>
-                  <AutoSizeTextarea
-                    value={proj.date || ''}
-                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, date: val } : p))}
-                  />
-                </span>
-              </div>
-              {hasRole && (
-                <p className={styles.itemCompany} style={{ cursor: 'text', margin: '2px 0' }}>
-                  <AutoSizeTextarea
-                    value={proj.role || ''}
-                    placeholder="Your Role / Contributions..."
-                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
-                  />
-                </p>
-              )}
-              {hasTech && (
-                <p className={styles.itemCompany} style={{ fontStyle: 'italic', color: '#64748b', cursor: 'text', display: 'flex', alignItems: 'center', gap: '4px', margin: '2px 0' }}>
-                  <span style={{ fontSize: '0.9em', color: '#94a3b8', fontStyle: 'normal', flexShrink: 0 }}>Tech:</span>
-                  <AutoSizeTextarea
-                    value={techString}
-                    placeholder="Technologies used (e.g. React, Node.js, Python)..."
-                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
-                      ...p,
-                      technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
-                    } : p))}
-                  />
-                </p>
-              )}
-              <ul className={styles.bulletsList}>
-                {proj.bullets.map((bullet: string, bulletIdx: number) => {
-                  const inputId = `bullet-input-project-${proj.id}-${bulletIdx}`;
-                  const key = `proj-bullet-${projIdx}-${bulletIdx}`;
-                  return (
-                    <li key={bulletIdx} onClick={handleContainerClickToFocus} className={`${styles.bulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                      <span className={styles.bulletDot} />
-                      {renderHoverAiControls(key, bullet, [
-                        { label: "Action Verbs", prompt: "Make it punchier with strong active verbs" },
-                        { label: "Tech Stack", prompt: "Highlight modern tech stack & system architecture" },
-                        { label: "Deliverables", prompt: "Focus on technical deliverables, scope, and results" }
-                      ])}
-                      {!isMeasuring && (
-                        <div className={`${styles.bulletControls} no-print`} style={{ right: '115px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveProjectBullet(projIdx, bulletIdx)}
-                            className={styles.deleteBulletBtn}
-                          >
-                            <X size={10} />
-                          </button>
-                        </div>
-                      )}
-
-                      <div className={styles.bulletContent}>
-                        {isRephrasing[key] ? (
-                          <div className={styles.canvasSkeletonBlock}>
-                            <div className={styles.skeletonLine} style={{ width: '92%' }} />
-                          </div>
-                        ) : (
-                          <AutoSizeTextarea
-                            id={inputId}
-                            value={bullet}
-                            onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? {
-                              ...p,
-                              bullets: p.bullets.map((b, bI) => bI === bulletIdx ? val : b)
-                            } : p))}
-                            onKeyDown={(e) => handleBulletKeyDown(e, 'project', proj.id, projIdx, bulletIdx, proj.bullets)}
-                          />
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    // 6. Education Card Item
-    if (unit.type === 'education-item') {
-      const edu = unit.itemData;
-      const eduIdx = unit.itemIndex!;
-      const isSectionHovered = hoveredSectionId === unit.sectionId;
-
-      return (
-        <div
-          className={`${isPP ? styles.ppSectionRow : (isGerman ? styles.germanRow : styles.resumeItem)} ${isSectionHovered ? styles.sectionHoverActive : ''}`}
-          style={{ ...mergedStyles, position: 'relative' }}
-          onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
-          onMouseLeave={() => setHoveredSectionId(null)}
-        >
-          {!isMeasuring && (
-            <div className={`${styles.itemControls} no-print`}>
-              <button
-                type="button"
-                disabled={eduIdx === 0}
-                onClick={() => handleMoveEducation(eduIdx, 'up')}
-                className={styles.itemSortBtn}
-              >
-                <ArrowUp size={12} />
-              </button>
-              <button
-                type="button"
-                disabled={eduIdx === editableEducations.length - 1}
-                onClick={() => handleMoveEducation(eduIdx, 'down')}
-                className={styles.itemSortBtn}
-              >
-                <ArrowDown size={12} />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAddEducationBullet(eduIdx)}
-                className={styles.itemSortBtn}
-                title="Add Bullet Point"
-              >
-                <Plus size={10} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditableEducations(prev => prev.filter(e => e.id !== edu.id))}
-                className={styles.deleteBlockBtn}
-              >
-                <Trash size={12} />
-              </button>
-            </div>
-          )}
-
-          {isPP || isGerman ? (
-            <>
-              <div className={isPP ? styles.ppLeftCol : styles.germanLeftCol}>
-                <span className={isPP ? styles.ppDateRange : styles.germanDateRange}>
-                  <AutoSizeTextarea
-                    value={`${edu.start_date || ''} - ${edu.end_date || ''}`}
-                    onChange={(val) => {
-                      const parts = val.split(' - ');
-                      setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, start_date: parts[0] || '', end_date: parts[1] || '' } : e));
-                    }}
-                  />
-                </span>
-              </div>
-              <div className={isPP ? styles.ppRightCol : styles.germanRightCol}>
-                <h4 className={isPP ? styles.ppDegree : styles.germanDegree} style={{ color: '#3d7ee6' }}>
-                  <AutoSizeTextarea
-                    value={`${edu.degree || ''}${edu.field_of_study ? ` in ${edu.field_of_study}` : ''}`}
-                    onChange={(val) => {
-                      const index = val.toLowerCase().indexOf(' in ');
-                      let newDegree = val;
-                      let newField = '';
-                      if (index !== -1) {
-                        newDegree = val.substring(0, index).trim();
-                        newField = val.substring(index + 4).trim();
-                      }
-                      setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, degree: newDegree, field_of_study: newField } : e));
-                    }}
-                  />
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <div className={isPP ? styles.ppCompany : styles.germanCompany} style={{ fontWeight: 600 }}>
-                    <AutoSizeTextarea
-                      value={edu.institution || ''}
-                      onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, institution: val } : e))}
-                    />
-                  </div>
-                  <div className={isPP ? styles.ppLocation : styles.germanLocation} style={{ fontWeight: 400, opacity: 0.8 }}>
-                    <AutoSizeTextarea
-                      value={edu.location || ''}
-                      onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, location: val } : e))}
-                    />
-                  </div>
-                </div>
-
-                <ul className={isPP ? styles.ppBulletsList : styles.germanBulletsList}>
-                  {(edu.bullets || []).map((bullet: string, bulletIdx: number) => {
-                    const inputId = `bullet-input-education-${edu.id}-${bulletIdx}`;
-                    const key = `edu-bullet-${eduIdx}-${bulletIdx}`;
-                    return (
-                      <li key={bulletIdx} className={`${isPP ? styles.ppBulletItem : styles.germanBulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                        <span className={styles.bulletDot} />
-                        {renderHoverAiControls(key, bullet, [
-                          { label: "Concise", prompt: "Make concise and academic" },
-                          { label: "Coursework", prompt: "Highlight key relevant technical coursework & projects" },
-                          { label: "Honors", prompt: "Emphasize honors, GPA, or academic distinctions" }
-                        ])}
-                        {!isMeasuring && (
-                          <div className={`${styles.bulletControls} no-print`} style={{ right: '115px' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveEducationBullet(eduIdx, bulletIdx)}
-                              className={styles.deleteBulletBtn}
-                            >
-                              <X size={10} />
-                            </button>
-                          </div>
-                        )}
-
-                        <div className={styles.bulletContent}>
-                          {isRephrasing[key] ? (
-                            <div className={styles.canvasSkeletonBlock}>
-                              <div className={styles.skeletonLine} style={{ width: '92%' }} />
-                            </div>
-                          ) : (
-                            <AutoSizeTextarea
-                              id={inputId}
-                              value={bullet}
-                              onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? {
-                                ...e,
-                                bullets: (e.bullets || []).map((b: string, bI: number) => bI === bulletIdx ? val : b)
-                              } : e))}
-                              onKeyDown={(e) => handleBulletKeyDown(e, 'education', edu.id, eduIdx, bulletIdx, edu.bullets || [])}
-                            />
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            </>
-          ) : (
-            // Classic stacked education layout
-            <div style={{ width: '100%' }}>
-              <div className={styles.itemMeta}>
-                <strong style={{ color: '#3d7ee6' }}>
-                  <AutoSizeTextarea
-                    value={`${edu.degree || ''}${edu.field_of_study ? ` in ${edu.field_of_study}` : ''}`}
-                    onChange={(val) => {
-                      const index = val.toLowerCase().indexOf(' in ');
-                      let newDegree = val;
-                      let newField = '';
-                      if (index !== -1) {
-                        newDegree = val.substring(0, index).trim();
-                        newField = val.substring(index + 4).trim();
-                      }
-                      setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, degree: newDegree, field_of_study: newField } : e));
-                    }}
-                  />
-                </strong>
-                <span>
-                  <AutoSizeTextarea
-                    value={`${edu.start_date || ''} - ${edu.end_date || ''}`}
-                    onChange={(val) => {
-                      const parts = val.split(' - ');
-                      setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, start_date: parts[0] || '', end_date: parts[1] || '' } : e));
-                    }}
-                  />
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-                <div className={styles.itemCompany} style={{ fontWeight: 600 }}>
-                  <AutoSizeTextarea
-                    value={edu.institution || ''}
-                    onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, institution: val } : e))}
-                  />
-                </div>
-                <div style={{ fontSize: '0.85em', color: '#64748b', fontWeight: 400, opacity: 0.8 }}>
-                  <AutoSizeTextarea
-                    value={edu.location || ''}
-                    onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, location: val } : e))}
-                  />
-                </div>
-              </div>
-
-              <ul className={styles.bulletsList}>
-                {(edu.bullets || []).map((bullet: string, bulletIdx: number) => {
-                  const inputId = `bullet-input-education-${edu.id}-${bulletIdx}`;
-                  const key = `edu-bullet-${eduIdx}-${bulletIdx}`;
-                  return (
-                    <li key={bulletIdx} className={`${styles.bulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                      <span className={styles.bulletDot} />
-                      {renderHoverAiControls(key, bullet, [
-                        { label: "Concise", prompt: "Make concise and academic" },
-                        { label: "Coursework", prompt: "Highlight key relevant technical coursework & projects" },
-                        { label: "Honors", prompt: "Emphasize honors, GPA, or academic distinctions" }
-                      ])}
-                      {!isMeasuring && (
-                        <div className={`${styles.bulletControls} no-print`} style={{ right: '115px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveEducationBullet(eduIdx, bulletIdx)}
-                            className={styles.deleteBulletBtn}
-                          >
-                            <X size={10} />
-                          </button>
-                        </div>
-                      )}
-
-                      <div className={styles.bulletContent}>
-                        {isRephrasing[key] ? (
-                          <div className={styles.canvasSkeletonBlock}>
-                            <div className={styles.skeletonLine} style={{ width: '92%' }} />
-                          </div>
-                        ) : (
-                          <AutoSizeTextarea
-                            id={inputId}
-                            value={bullet}
-                            onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? {
-                              ...e,
-                              bullets: (e.bullets || []).map((b: string, bI: number) => bI === bulletIdx ? val : b)
-                            } : e))}
-                            onKeyDown={(e) => handleBulletKeyDown(e, 'education', edu.id, eduIdx, bulletIdx, edu.bullets || [])}
-                          />
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-
-    // 7. Languages Block (Dedicated Subsection)
-    if (unit.type === 'skills-languages') {
-      const skillsList = unit.skills || [];
-      const subTitle = targetLanguage === 'de' ? 'Sprachen' : 'Languages';
-      const isSectionHovered = hoveredSectionId === unit.sectionId;
-
-      return (
-        <div
-          className={isSectionHovered ? styles.sectionHoverActive : ''}
-          style={{ ...mergedStyles, position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', marginTop: '6px', marginBottom: '8px' }}
-          onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
-          onMouseLeave={() => setHoveredSectionId(null)}
-        >
-          {!isMeasuring && (
-            <div className={`${styles.itemControls} no-print`} style={{ left: '-48px' }}>
-              <button type="button" disabled={languagesFirst} onClick={() => setLanguagesFirst(true)} className={styles.itemSortBtn} title="Move Up"><ArrowUp size={12} /></button>
-              <button type="button" disabled={!languagesFirst} onClick={() => setLanguagesFirst(false)} className={styles.itemSortBtn} title="Move Down"><ArrowDown size={12} /></button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm("Delete languages?")) {
-                    setEditableSkills(prev => prev.filter(s => (s.category || '').toLowerCase().trim() !== 'languages'));
-                  }
-                }}
-                className={styles.deleteBlockBtn}
-                title="Delete languages"
-              >
-                <Trash size={12} />
-              </button>
-            </div>
-          )}
-
-          {/* Dedicated Subsection Sub-heading */}
-          <div style={{ fontWeight: 700, fontSize: '1.05em', color: 'var(--accent-color, #0f172a)', marginBottom: '4px' }}>
-            <AutoSizeTextarea
-              value={languagesTitle || (targetLanguage === 'de' ? 'Sprachen' : 'Languages')}
-              onChange={(val) => setLanguagesTitle(val)}
-            />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'flex-start', paddingLeft: '24px', width: '100%' }}>
-            <span className={styles.bulletDot} />
-            <div style={{ flex: 1 }}>
-              {(() => {
-                const rawLangs = skillsList.map(s => s.name).join(', ');
-                const formattedNode = renderFormattedLanguageList(rawLangs);
-                return formattedNode && editingLanguagesId !== unit.id ? (
-                  <div onClick={() => setEditingLanguagesId(unit.id!)} style={{ cursor: 'pointer', minHeight: '1.2em' }}>
-                    {formattedNode}
-                  </div>
-                ) : (
-                  <AutoSizeTextarea
-                    value={rawLangs}
-                    onChange={(val) => {
-                      const names = val.split(',').map(n => n.trim()).filter(Boolean);
-                      setEditableSkills(prev => {
-                        const nonLang = prev.filter(s => (s.category || '').toLowerCase().trim() !== 'languages');
-                        const updatedLangs = names.map((name, i) => ({
-                          id: `lang_${i}_${Date.now()}`,
-                          name,
-                          category: 'languages'
-                        }));
-                        return [...nonLang, ...updatedLangs];
-                      });
-                    }}
-                    onBlur={() => setEditingLanguagesId(null)}
-                  />
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // 8. Skills Category Block
-    if (unit.type === 'skills-category') {
-      const skillsList = unit.skills || [];
-      const cat = unit.category!;
-      const catLabel = getLocalizedCategoryName(cat);
-      const isSectionHovered = hoveredSectionId === unit.sectionId;
-
-      return (
-        <div
-          className={isSectionHovered ? styles.sectionHoverActive : ''}
-          style={{ ...mergedStyles, position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', marginBottom: '8px' }}
-          onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
-          onMouseLeave={() => setHoveredSectionId(null)}
-        >
-          {!isMeasuring && (
-            <div className={`${styles.itemControls} no-print`} style={{ left: '-48px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm(`Delete skills category "${catLabel}"?`)) {
-                    setEditableSkills(prev => prev.filter(s => (s.category || 'technical').toLowerCase().trim() !== cat.toLowerCase().trim()));
-                  }
-                }}
-                className={styles.deleteBlockBtn}
-                title={`Delete ${catLabel}`}
-              >
-                <Trash size={12} />
-              </button>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'flex-start', paddingLeft: '24px', width: '100%' }}>
-            <span className={styles.bulletDot} />
-            <strong style={{ fontWeight: 700, marginRight: '5px', color: 'var(--text-color, #1e293b)' }}>
-              {catLabel}:
-            </strong>
-            <div style={{ flex: 1 }}>
-              <AutoSizeTextarea
-                value={skillsList.map(s => s.name).join(', ')}
-                onChange={(val) => {
-                  const names = val.split(',').map(n => n.trim()).filter(Boolean);
-                  setEditableSkills(prev => {
-                    const otherSkills = prev.filter(s => s.category.toLowerCase() !== cat.toLowerCase() && (s.category || '').toLowerCase().trim() !== 'languages');
-                    const updatedSkills = names.map((name, i) => ({
-                      id: `skill_${cat}_${i}_${Date.now()}`,
-                      name,
-                      category: cat.toLowerCase()
-                    }));
-                    const finalLangs = prev.filter(s => (s.category || '').toLowerCase().trim() === 'languages');
-                    return [...finalLangs, ...otherSkills, ...updatedSkills];
-                  });
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-
-    // 9. Custom Section Items (Choice of Bullets or KeyValue formats)
-    if (unit.type === 'custom-content') {
-      const bulletsList = unit.bullets || [];
-      const isSectionHovered = hoveredSectionId === unit.sectionId;
-
-      if (sec?.customFormat === 'keyvalue') {
-        const pairs = sec.keyValuePairs || [{ key: 'Label', value: 'Detail Description' }];
-        return (
-          <div
-            className={isSectionHovered ? styles.sectionHoverActive : ''}
-            style={mergedStyles}
-            onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
-            onMouseLeave={() => setHoveredSectionId(null)}
-          >
-            {pairs.map((pair, pIdx) => (
-              <div
-                key={pIdx}
-                className={`${isPP ? styles.ppSectionRow : (isGerman ? styles.germanRow : styles.resumeItem)}`}
-                style={{ position: 'relative', display: isPP || isGerman ? undefined : 'flex', marginBottom: '6px' }}
-              >
-                {!isMeasuring && (
-                  <div className={`${styles.bulletControls} no-print`} style={{ left: '-40px' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSections(prev => prev.map(s => {
-                          if (s.id === unit.sectionId) {
-                            const newPairs = [...(s.keyValuePairs || [])];
-                            newPairs.splice(pIdx, 1);
-                            return { ...s, keyValuePairs: newPairs };
-                          }
-                          return s;
-                        }));
-                      }}
-                      className={styles.deleteBulletBtn}
-                    >
-                      <Trash size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      style={{ color: 'var(--primary)' }}
-                      onClick={() => {
-                        setSections(prev => prev.map(s => {
-                          if (s.id === unit.sectionId) {
-                            const newPairs = [...(s.keyValuePairs || [])];
-                            newPairs.splice(pIdx + 1, 0, { key: 'Key Label', value: 'Text Value' });
-                            return { ...s, keyValuePairs: newPairs };
-                          }
-                          return s;
-                        }));
-                      }}
-                      className={styles.deleteBulletBtn}
-                    >
-                      <Plus size={12} />
-                    </button>
-                  </div>
-                )}
-                <div className={isPP ? styles.ppLeftCol : styles.germanLeftCol}>
-                  <strong style={{ color: 'var(--accent-color, #0f172a)' }}>
-                    <AutoSizeTextarea
-                      value={pair.key}
-                      onChange={(val) => {
-                        setSections(prev => prev.map(s => {
-                          if (s.id === unit.sectionId) {
-                            const newPairs = [...(s.keyValuePairs || [])];
-                            newPairs[pIdx] = { ...newPairs[pIdx], key: val };
-                            return { ...s, keyValuePairs: newPairs };
-                          }
-                          return s;
-                        }));
-                      }}
-                    />
-                  </strong>
-                </div>
-                <div className={isPP ? styles.ppRightCol : styles.germanRightCol}>
-                  <AutoSizeTextarea
-                    value={pair.value}
-                    onChange={(val) => {
-                      setSections(prev => prev.map(s => {
-                        if (s.id === unit.sectionId) {
-                          const newPairs = [...(s.keyValuePairs || [])];
-                          newPairs[pIdx] = { ...newPairs[pIdx], value: val };
-                          return { ...s, keyValuePairs: newPairs };
-                        }
-                        return s;
-                      }));
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-      }
-
-      // Default custom formats (multi-bullet lists)
-      return (
-        <div
-          className={isSectionHovered ? styles.sectionHoverActive : ''}
-          style={mergedStyles}
-          onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
-          onMouseLeave={() => setHoveredSectionId(null)}
-        >
-          <ul className={isPP ? styles.ppBulletsList : (isGerman ? styles.germanBulletsList : styles.bulletsList)}>
-            {bulletsList.map((bullet, bulletIdx) => {
-              const inputId = `bullet-input-custom-${unit.sectionId}-${bulletIdx}`;
-              const key = `custom-bullet-${unit.sectionId}-${bulletIdx}`;
-              return (
-                <li key={bulletIdx} onClick={handleContainerClickToFocus} className={`${isPP ? styles.ppBulletItem : (isGerman ? styles.germanBulletItem : styles.bulletItem)} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                  <span className={styles.bulletDot} />
-                  {renderHoverAiControls(key, bullet, [
-                    { label: "Punchier", prompt: "Make punchier with strong professional impact" },
-                    { label: "Tone & Clarity", prompt: "Improve professional tone, grammar, and sentence flow" },
-                    { label: "Domain Expertise", prompt: "Highlight key domain expertise and technical achievements" }
-                  ])}
-                  {!isMeasuring && (
-                    <div className={`${styles.bulletControls} no-print`} style={{ right: '115px' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveCustomBullet(unit.sectionId!, bulletIdx)}
-                        className={styles.deleteBulletBtn}
-                        title="Delete bullet"
-                      >
-                        <X size={10} />
-                      </button>
-                    </div>
-                  )}
-
-                  <div className={styles.bulletContent}>
-                    {isRephrasing[key] ? (
-                      <div className={styles.canvasSkeletonBlock}>
-                        <div className={styles.skeletonLine} style={{ width: '92%' }} />
-                      </div>
-                    ) : (
-                      <AutoSizeTextarea
-                        id={inputId}
-                        value={bullet}
-                        onChange={(val) => {
-                          setSections(prev => prev.map(s => s.id === unit.sectionId ? {
-                            ...s,
-                            bullets: s.bullets!.map((b, bI) => bI === bulletIdx ? val : b)
-                          } : s));
-                        }}
-                        onKeyDown={(e) => handleBulletKeyDown(e, 'custom', unit.sectionId!, 0, bulletIdx, bulletsList)}
-                      />
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      );
-    }
-
-    // 10. Contacts-Static (Creative Tech Contacts module fallback)
-    if (unit.type === 'contacts-static') {
-      return (
-        <div className={styles.resumeSection} style={mergedStyles}>
-          <h3 className={styles.resumeSectionTitle}>Contacts</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px', color: '#64748b' }}>
-            {editablePersonalInfo.email && <div>E-Mail: {editablePersonalInfo.email}</div>}
-            {editablePersonalInfo.phone && <div>Telefon: {editablePersonalInfo.phone}</div>}
-            {editablePersonalInfo.location && <div>Anschrift: {editablePersonalInfo.location}</div>}
-          </div>
-        </div>
-      );
-    }
-
-    return null;
+    return (
+      <UnitRenderer
+        unit={unit}
+        isMeasuring={isMeasuring}
+        template={template}
+        sections={sections}
+        customStyles={customStyles}
+        headerStyles={headerStyles}
+        editablePersonalInfo={editablePersonalInfo}
+        setEditablePersonalInfo={setEditablePersonalInfo}
+        editableExperiences={editableExperiences}
+        setEditableExperiences={setEditableExperiences}
+        editableProjects={editableProjects}
+        setEditableProjects={setEditableProjects}
+        editableEducations={editableEducations}
+        setEditableEducations={setEditableEducations}
+        editableSkills={editableSkills}
+        setEditableSkills={setEditableSkills}
+        editableSummary={editableSummary}
+        setEditableSummary={setEditableSummary}
+        activeSectionSettings={activeSectionSettings}
+        setActiveSectionSettings={setActiveSectionSettings}
+        popoverPosition={popoverPosition}
+        setPopoverPosition={setPopoverPosition}
+        setHeaderStyles={setHeaderStyles}
+        setSections={setSections}
+        editingSectionTitleId={editingSectionTitleId}
+        setEditingSectionTitleId={setEditingSectionTitleId}
+        editingLanguagesId={editingLanguagesId}
+        setEditingLanguagesId={setEditingLanguagesId}
+        hoveredSectionId={hoveredSectionId}
+        setHoveredSectionId={setHoveredSectionId}
+        handleMoveSection={handleMoveSection}
+        handleQuickAddSectionItem={handleQuickAddSectionItem}
+        setOpenSectionAiModalId={setOpenSectionAiModalId}
+        handleMouseEnterSuggestion={handleMouseEnterSuggestion}
+        handleMouseLeaveSuggestion={handleMouseLeaveSuggestion}
+        reviewedActions={reviewedActions}
+        renderHoverAiControls={renderHoverAiControls}
+        isRephrasing={isRephrasing}
+        handleMoveExperience={handleMoveExperience}
+        handleAddExperienceBullet={handleAddExperienceBullet}
+        handleRemoveExperienceBullet={handleRemoveExperienceBullet}
+        handleBulletKeyDown={handleBulletKeyDown}
+        handleMoveProject={handleMoveProject}
+        handleAddProjectBullet={handleAddProjectBullet}
+        handleRemoveProjectBullet={handleRemoveProjectBullet}
+        handleMoveEducation={handleMoveEducation}
+        handleAddEducationBullet={handleAddEducationBullet}
+        handleRemoveEducationBullet={handleRemoveEducationBullet}
+        languagesFirst={languagesFirst}
+        setLanguagesFirst={setLanguagesFirst}
+        languagesTitle={languagesTitle}
+        setLanguagesTitle={setLanguagesTitle}
+        targetLanguage={targetLanguage}
+        categoryOrder={categoryOrder}
+        getLocalizedCategoryName={getLocalizedCategoryName}
+        getAlertsFor={getAlertsFor}
+      />
+    );
   };
 
   const handleMouseEnterSuggestion = (id: string) => {
@@ -5415,41 +2952,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       {/* Local individual section styles panel */}
                       {expandedSectionSettings === secItem.id && (
                         <div className={styles.sectionSettingsCard}>
-                          <h4>{secItem.name} Config</h4>
-
-                          <div className={styles.sliderGroup}>
-                            <label>Font Size</label>
-                            <input
-                              type="range"
-                              min="10"
-                              max="18"
-                              value={secItem.customStyles?.fontSize || customStyles.fontSize}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value);
-                                setSections(prev => prev.map(s => s.id === secItem.id ? {
-                                  ...s,
-                                  customStyles: { ...s.customStyles, fontSize: val }
-                                } : s));
-                              }}
-                            />
-                          </div>
-
-                          <div className={styles.sliderGroup}>
-                            <label>Spacing</label>
-                            <input
-                              type="range"
-                              min="5"
-                              max="50"
-                              value={secItem.customStyles?.spacing || customStyles.sectionSpacing}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value);
-                                setSections(prev => prev.map(s => s.id === secItem.id ? {
-                                  ...s,
-                                  customStyles: { ...s.customStyles, spacing: val }
-                                } : s));
-                              }}
-                            />
-                          </div>
+                          <h4>{secItem.name} Manager</h4>
 
                           {/* Local layout choice for custom sections */}
                           {secItem.type === 'custom' && (
@@ -5480,48 +2983,180 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                           )}
 
                           {secItem.type === 'projects' && (
-                            <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--card-border, rgba(255,255,255,0.1))' }}>
-                              <label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--foreground, #1e293b)', marginBottom: '8px', display: 'block' }}>
-                                Project Fields & Details Manager
-                              </label>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <h5 style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--foreground, #0f172a)' }}>
+                                    Projects & Subfields Manager
+                                  </h5>
+                                  <span style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)' }}>
+                                    Customize roles, tech stack, dates & links
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddProject()}
+                                  style={{
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    color: '#ffffff',
+                                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                    border: 'none',
+                                    padding: '5px 10px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 4px rgba(99, 102, 241, 0.25)',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                >
+                                  + New Project
+                                </button>
+                              </div>
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
                                 {editableProjects.map((proj, pIdx) => {
-                                  const projHasRole = Boolean(proj.role && proj.role.trim());
+                                  const cardKey = proj.id || `proj_${pIdx}`;
+                                  const isExpanded = !!expandedProjectCards[cardKey];
                                   const projTechStr = Array.isArray(proj.technologies)
                                     ? proj.technologies.join(', ')
                                     : (proj.technologies || '');
-                                  const projHasTech = Boolean(projTechStr && projTechStr.trim());
+                                  const projLinkVal = proj.link || proj.github_url || proj.demo_url || '';
 
                                   return (
-                                    <div key={proj.id || pIdx} style={{ background: 'rgba(99, 102, 241, 0.05)', padding: '8px 10px', borderRadius: '6px', border: '1px solid rgba(99, 102, 241, 0.15)' }}>
-                                      <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-main, #334155)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        📌 {proj.title || `Project #${pIdx + 1}`}
-                                      </div>
-                                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                        {!projHasRole && (
-                                          <button
-                                            type="button"
-                                            className={styles.popoverFieldBtn}
-                                            onClick={() => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, role: 'Your Role / Contribution' } : p))}
-                                          >
-                                            🏢 + Add Role
-                                          </button>
-                                        )}
-                                        {!projHasTech && (
-                                          <button
-                                            type="button"
-                                            className={styles.popoverFieldBtn}
-                                            onClick={() => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, technologies: ['React', 'Node.js'] } : p))}
-                                          >
-                                            ⚡ + Add Tech Stack
-                                          </button>
-                                        )}
-                                        {projHasRole && projHasTech && (
-                                          <span style={{ fontSize: '11px', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
-                                            ✓ Role & Tech Stack Active
+                                    <div key={cardKey} className={styles.projectCard}>
+                                      {/* Header Bar (Click to toggle expand/collapse) */}
+                                      <div
+                                        className={styles.projectHeaderRow}
+                                        style={{ cursor: 'pointer', userSelect: 'none', borderBottom: isExpanded ? '1px solid var(--card-border, #f1f5f9)' : 'none', paddingBottom: isExpanded ? '6px' : '0' }}
+                                        onClick={() => setExpandedProjectCards(prev => ({ ...prev, [cardKey]: !prev[cardKey] }))}
+                                      >
+                                        <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--foreground)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                          <span style={{ fontSize: '10px', color: 'var(--primary, #6366f1)' }}>{isExpanded ? '▼' : '▶'}</span>
+                                          📌 {proj.title ? proj.title : `Project #${pIdx + 1}`}
+                                        </span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <span style={{ fontSize: '10.5px', color: 'var(--primary, #6366f1)', fontWeight: 600 }}>
+                                            {isExpanded ? 'Collapse' : 'Edit Details'}
                                           </span>
-                                        )}
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setEditableProjects(prev => prev.filter((_, i) => i !== pIdx));
+                                            }}
+                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '11px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                          >
+                                            <Trash size={12} />
+                                          </button>
+                                        </div>
                                       </div>
+
+                                      {/* Collapsible Body (Only rendered when expanded) */}
+                                      {isExpanded && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', boxSizing: 'border-box', paddingTop: '4px' }}>
+                                          {/* Title */}
+                                          <div className={styles.projectInputGroup}>
+                                            <label className={styles.projectInputLabel}>
+                                              PROJECT TITLE
+                                            </label>
+                                            <input
+                                              type="text"
+                                              className={styles.projectInput}
+                                              placeholder="e.g. E-Commerce Microservices Platform"
+                                              value={proj.title || ''}
+                                              onChange={(e) => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, title: e.target.value } : p))}
+                                            />
+                                          </div>
+
+                                          {/* Subfields (Stacked single-column layout for narrow sidebar) */}
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+                                            {/* Role */}
+                                            <div className={styles.projectInputGroup}>
+                                              <label className={styles.projectInputLabel}>
+                                                🏢 Role
+                                              </label>
+                                              <input
+                                                type="text"
+                                                className={styles.projectInput}
+                                                placeholder="e.g. Lead Engineer"
+                                                value={proj.role || ''}
+                                                onChange={(e) => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, role: e.target.value } : p))}
+                                              />
+                                            </div>
+
+                                            {/* Tech Stack */}
+                                            <div className={styles.projectInputGroup}>
+                                              <label className={styles.projectInputLabel}>
+                                                ⚡ Tech Stack
+                                              </label>
+                                              <input
+                                                type="text"
+                                                className={styles.projectInput}
+                                                placeholder="e.g. React, Node.js, Python"
+                                                value={projTechStr}
+                                                onChange={(e) => {
+                                                  const val = e.target.value;
+                                                  setEditableProjects(prev => prev.map((p, i) => i === pIdx ? {
+                                                    ...p,
+                                                    technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
+                                                  } : p));
+                                                }}
+                                              />
+                                            </div>
+
+                                            {/* Link */}
+                                            <div className={styles.projectInputGroup}>
+                                              <label className={styles.projectInputLabel}>
+                                                🔗 Link URL
+                                              </label>
+                                              <input
+                                                type="text"
+                                                className={styles.projectInput}
+                                                placeholder="e.g. https://github.com/username/project"
+                                                value={projLinkVal}
+                                                onChange={(e) => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, link: e.target.value } : p))}
+                                              />
+                                            </div>
+
+                                            {/* Date */}
+                                            <div className={styles.projectInputGroup}>
+                                              <label className={styles.projectInputLabel}>
+                                                📅 Date / Period
+                                              </label>
+                                              <input
+                                                type="text"
+                                                className={styles.projectInput}
+                                                placeholder="e.g. 2026"
+                                                value={proj.date || ''}
+                                                onChange={(e) => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, date: e.target.value } : p))}
+                                              />
+                                            </div>
+                                          </div>
+
+                                          {/* Footer Button */}
+                                          <div style={{ display: 'flex', justifyContent: 'flex-start', paddingTop: '4px' }}>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleAddProjectBullet(pIdx)}
+                                              style={{
+                                                fontSize: '11px',
+                                                fontWeight: 600,
+                                                color: 'var(--primary, #4f46e5)',
+                                                background: 'rgba(99, 102, 241, 0.08)',
+                                                border: '1px solid rgba(99, 102, 241, 0.2)',
+                                                padding: '4px 10px',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                              }}
+                                            >
+                                              + Add Bullet Point
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -6340,7 +3975,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                   </div>
                                 </>
                               ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                                <div className='allowedPageContentHeight' style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
                                   {pageUnits.map(unit => renderUnit(unit))}
                                 </div>
                               )}
@@ -6504,125 +4139,20 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
       {/* Side-by-Side Section AI Polish Review Modal */}
       {openSectionAiModalId && (
-        <div className={styles.sectionAiModalOverlay} onClick={() => { setOpenSectionAiModalId(null); setSectionAiProposal(null); }}>
-          <div className={styles.sectionAiModalCard} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.sectionAiModalHeader}>
-              <div className={styles.sectionAiModalTitle}>
-                <Sparkles size={16} className={styles.sparkleIconGlow} />
-                <span>AI Section Polish & Job Tailor</span>
-              </div>
-              <button type="button" className={styles.popoverClose} onClick={() => { setOpenSectionAiModalId(null); setSectionAiProposal(null); }}>
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className={styles.sectionAiModalBody}>
-              <div className={styles.sectionAiPromptSection}>
-                <div className={styles.sectionAiScopeRow}>
-                  <label>Select Target Scope:</label>
-                  <select
-                    className={styles.sectionAiScopeSelect}
-                    value={sectionAiScope}
-                    onChange={(e) => {
-                      setSectionAiScope(e.target.value);
-                      setSectionAiProposal(null);
-                    }}
-                  >
-                    {getSectionAiScopeOptions(openSectionAiModalId).map(opt => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <label>Choose AI Optimization Objective or type custom prompt:</label>
-                <div className={styles.sectionAiPresetChips}>
-                  <button type="button" onClick={() => handleGenerateSectionAi(openSectionAiModalId, "Tailor to target job description with high-impact keywords")}>
-                    🎯 Tailor to Job
-                  </button>
-                  <button type="button" onClick={() => handleGenerateSectionAi(openSectionAiModalId, "Highlight quantifiable metrics and technical results")}>
-                    📊 Metrics & Impact
-                  </button>
-                  <button type="button" onClick={() => handleGenerateSectionAi(openSectionAiModalId, "Optimize key industry terminology for ATS screening")}>
-                    🔍 ATS Polish
-                  </button>
-                  <button type="button" onClick={() => handleGenerateSectionAi(openSectionAiModalId, "Make concise with strong action verbs")}>
-                    💥 Punchier
-                  </button>
-                  <button type="button" onClick={() => handleGenerateSectionAi(openSectionAiModalId, "Enhance action verbs and quantify achievements")}>
-                    ⚡ Strong Action Verbs
-                  </button>
-                  <button type="button" onClick={() => handleGenerateSectionAi(openSectionAiModalId, "Fix grammar, spelling, and executive professional tone")}>
-                    ✨ Polish Grammar & Tone
-                  </button>
-                  <button type="button" onClick={() => handleGenerateSectionAi(openSectionAiModalId, "Make concise, punchy, and remove filler words")}>
-                    📉 Condense Section
-                  </button>
-                </div>
-                <div className={styles.sectionAiInputRow}>
-                  <input
-                    type="text"
-                    placeholder="e.g. Focus on technical leadership and cloud infrastructure..."
-                    value={sectionAiPrompt}
-                    onChange={(e) => setSectionAiPrompt(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && sectionAiPrompt.trim()) {
-                        handleGenerateSectionAi(openSectionAiModalId, sectionAiPrompt);
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className={styles.sectionAiSubmitBtn}
-                    disabled={isGeneratingSectionAi}
-                    onClick={() => handleGenerateSectionAi(openSectionAiModalId, sectionAiPrompt)}
-                  >
-                    {isGeneratingSectionAi ? <RefreshCw size={14} className={styles.spinIcon} /> : <Wand2 size={14} />}
-                    {isGeneratingSectionAi ? 'Generating...' : 'Generate AI Proposal'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Side-by-Side Comparison Diff View */}
-              {sectionAiProposal && (
-                <div className={styles.diffComparisonContainer}>
-                  <div className={styles.diffHeaderRow}>
-                    <span className={styles.diffOriginalBadge}>Current Section Content</span>
-                    <span className={styles.diffProposedBadge}>✨ AI Enhanced Proposal</span>
-                  </div>
-                  <div className={styles.diffGrid}>
-                    <div className={styles.diffBoxOriginal}>
-                      <pre>{sectionAiProposal.originalText || '(Section currently empty)'}</pre>
-                    </div>
-                    <div className={styles.diffBoxProposed}>
-                      <pre>{sectionAiProposal.proposedText}</pre>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className={styles.sectionAiModalFooter}>
-              <button
-                type="button"
-                className={styles.cancelAiBtn}
-                onClick={() => { setOpenSectionAiModalId(null); setSectionAiProposal(null); }}
-              >
-                Cancel
-              </button>
-              {sectionAiProposal && (
-                <button
-                  type="button"
-                  className={styles.applyAiBtn}
-                  onClick={handleApplySectionAiProposal}
-                >
-                  <Check size={14} /> Apply AI Improvements to Section
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <SectionAiPolishModal
+          openSectionAiModalId={openSectionAiModalId}
+          onClose={() => { setOpenSectionAiModalId(null); setSectionAiProposal(null); }}
+          sectionAiScope={sectionAiScope}
+          setSectionAiScope={setSectionAiScope}
+          sectionAiPrompt={sectionAiPrompt}
+          setSectionAiPrompt={setSectionAiPrompt}
+          isGeneratingSectionAi={isGeneratingSectionAi}
+          sectionAiProposal={sectionAiProposal}
+          setSectionAiProposal={setSectionAiProposal}
+          getSectionAiScopeOptions={getSectionAiScopeOptions}
+          handleGenerateSectionAi={handleGenerateSectionAi}
+          handleAcceptSectionAiProposal={handleApplySectionAiProposal}
+        />
       )}
     </div>
   );

@@ -27,7 +27,7 @@ export const LandingSkeleton: React.FC = () => {
           <Skeleton variant="text" width="65%" height={48} />
           <Skeleton variant="text" width="75%" height={20} style={{ marginTop: '0.5rem' }} />
           <Skeleton variant="text" width="55%" height={20} />
-          
+
           <div className={styles.heroButtons}>
             <Skeleton variant="rect" width={160} height={46} />
             <Skeleton variant="rect" width={140} height={46} />

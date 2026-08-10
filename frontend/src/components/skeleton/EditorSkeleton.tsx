@@ -12,7 +12,7 @@ export const EditorSkeleton: React.FC = () => {
           <Skeleton variant="text" width={220} height={24} />
           <Skeleton variant="rect" width={110} height={26} style={{ borderRadius: '999px' }} />
         </div>
-        
+
         <div className={styles.toolbarGroup}>
           <Skeleton variant="rect" width={100} height={36} />
           <Skeleton variant="rect" width={120} height={36} />
@@ -70,7 +70,7 @@ export const EditorSkeleton: React.FC = () => {
             {/* Paper Work Experience Skeleton */}
             <div className={styles.paperSection}>
               <Skeleton variant="text" width={180} height={20} style={{ background: '#cbd5e1' }} />
-              
+
               {[1, 2].map((idx) => (
                 <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>

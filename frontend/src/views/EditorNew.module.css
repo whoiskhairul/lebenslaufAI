@@ -1494,11 +1494,12 @@
 }
 
 .bulletDot {
-  width: 4px;
-  height: 4px;
-  background-color: var(--accent-color, currentColor);
+  width: 3px;
+  height: 3px;
+  background-color: currentColor;
+  opacity: 0.55;
   border-radius: 50%;
-  margin-top: calc((var(--line-height-mult, 1.4) * 1em / 2) - 2px);
+  margin-top: calc((var(--line-height-mult, 1.4) * 1em / 2) - 1.5px);
   margin-right: 8px;
   flex-shrink: 0;
   display: inline-block;
@@ -1587,18 +1588,29 @@
   background: rgba(99, 102, 241, 0.08);
 }
 
-/* AutoSizeTextarea overrides for canvas flow */
-.autoTextareaWrapper {
-  width: 100%;
+/* AutoSizeTextarea overrides & inline editing visual feedback */
+.canvasFieldEdit {
+  transition: background 0.15s ease, box-shadow 0.15s ease, border-radius 0.15s ease;
+  border-radius: 3px;
 }
 
-.autoTextareaWrapper textarea {
-  transition: background 0.15s ease;
+.canvasFieldEdit:hover {
+  background: rgba(99, 102, 241, 0.05);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  border-radius: 4px;
 }
 
-.autoTextareaWrapper textarea:focus {
-  background: rgba(99, 102, 241, 0.04);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+.canvasFieldEdit:focus {
+  background: rgba(99, 102, 241, 0.08);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+  border-radius: 4px;
+}
+
+.bulletItem:hover,
+.ppBulletItem:hover,
+.germanBulletItem:hover,
+.canvasHoverBlock:hover {
+  background: rgba(99, 102, 241, 0.03);
   border-radius: 4px;
 }
 
@@ -1797,12 +1809,55 @@
   text-align: left;
 }
 
-.bulletsList li {
+.bulletsList li,
+.bulletItem {
   list-style: none !important;
   list-style-type: none !important;
   font-size: 1em;
   color: inherit;
-  line-height: inherit;
+  line-height: 1.45;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  position: relative;
+}
+
+.bulletDot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 3px;
+  height: 3px;
+  background-color: currentColor;
+  opacity: 0.55;
+  border-radius: 50%;
+  margin-top: 6px;
+}
+
+.bulletContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.resumeContacts a,
+.projectLink {
+  color: #2563eb;
+  text-decoration: underline;
+  text-decoration-color: rgba(37, 99, 235, 0.4);
+  text-underline-offset: 2px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+.resumeContacts a:hover,
+.projectLink:hover {
+  color: #1d4ed8;
+  text-decoration-color: #1d4ed8;
+}
+
+@media print {
+  a[href] {
+    color: #1d4ed8 !important;
+    text-decoration: underline !important;
+  }
 }
 
 .resumeSkills {
@@ -3150,4 +3205,69 @@
   border-color: rgba(139, 92, 246, 0.5) !important;
   background: rgba(139, 92, 246, 0.16) !important;
   color: #8b5cf6 !important;
+}
+
+/* Projects Manager Theme-Adaptive Card & Inputs */
+.projectCard {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md, 8px);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: var(--shadow-sm);
+}
+
+.projectHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--card-border);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.projectInputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.projectInputLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.projectInput {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 11px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--card-border);
+  background: var(--background);
+  color: var(--foreground);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.projectInput:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
+.projectInput::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
 }
