@@ -210,44 +210,101 @@ export const SectionSettingsPopover: React.FC<SectionSettingsPopoverProps> = ({
           </div>
         )}
 
-        <div className={styles.popoverActionsRow}>
+        <div className={styles.popoverActionsRow} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
           {sec?.type === 'experience' && (
-            <button
-              type="button"
-              onClick={() => {
-                setEditableExperiences(prev => [...prev, {
-                  id: `exp_${Date.now()}`,
-                  company: 'Company Name',
-                  position: 'Job Title',
-                  location: 'City, Country',
-                  start_date: 'Start Date',
-                  end_date: 'End Date',
-                  bullets: ['Add key achievement or responsibility...']
-                }]);
-              }}
-              className={styles.popoverAddBtn}
-            >
-              + Add Experience
-            </button>
+            <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditableExperiences(prev => [...prev, {
+                    id: `exp_${Date.now()}`,
+                    company: 'Company Name',
+                    position: 'Job Title',
+                    location: 'City, Country',
+                    start_date: '01/2026',
+                    end_date: 'Present',
+                    bullets: ['Describe your major contribution...']
+                  }]);
+                }}
+                className={styles.popoverAddBtn}
+                style={{ flex: 1 }}
+              >
+                + Add Experience
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditableExperiences(prev => {
+                    if (prev.length === 0) {
+                      return [{
+                        id: `exp_${Date.now()}`,
+                        company: 'Company Name',
+                        position: 'Job Title',
+                        location: 'City, Country',
+                        start_date: '01/2026',
+                        end_date: 'Present',
+                        bullets: ['New key accomplishment...']
+                      }];
+                    }
+                    const lastIdx = prev.length - 1;
+                    return prev.map((exp, idx) => idx === lastIdx ? { ...exp, bullets: [...exp.bullets, 'New key accomplishment...'] } : exp);
+                  });
+                }}
+                className={styles.popoverAddBtn}
+                style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#4f46e5', border: '1px dashed #6366f1' }}
+                title="Append bullet to last experience item"
+              >
+                + Append Bullet
+              </button>
+            </div>
           )}
 
           {sec?.type === 'projects' && (
-            <button
-              type="button"
-              onClick={() => {
-                setEditableProjects(prev => [...prev, {
-                  id: `proj_${Date.now()}`,
-                  title: 'Project Title',
-                  role: 'Role',
-                  date: 'Date',
-                  technologies: ['Tech 1', 'Tech 2'],
-                  bullets: ['Add key project accomplishment...']
-                }]);
-              }}
-              className={styles.popoverAddBtn}
-            >
-              + Add Project
-            </button>
+            <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditableProjects(prev => [...prev, {
+                    id: `proj_${Date.now()}`,
+                    title: 'Project Title',
+                    role: 'Your Role / Contributions',
+                    date: '2026',
+                    link: 'https://github.com/username/repository',
+                    technologies: ['React', 'TypeScript', 'Node.js'],
+                    bullets: ['Describe project deliverables & technical output...']
+                  }]);
+                }}
+                className={styles.popoverAddBtn}
+                style={{ flex: 1 }}
+              >
+                + Add Project
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditableProjects(prev => {
+                    if (prev.length === 0) {
+                      return [{
+                        id: `proj_${Date.now()}`,
+                        title: 'Project Title',
+                        role: 'Your Role',
+                        date: '2026',
+                        link: 'https://github.com/username/repository',
+                        technologies: ['React', 'TypeScript'],
+                        bullets: ['New project accomplishment...']
+                      }];
+                    }
+                    const lastIdx = prev.length - 1;
+                    return prev.map((proj, idx) => idx === lastIdx ? { ...proj, bullets: [...proj.bullets, 'New project accomplishment...'] } : proj);
+                  });
+                }}
+                className={styles.popoverAddBtn}
+                style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#4f46e5', border: '1px dashed #6366f1' }}
+                title="Append bullet to last project item"
+              >
+                + Append Bullet
+              </button>
+            </div>
           )}
 
           {sec?.type === 'education' && (
@@ -259,14 +316,31 @@ export const SectionSettingsPopover: React.FC<SectionSettingsPopoverProps> = ({
                   institution: 'University / Institute Name',
                   degree: 'Degree',
                   field_of_study: 'Field of Study',
-                  start_date: 'Start Year',
-                  end_date: 'End Year',
+                  start_date: '2022',
+                  end_date: '2026',
                   location: 'City, Country'
                 }]);
               }}
               className={styles.popoverAddBtn}
             >
               + Add Education
+            </button>
+          )}
+
+          {sec?.type === 'custom' && (
+            <button
+              type="button"
+              onClick={() => {
+                setSections(prev => prev.map(s => {
+                  if (s.id === sectionId) {
+                    return { ...s, bullets: [...(s.bullets || []), 'New custom section point...'] };
+                  }
+                  return s;
+                }));
+              }}
+              className={styles.popoverAddBtn}
+            >
+              + Append Bullet Point
             </button>
           )}
 

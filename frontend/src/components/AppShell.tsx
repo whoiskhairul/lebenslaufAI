@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { 
+import {
   LayoutDashboard, UserCircle, Wand2, Settings as SettingsIcon, LogOut, Sun, Moon, Menu, X, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import styles from './AppShell.module.css';
@@ -44,8 +44,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
     <div className={styles.container}>
       {/* Mobile Top Bar */}
       <header className={`${styles.header} no-print`}>
-        <button 
-          className={styles.menuToggle} 
+        <button
+          className={styles.menuToggle}
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           aria-label="Toggle menu"
         >

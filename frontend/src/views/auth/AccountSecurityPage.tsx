@@ -10,7 +10,7 @@ export const AccountSecurityPage: React.FC = () => {
   const [twoFactorData, setTwoFactorData] = useState<{ secret: string; qr_code: string; recovery_codes: string[] } | null>(null);
   const [totpCode, setTotpCode] = useState('');
   const [disablePassword, setDisablePassword] = useState('');
-  
+
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

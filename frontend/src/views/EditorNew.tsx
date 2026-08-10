@@ -234,9 +234,10 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     image_url: ''
   });
   const [editableExperiences, setEditableExperiences] = useState<Array<{ id: string; bullets: string[]; company?: string; position?: string; location?: string; start_date?: string; end_date?: string }>>([]);
-  const [editableProjects, setEditableProjects] = useState<Array<{ id: string; bullets: string[]; title?: string; role?: string; technologies?: string[] | string; date?: string }>>([]);
+  const [editableProjects, setEditableProjects] = useState<Array<{ id: string; bullets: string[]; title?: string; role?: string; technologies?: string[] | string; date?: string; link?: string; github_url?: string; demo_url?: string }>>([]);
   const [editableEducations, setEditableEducations] = useState<Array<{ id: string; institution: string; degree?: string; field_of_study?: string; start_date?: string; end_date?: string; location?: string; bullets?: string[] }>>([]);
   const [editableSkills, setEditableSkills] = useState<Array<{ id: string; name: string; category: string }>>([]);
+  const [expandedProjectCards, setExpandedProjectCards] = useState<Record<string, boolean>>({});
 
   // Dynamic Document Title: "name of the applicant_Lebenslauf"
   useEffect(() => {
@@ -2951,41 +2952,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       {/* Local individual section styles panel */}
                       {expandedSectionSettings === secItem.id && (
                         <div className={styles.sectionSettingsCard}>
-                          <h4>{secItem.name} Config</h4>
-
-                          <div className={styles.sliderGroup}>
-                            <label>Font Size</label>
-                            <input
-                              type="range"
-                              min="10"
-                              max="18"
-                              value={secItem.customStyles?.fontSize || customStyles.fontSize}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value);
-                                setSections(prev => prev.map(s => s.id === secItem.id ? {
-                                  ...s,
-                                  customStyles: { ...s.customStyles, fontSize: val }
-                                } : s));
-                              }}
-                            />
-                          </div>
-
-                          <div className={styles.sliderGroup}>
-                            <label>Spacing</label>
-                            <input
-                              type="range"
-                              min="5"
-                              max="50"
-                              value={secItem.customStyles?.spacing || customStyles.sectionSpacing}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value);
-                                setSections(prev => prev.map(s => s.id === secItem.id ? {
-                                  ...s,
-                                  customStyles: { ...s.customStyles, spacing: val }
-                                } : s));
-                              }}
-                            />
-                          </div>
+                          <h4>{secItem.name} Manager</h4>
 
                           {/* Local layout choice for custom sections */}
                           {secItem.type === 'custom' && (
@@ -3016,48 +2983,180 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                           )}
 
                           {secItem.type === 'projects' && (
-                            <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--card-border, rgba(255,255,255,0.1))' }}>
-                              <label style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--foreground, #1e293b)', marginBottom: '8px', display: 'block' }}>
-                                Project Fields & Details Manager
-                              </label>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <h5 style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--foreground, #0f172a)' }}>
+                                    Projects & Subfields Manager
+                                  </h5>
+                                  <span style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)' }}>
+                                    Customize roles, tech stack, dates & links
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddProject()}
+                                  style={{
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    color: '#ffffff',
+                                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                    border: 'none',
+                                    padding: '5px 10px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 4px rgba(99, 102, 241, 0.25)',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                >
+                                  + New Project
+                                </button>
+                              </div>
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
                                 {editableProjects.map((proj, pIdx) => {
-                                  const projHasRole = Boolean(proj.role && proj.role.trim());
+                                  const cardKey = proj.id || `proj_${pIdx}`;
+                                  const isExpanded = !!expandedProjectCards[cardKey];
                                   const projTechStr = Array.isArray(proj.technologies)
                                     ? proj.technologies.join(', ')
                                     : (proj.technologies || '');
-                                  const projHasTech = Boolean(projTechStr && projTechStr.trim());
+                                  const projLinkVal = proj.link || proj.github_url || proj.demo_url || '';
 
                                   return (
-                                    <div key={proj.id || pIdx} style={{ background: 'rgba(99, 102, 241, 0.05)', padding: '8px 10px', borderRadius: '6px', border: '1px solid rgba(99, 102, 241, 0.15)' }}>
-                                      <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-main, #334155)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        📌 {proj.title || `Project #${pIdx + 1}`}
-                                      </div>
-                                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                        {!projHasRole && (
-                                          <button
-                                            type="button"
-                                            className={styles.popoverFieldBtn}
-                                            onClick={() => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, role: 'Your Role / Contribution' } : p))}
-                                          >
-                                            🏢 + Add Role
-                                          </button>
-                                        )}
-                                        {!projHasTech && (
-                                          <button
-                                            type="button"
-                                            className={styles.popoverFieldBtn}
-                                            onClick={() => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, technologies: ['React', 'Node.js'] } : p))}
-                                          >
-                                            ⚡ + Add Tech Stack
-                                          </button>
-                                        )}
-                                        {projHasRole && projHasTech && (
-                                          <span style={{ fontSize: '11px', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
-                                            ✓ Role & Tech Stack Active
+                                    <div key={cardKey} className={styles.projectCard}>
+                                      {/* Header Bar (Click to toggle expand/collapse) */}
+                                      <div
+                                        className={styles.projectHeaderRow}
+                                        style={{ cursor: 'pointer', userSelect: 'none', borderBottom: isExpanded ? '1px solid var(--card-border, #f1f5f9)' : 'none', paddingBottom: isExpanded ? '6px' : '0' }}
+                                        onClick={() => setExpandedProjectCards(prev => ({ ...prev, [cardKey]: !prev[cardKey] }))}
+                                      >
+                                        <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--foreground)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                          <span style={{ fontSize: '10px', color: 'var(--primary, #6366f1)' }}>{isExpanded ? '▼' : '▶'}</span>
+                                          📌 {proj.title ? proj.title : `Project #${pIdx + 1}`}
+                                        </span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <span style={{ fontSize: '10.5px', color: 'var(--primary, #6366f1)', fontWeight: 600 }}>
+                                            {isExpanded ? 'Collapse' : 'Edit Details'}
                                           </span>
-                                        )}
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setEditableProjects(prev => prev.filter((_, i) => i !== pIdx));
+                                            }}
+                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '11px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                          >
+                                            <Trash size={12} />
+                                          </button>
+                                        </div>
                                       </div>
+
+                                      {/* Collapsible Body (Only rendered when expanded) */}
+                                      {isExpanded && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', boxSizing: 'border-box', paddingTop: '4px' }}>
+                                          {/* Title */}
+                                          <div className={styles.projectInputGroup}>
+                                            <label className={styles.projectInputLabel}>
+                                              PROJECT TITLE
+                                            </label>
+                                            <input
+                                              type="text"
+                                              className={styles.projectInput}
+                                              placeholder="e.g. E-Commerce Microservices Platform"
+                                              value={proj.title || ''}
+                                              onChange={(e) => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, title: e.target.value } : p))}
+                                            />
+                                          </div>
+
+                                          {/* Subfields (Stacked single-column layout for narrow sidebar) */}
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+                                            {/* Role */}
+                                            <div className={styles.projectInputGroup}>
+                                              <label className={styles.projectInputLabel}>
+                                                🏢 Role
+                                              </label>
+                                              <input
+                                                type="text"
+                                                className={styles.projectInput}
+                                                placeholder="e.g. Lead Engineer"
+                                                value={proj.role || ''}
+                                                onChange={(e) => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, role: e.target.value } : p))}
+                                              />
+                                            </div>
+
+                                            {/* Tech Stack */}
+                                            <div className={styles.projectInputGroup}>
+                                              <label className={styles.projectInputLabel}>
+                                                ⚡ Tech Stack
+                                              </label>
+                                              <input
+                                                type="text"
+                                                className={styles.projectInput}
+                                                placeholder="e.g. React, Node.js, Python"
+                                                value={projTechStr}
+                                                onChange={(e) => {
+                                                  const val = e.target.value;
+                                                  setEditableProjects(prev => prev.map((p, i) => i === pIdx ? {
+                                                    ...p,
+                                                    technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
+                                                  } : p));
+                                                }}
+                                              />
+                                            </div>
+
+                                            {/* Link */}
+                                            <div className={styles.projectInputGroup}>
+                                              <label className={styles.projectInputLabel}>
+                                                🔗 Link URL
+                                              </label>
+                                              <input
+                                                type="text"
+                                                className={styles.projectInput}
+                                                placeholder="e.g. https://github.com/username/project"
+                                                value={projLinkVal}
+                                                onChange={(e) => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, link: e.target.value } : p))}
+                                              />
+                                            </div>
+
+                                            {/* Date */}
+                                            <div className={styles.projectInputGroup}>
+                                              <label className={styles.projectInputLabel}>
+                                                📅 Date / Period
+                                              </label>
+                                              <input
+                                                type="text"
+                                                className={styles.projectInput}
+                                                placeholder="e.g. 2026"
+                                                value={proj.date || ''}
+                                                onChange={(e) => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, date: e.target.value } : p))}
+                                              />
+                                            </div>
+                                          </div>
+
+                                          {/* Footer Button */}
+                                          <div style={{ display: 'flex', justifyContent: 'flex-start', paddingTop: '4px' }}>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleAddProjectBullet(pIdx)}
+                                              style={{
+                                                fontSize: '11px',
+                                                fontWeight: 600,
+                                                color: 'var(--primary, #4f46e5)',
+                                                background: 'rgba(99, 102, 241, 0.08)',
+                                                border: '1px solid rgba(99, 102, 241, 0.2)',
+                                                padding: '4px 10px',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                              }}
+                                            >
+                                              + Add Bullet Point
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}

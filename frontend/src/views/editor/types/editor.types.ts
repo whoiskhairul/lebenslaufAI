@@ -8,7 +8,7 @@ export interface ResumeVersion {
   tailored_details: {
     experiences: Array<{ id: string; bullets: string[] }>;
     skills?: Array<{ id?: string; name: string; category: string; level?: string }>;
-    projects?: Array<{ id?: string; title: string; role?: string; technologies?: string[]; bullets?: string[]; link?: string; date?: string }>;
+    projects?: Array<{ id?: string; title: string; role?: string; technologies?: string[]; bullets?: string[]; link?: string; github_url?: string; demo_url?: string; date?: string }>;
     ats_report: {
       score: number;
       matched_keywords: string[];

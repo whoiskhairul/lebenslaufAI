@@ -181,300 +181,300 @@ export const Settings: React.FC = () => {
       ) : (
         <>
           {/* TAB 1: PROFILE DETAILS */}
-      {activeTab === 'profile' && (
-        <div className={`${styles.card} glass-card`}>
-          <div className={styles.sectionHeader}>
-            <UserIcon size={22} className={styles.headerIcon} />
-            <div>
-              <h3>Personal Identity & Avatar</h3>
-              <p className={styles.sectionDesc}>Customize your profile picture, display name, and contact settings.</p>
-            </div>
-          </div>
+          {activeTab === 'profile' && (
+            <div className={`${styles.card} glass-card`}>
+              <div className={styles.sectionHeader}>
+                <UserIcon size={22} className={styles.headerIcon} />
+                <div>
+                  <h3>Personal Identity & Avatar</h3>
+                  <p className={styles.sectionDesc}>Customize your profile picture, display name, and contact settings.</p>
+                </div>
+              </div>
 
-          {profileMsg.text && (
-            <div className={profileMsg.type === 'success' ? styles.successBanner : styles.errorBanner}>
-              {profileMsg.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
-              <span>{profileMsg.text}</span>
+              {profileMsg.text && (
+                <div className={profileMsg.type === 'success' ? styles.successBanner : styles.errorBanner}>
+                  {profileMsg.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+                  <span>{profileMsg.text}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleUpdateProfile} className={styles.form}>
+                {/* Avatar Row */}
+                <div className={styles.avatarSection}>
+                  <div className={styles.avatarPreviewContainer}>
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="User Avatar" className={styles.avatarImg} />
+                    ) : (
+                      <div className={styles.avatarPlaceholder}>
+                        {user?.full_name ? user.full_name.charAt(0).toUpperCase() : (user?.email?.charAt(0).toUpperCase() || 'U')}
+                      </div>
+                    )}
+                  </div>
+                  <div className={styles.avatarInputs}>
+                    <InputField
+                      label="Profile Picture URL / Social Avatar"
+                      id="avatarUrl"
+                      type="url"
+                      placeholder="https://images.unsplash.com/... or Google profile pic URL"
+                      value={avatarUrl}
+                      onChange={(e) => setAvatarUrl(e.target.value)}
+                    />
+                    <div className={styles.avatarActions}>
+                      {avatarUrl && (
+                        <Button variant="ghost" type="button" onClick={() => setAvatarUrl('')} className={styles.removeAvatarBtn}>
+                          <Trash2 size={14} /> Remove Avatar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.grid2Col}>
+                  <InputField
+                    label="Full Name"
+                    id="fullName"
+                    type="text"
+                    placeholder="e.g. Marcus Thorne"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                  />
+
+                  <InputField
+                    label="Username"
+                    id="username"
+                    type="text"
+                    placeholder="e.g. marcusthorne"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                </div>
+
+                <div className={styles.grid2Col}>
+                  <div>
+                    <label className={styles.inputLabel}>Email Address</label>
+                    <div className={styles.emailBadgeRow}>
+                      <InputField
+                        label=""
+                        id="email"
+                        type="email"
+                        value={user?.email || ''}
+                        disabled
+                        readOnly
+                      />
+                      {user?.email_verified && (
+                        <span className={styles.verifiedBadge} title="Email Verified">
+                          <Check size={14} /> Verified
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={styles.inputLabel}>Account Provider</label>
+                    <div className={styles.providerBadge}>
+                      <CheckCircle2 size={16} color="#10b981" />
+                      <span>Authenticated via SimpleJWT & Social OAuth</span>
+                    </div>
+                  </div>
+                </div>
+
+                <Button type="submit" disabled={isUpdatingProfile} className={styles.saveBtn}>
+                  {isUpdatingProfile ? 'Saving Changes...' : 'Save Profile Changes'}
+                </Button>
+              </form>
             </div>
           )}
 
-          <form onSubmit={handleUpdateProfile} className={styles.form}>
-            {/* Avatar Row */}
-            <div className={styles.avatarSection}>
-              <div className={styles.avatarPreviewContainer}>
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="User Avatar" className={styles.avatarImg} />
-                ) : (
-                  <div className={styles.avatarPlaceholder}>
-                    {user?.full_name ? user.full_name.charAt(0).toUpperCase() : (user?.email?.charAt(0).toUpperCase() || 'U')}
+          {/* TAB 2: ACCOUNT SECURITY */}
+          {activeTab === 'security' && (
+            <div className={styles.securityStack}>
+              {/* Password Change Card */}
+              <div className={`${styles.card} glass-card`}>
+                <div className={styles.sectionHeader}>
+                  <Key size={22} className={styles.headerIcon} />
+                  <div>
+                    <h3>Change Account Password</h3>
+                    <p className={styles.sectionDesc}>Ensure your account is using a long, strong, and unique password.</p>
+                  </div>
+                </div>
+
+                {passMsg.text && (
+                  <div className={passMsg.type === 'success' ? styles.successBanner : styles.errorBanner}>
+                    {passMsg.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+                    <span>{passMsg.text}</span>
                   </div>
                 )}
-              </div>
-              <div className={styles.avatarInputs}>
-                <InputField
-                  label="Profile Picture URL / Social Avatar"
-                  id="avatarUrl"
-                  type="url"
-                  placeholder="https://images.unsplash.com/... or Google profile pic URL"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                />
-                <div className={styles.avatarActions}>
-                  {avatarUrl && (
-                    <Button variant="ghost" type="button" onClick={() => setAvatarUrl('')} className={styles.removeAvatarBtn}>
-                      <Trash2 size={14} /> Remove Avatar
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
 
-            <div className={styles.grid2Col}>
-              <InputField
-                label="Full Name"
-                id="fullName"
-                type="text"
-                placeholder="e.g. Marcus Thorne"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-              />
-
-              <InputField
-                label="Username"
-                id="username"
-                type="text"
-                placeholder="e.g. marcusthorne"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-            </div>
-
-            <div className={styles.grid2Col}>
-              <div>
-                <label className={styles.inputLabel}>Email Address</label>
-                <div className={styles.emailBadgeRow}>
-                  <InputField
-                    label=""
-                    id="email"
-                    type="email"
-                    value={user?.email || ''}
-                    disabled
-                    readOnly
-                  />
-                  {user?.email_verified && (
-                    <span className={styles.verifiedBadge} title="Email Verified">
-                      <Check size={14} /> Verified
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className={styles.inputLabel}>Account Provider</label>
-                <div className={styles.providerBadge}>
-                  <CheckCircle2 size={16} color="#10b981" />
-                  <span>Authenticated via SimpleJWT & Social OAuth</span>
-                </div>
-              </div>
-            </div>
-
-            <Button type="submit" disabled={isUpdatingProfile} className={styles.saveBtn}>
-              {isUpdatingProfile ? 'Saving Changes...' : 'Save Profile Changes'}
-            </Button>
-          </form>
-        </div>
-      )}
-
-      {/* TAB 2: ACCOUNT SECURITY */}
-      {activeTab === 'security' && (
-        <div className={styles.securityStack}>
-          {/* Password Change Card */}
-          <div className={`${styles.card} glass-card`}>
-            <div className={styles.sectionHeader}>
-              <Key size={22} className={styles.headerIcon} />
-              <div>
-                <h3>Change Account Password</h3>
-                <p className={styles.sectionDesc}>Ensure your account is using a long, strong, and unique password.</p>
-              </div>
-            </div>
-
-            {passMsg.text && (
-              <div className={passMsg.type === 'success' ? styles.successBanner : styles.errorBanner}>
-                {passMsg.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
-                <span>{passMsg.text}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleChangePassword} className={styles.form}>
-              <div className={styles.inputWrapper}>
-                <InputField
-                  label="Current Password"
-                  id="oldPassword"
-                  type={showOldPass ? 'text' : 'password'}
-                  placeholder="Enter current password"
-                  value={oldPassword}
-                  onChange={(e) => setOldPassword(e.target.value)}
-                  required
-                />
-                <button
-                  type="button"
-                  className={styles.eyeBtn}
-                  onClick={() => setShowOldPass(!showOldPass)}
-                  title={showOldPass ? 'Hide Password' : 'Show Password'}
-                >
-                  {showOldPass ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-
-              <div className={styles.grid2Col}>
-                <div className={styles.inputWrapper}>
-                  <InputField
-                    label="New Password"
-                    id="newPassword"
-                    type={showNewPass ? 'text' : 'password'}
-                    placeholder="At least 8 characters"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className={styles.eyeBtn}
-                    onClick={() => setShowNewPass(!showNewPass)}
-                    title={showNewPass ? 'Hide Password' : 'Show Password'}
-                  >
-                    {showNewPass ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-
-                <InputField
-                  label="Confirm New Password"
-                  id="confirmPassword"
-                  type={showNewPass ? 'text' : 'password'}
-                  placeholder="Re-enter new password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-              </div>
-
-              <Button type="submit" disabled={isChangingPass} className={styles.saveBtn}>
-                {isChangingPass ? 'Updating Password...' : 'Update Password'}
-              </Button>
-            </form>
-          </div>
-
-          {/* Active Login Sessions Card */}
-          <div className={`${styles.card} glass-card`}>
-            <div className={styles.sectionHeader}>
-              <Laptop size={22} className={styles.headerIcon} />
-              <div>
-                <h3>Active Device Sessions</h3>
-                <p className={styles.sectionDesc}>Review devices currently logged into your Lebenslauf AI account.</p>
-              </div>
-            </div>
-
-            <div className={styles.sessionList}>
-              {sessions.length > 0 ? (
-                sessions.map((sess) => (
-                  <div key={sess.id} className={styles.sessionItem}>
-                    <div className={styles.sessionInfo}>
-                      <Laptop size={20} className={styles.deviceIcon} />
-                      <div>
-                        <h4 className={styles.deviceTitle}>{sess.device_info || 'Web Browser'}</h4>
-                        <p className={styles.deviceSub}>
-                          IP: <code>{sess.ip_address}</code> • Last Active: {new Date(sess.last_active).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                    {sess.is_active && (
-                      <Button variant="ghost" onClick={() => handleRevokeSession(sess.id)} className={styles.revokeBtn}>
-                        <LogOut size={14} /> Revoke Session
-                      </Button>
-                    )}
+                <form onSubmit={handleChangePassword} className={styles.form}>
+                  <div className={styles.inputWrapper}>
+                    <InputField
+                      label="Current Password"
+                      id="oldPassword"
+                      type={showOldPass ? 'text' : 'password'}
+                      placeholder="Enter current password"
+                      value={oldPassword}
+                      onChange={(e) => setOldPassword(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className={styles.eyeBtn}
+                      onClick={() => setShowOldPass(!showOldPass)}
+                      title={showOldPass ? 'Hide Password' : 'Show Password'}
+                    >
+                      {showOldPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
-                ))
-              ) : (
-                <p className={styles.noSessionsText}>Your current session is active and secure.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* TAB 3: PREFERENCES & AI KEYS */}
-      {activeTab === 'preferences' && (
-        <div className={styles.prefStack}>
-          {/* Appearance Preference */}
-          <div className={`${styles.card} glass-card`}>
-            <div className={styles.sectionHeader}>
-              <Moon size={22} className={styles.headerIcon} />
-              <div>
-                <h3>Appearance Preference</h3>
-                <p className={styles.sectionDesc}>Toggle between dark mode and light mode themes.</p>
+                  <div className={styles.grid2Col}>
+                    <div className={styles.inputWrapper}>
+                      <InputField
+                        label="New Password"
+                        id="newPassword"
+                        type={showNewPass ? 'text' : 'password'}
+                        placeholder="At least 8 characters"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className={styles.eyeBtn}
+                        onClick={() => setShowNewPass(!showNewPass)}
+                        title={showNewPass ? 'Hide Password' : 'Show Password'}
+                      >
+                        {showNewPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+
+                    <InputField
+                      label="Confirm New Password"
+                      id="confirmPassword"
+                      type={showNewPass ? 'text' : 'password'}
+                      placeholder="Re-enter new password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <Button type="submit" disabled={isChangingPass} className={styles.saveBtn}>
+                    {isChangingPass ? 'Updating Password...' : 'Update Password'}
+                  </Button>
+                </form>
+              </div>
+
+              {/* Active Login Sessions Card */}
+              <div className={`${styles.card} glass-card`}>
+                <div className={styles.sectionHeader}>
+                  <Laptop size={22} className={styles.headerIcon} />
+                  <div>
+                    <h3>Active Device Sessions</h3>
+                    <p className={styles.sectionDesc}>Review devices currently logged into your Lebenslauf AI account.</p>
+                  </div>
+                </div>
+
+                <div className={styles.sessionList}>
+                  {sessions.length > 0 ? (
+                    sessions.map((sess) => (
+                      <div key={sess.id} className={styles.sessionItem}>
+                        <div className={styles.sessionInfo}>
+                          <Laptop size={20} className={styles.deviceIcon} />
+                          <div>
+                            <h4 className={styles.deviceTitle}>{sess.device_info || 'Web Browser'}</h4>
+                            <p className={styles.deviceSub}>
+                              IP: <code>{sess.ip_address}</code> • Last Active: {new Date(sess.last_active).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        {sess.is_active && (
+                          <Button variant="ghost" onClick={() => handleRevokeSession(sess.id)} className={styles.revokeBtn}>
+                            <LogOut size={14} /> Revoke Session
+                          </Button>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <p className={styles.noSessionsText}>Your current session is active and secure.</p>
+                  )}
+                </div>
               </div>
             </div>
+          )}
 
-            <div className={styles.themeToggleRow}>
-              <span>Current Interface Theme: <strong style={{ textTransform: 'capitalize' }}>{theme} Mode</strong></span>
-              <Button variant="secondary" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-                <span>Switch to {theme === 'dark' ? 'Light' : 'Dark'} Mode</span>
-              </Button>
-            </div>
-          </div>
+          {/* TAB 3: PREFERENCES & AI KEYS */}
+          {activeTab === 'preferences' && (
+            <div className={styles.prefStack}>
+              {/* Appearance Preference */}
+              <div className={`${styles.card} glass-card`}>
+                <div className={styles.sectionHeader}>
+                  <Moon size={22} className={styles.headerIcon} />
+                  <div>
+                    <h3>Appearance Preference</h3>
+                    <p className={styles.sectionDesc}>Toggle between dark mode and light mode themes.</p>
+                  </div>
+                </div>
 
-          {/* AI Credentials */}
-          <div className={`${styles.card} glass-card`}>
-            <div className={styles.sectionHeader}>
-              <Shield size={22} className={styles.headerIcon} />
-              <div>
-                <h3>AI Engine Credentials</h3>
-                <p className={styles.sectionDesc}>Configure your personal DeepSeek API key for live AI tailoring.</p>
+                <div className={styles.themeToggleRow}>
+                  <span>Current Interface Theme: <strong style={{ textTransform: 'capitalize' }}>{theme} Mode</strong></span>
+                  <Button variant="secondary" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+                    {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                    <span>Switch to {theme === 'dark' ? 'Light' : 'Dark'} Mode</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* AI Credentials */}
+              <div className={`${styles.card} glass-card`}>
+                <div className={styles.sectionHeader}>
+                  <Shield size={22} className={styles.headerIcon} />
+                  <div>
+                    <h3>AI Engine Credentials</h3>
+                    <p className={styles.sectionDesc}>Configure your personal DeepSeek API key for live AI tailoring.</p>
+                  </div>
+                </div>
+
+                {prefMsg.text && (
+                  <div className={prefMsg.type === 'success' ? styles.successBanner : styles.errorBanner}>
+                    {prefMsg.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+                    <span>{prefMsg.text}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSavePreferences} className={styles.form}>
+                  <div className={styles.inputWrapper}>
+                    <InputField
+                      label="DeepSeek API Key"
+                      id="settingsApiKey"
+                      type={showKey ? 'text' : 'password'}
+                      placeholder="sk-..."
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className={styles.eyeBtn}
+                      onClick={() => setShowKey(!showKey)}
+                      title={showKey ? 'Hide Key' : 'Show Key'}
+                    >
+                      {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+
+                  <div className={styles.infoBox}>
+                    <Sparkles size={16} className={styles.infoIcon} />
+                    <p>
+                      If no API key is specified, ResumeAI falls back to our realistic local AI Engine mock mode.
+                    </p>
+                  </div>
+
+                  <Button type="submit" className={styles.saveBtn}>
+                    Save AI Credentials
+                  </Button>
+                </form>
               </div>
             </div>
-
-            {prefMsg.text && (
-              <div className={prefMsg.type === 'success' ? styles.successBanner : styles.errorBanner}>
-                {prefMsg.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
-                <span>{prefMsg.text}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSavePreferences} className={styles.form}>
-              <div className={styles.inputWrapper}>
-                <InputField
-                  label="DeepSeek API Key"
-                  id="settingsApiKey"
-                  type={showKey ? 'text' : 'password'}
-                  placeholder="sk-..."
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className={styles.eyeBtn}
-                  onClick={() => setShowKey(!showKey)}
-                  title={showKey ? 'Hide Key' : 'Show Key'}
-                >
-                  {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-
-              <div className={styles.infoBox}>
-                <Sparkles size={16} className={styles.infoIcon} />
-                <p>
-                  If no API key is specified, ResumeAI falls back to our realistic local AI Engine mock mode.
-                </p>
-              </div>
-
-              <Button type="submit" className={styles.saveBtn}>
-                Save AI Credentials
-              </Button>
-            </form>
-          </div>
-        </div>
-      )}
+          )}
         </>
       )}
     </div>

@@ -529,46 +529,56 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
           {editablePersonalInfo.email && (
             <>
               {editablePersonalInfo.location && <span>•</span>}
-              <AutoSizeTextarea
-                value={editablePersonalInfo.email}
-                onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, email: val }))}
-              />
+              <a href={`mailto:${editablePersonalInfo.email}`} target="_blank" rel="noopener noreferrer">
+                <AutoSizeTextarea
+                  value={editablePersonalInfo.email}
+                  onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, email: val }))}
+                />
+              </a>
             </>
           )}
           {editablePersonalInfo.website && (
             <>
               {(editablePersonalInfo.location || editablePersonalInfo.email) && <span>•</span>}
-              <AutoSizeTextarea
-                value={editablePersonalInfo.website}
-                onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, website: val }))}
-              />
+              <a href={editablePersonalInfo.website.startsWith('http') ? editablePersonalInfo.website : `https://${editablePersonalInfo.website}`} target="_blank" rel="noopener noreferrer">
+                <AutoSizeTextarea
+                  value={editablePersonalInfo.website}
+                  onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, website: val }))}
+                />
+              </a>
             </>
           )}
           {editablePersonalInfo.phone && (
             <>
               {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website) && <span>•</span>}
-              <AutoSizeTextarea
-                value={editablePersonalInfo.phone}
-                onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, phone: val }))}
-              />
+              <a href={`tel:${editablePersonalInfo.phone}`} target="_blank" rel="noopener noreferrer">
+                <AutoSizeTextarea
+                  value={editablePersonalInfo.phone}
+                  onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, phone: val }))}
+                />
+              </a>
             </>
           )}
           {editablePersonalInfo.linkedin && (
             <>
               {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website || editablePersonalInfo.phone) && <span>•</span>}
-              <AutoSizeTextarea
-                value={editablePersonalInfo.linkedin}
-                onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, linkedin: val }))}
-              />
+              <a href={editablePersonalInfo.linkedin.startsWith('http') ? editablePersonalInfo.linkedin : `https://${editablePersonalInfo.linkedin}`} target="_blank" rel="noopener noreferrer">
+                <AutoSizeTextarea
+                  value={editablePersonalInfo.linkedin}
+                  onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, linkedin: val }))}
+                />
+              </a>
             </>
           )}
           {editablePersonalInfo.github && (
             <>
               {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website || editablePersonalInfo.phone || editablePersonalInfo.linkedin) && <span>•</span>}
-              <AutoSizeTextarea
-                value={editablePersonalInfo.github}
-                onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, github: val }))}
-              />
+              <a href={editablePersonalInfo.github.startsWith('http') ? editablePersonalInfo.github : `https://${editablePersonalInfo.github}`} target="_blank" rel="noopener noreferrer">
+                <AutoSizeTextarea
+                  value={editablePersonalInfo.github}
+                  onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, github: val }))}
+                />
+              </a>
             </>
           )}
         </div>
@@ -1049,22 +1059,38 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                   onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? { ...p, title: val } : p))}
                 />
               </h4>
+              {proj.date && (
+                <div style={{ fontSize: '0.82em', fontWeight: 500, color: '#64748b', marginTop: '2px' }}>
+                  <AutoSizeTextarea
+                    singleLine
+                    value={proj.date || ''}
+                    placeholder="Project Date..."
+                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, date: val } : p))}
+                  />
+                </div>
+              )}
             </div>
             <div className={isPP ? styles.ppRightCol : styles.germanRightCol}>
-              <div style={{ display: 'flex', gap: '8px', fontSize: '1em', color: '#64748b', paddingTop: '0px', flexWrap: 'wrap', alignItems: 'baseline', width: '100%' }}>
-                {hasRole && (
-                  <span style={{ fontWeight: 800, flex: 1, minWidth: '120px', cursor: 'text' }}>
+              {(() => {
+                const roleNode = hasRole ? (
+                  <div key="role" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'text', fontSize: '0.88em', color: '#1e293b', fontWeight: 600, maxWidth: '100%' }}>
+                    <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Role:</span>
                     <AutoSizeTextarea
+                      singleLine
+                      style={{ fontSize: '1em', fontWeight: 600, color: '#1e293b' }}
                       value={proj.role || ''}
                       placeholder="Your Role / Contributions..."
                       onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
                     />
-                  </span>
-                )}
-                {hasTech && (
-                  <span style={{ fontWeight: 600, fontStyle: 'italic', color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: '140px', cursor: 'text' }}>
-                    <span style={{ fontSize: '0.9em', color: '#94a3b8', fontStyle: 'normal', flexShrink: 0 }}>Tech:</span>
+                  </div>
+                ) : null;
+
+                const techNode = hasTech ? (
+                  <div key="tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'text', fontSize: '0.88em', color: '#334155', fontWeight: 600, maxWidth: '100%' }}>
+                    <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Tech:</span>
                     <AutoSizeTextarea
+                      singleLine
+                      style={{ fontSize: '1em', fontWeight: 600, color: '#334155', fontStyle: 'italic' }}
                       value={techString}
                       placeholder="Technologies used (e.g. React, Node.js, Python)..."
                       onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
@@ -1072,19 +1098,58 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                         technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
                       } : p))}
                     />
-                  </span>
-                )}
-                {(hasRole || hasTech) && proj.date && <span style={{ flexShrink: 0 }}>•</span>}
-                {proj.date && (
-                  <span style={{ flexShrink: 0 }}>
-                    <AutoSizeTextarea
-                      singleLine
-                      value={proj.date || ''}
-                      onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, date: val } : p))}
-                    />
-                  </span>
-                )}
-              </div>
+                  </div>
+                ) : null;
+
+                const linkVal = proj.link || proj.github_url || proj.demo_url || '';
+                const hasLink = Boolean(linkVal && linkVal.trim());
+                const linkNode = hasLink ? (
+                  <div key="link" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.88em', fontWeight: 600, color: '#1e293b', maxWidth: '100%' }}>
+                    <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Link:</span>
+                    <a
+                      href={linkVal.startsWith('http') ? linkVal : `https://${linkVal}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#1e293b', textDecoration: 'underline', textDecorationColor: 'rgba(30, 41, 59, 0.4)', fontWeight: 600, fontSize: '1em', maxWidth: '100%', overflow: 'hidden' }}
+                    >
+                      <AutoSizeTextarea
+                        singleLine
+                        style={{ fontSize: '1em', fontWeight: 600, color: '#1e293b' }}
+                        value={linkVal}
+                        placeholder="GitHub / Live Demo Link..."
+                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, link: val } : p))}
+                      />
+                    </a>
+                  </div>
+                ) : null;
+
+                const activeNodes = [];
+                if (hasRole) activeNodes.push({ type: 'role', node: roleNode });
+                if (hasTech) activeNodes.push({ type: 'tech', node: techNode });
+                if (hasLink) activeNodes.push({ type: 'link', node: linkNode });
+
+                if (activeNodes.length === 0) return null;
+
+                if (activeNodes.length === 3) {
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%', marginBottom: '4px' }}>
+                      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', maxWidth: '100%' }}>
+                        {roleNode}
+                        {techNode}
+                      </div>
+                      <div style={{ maxWidth: '100%' }}>
+                        {linkNode}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', width: '100%', maxWidth: '100%', marginBottom: '4px' }}>
+                    {activeNodes.map(n => n.node)}
+                  </div>
+                );
+              })()}
               <ul className={isPP ? styles.ppBulletsList : styles.germanBulletsList}>
                 {proj.bullets.map((bullet: string, bulletIdx: number) => {
                   const inputId = `bullet-input-project-${proj.id}-${bulletIdx}`;
@@ -1141,35 +1206,96 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                   onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, title: val } : p))}
                 />
               </strong>
-              <span>
+            </div>
+            {proj.date && (
+              <div style={{ fontSize: '0.85em', fontWeight: 500, color: '#64748b', margin: '1px 0 3px 0' }}>
                 <AutoSizeTextarea
+                  singleLine
                   value={proj.date || ''}
+                  placeholder="Project Date..."
                   onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, date: val } : p))}
                 />
-              </span>
-            </div>
-            {hasRole && (
-              <p className={styles.itemCompany} style={{ cursor: 'text', margin: '2px 0' }}>
-                <AutoSizeTextarea
-                  value={proj.role || ''}
-                  placeholder="Your Role / Contributions..."
-                  onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
-                />
-              </p>
+              </div>
             )}
-            {hasTech && (
-              <p className={styles.itemCompany} style={{ fontStyle: 'italic', color: '#64748b', cursor: 'text', display: 'flex', alignItems: 'center', gap: '4px', margin: '2px 0' }}>
-                <span style={{ fontSize: '0.9em', color: '#94a3b8', fontStyle: 'normal', flexShrink: 0 }}>Tech:</span>
-                <AutoSizeTextarea
-                  value={techString}
-                  placeholder="Technologies used (e.g. React, Node.js, Python)..."
-                  onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
-                    ...p,
-                    technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
-                  } : p))}
-                />
-              </p>
-            )}
+            {(() => {
+              const roleNode = hasRole ? (
+                <div key="role" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'text', fontSize: '0.88em', color: '#1e293b', fontWeight: 600, maxWidth: '100%' }}>
+                  <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Role:</span>
+                  <AutoSizeTextarea
+                    singleLine
+                    style={{ fontSize: '1em', fontWeight: 600, color: '#1e293b' }}
+                    value={proj.role || ''}
+                    placeholder="Your Role / Contributions..."
+                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
+                  />
+                </div>
+              ) : null;
+
+              const techNode = hasTech ? (
+                <div key="tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'text', fontSize: '0.88em', color: '#334155', fontWeight: 600, maxWidth: '100%' }}>
+                  <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Tech:</span>
+                  <AutoSizeTextarea
+                    singleLine
+                    style={{ fontSize: '1em', fontWeight: 600, color: '#334155', fontStyle: 'italic' }}
+                    value={techString}
+                    placeholder="Technologies used (e.g. React, Node.js, Python)..."
+                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
+                      ...p,
+                      technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
+                    } : p))}
+                  />
+                </div>
+              ) : null;
+
+              const linkVal = proj.link || proj.github_url || proj.demo_url || '';
+              const hasLink = Boolean(linkVal && linkVal.trim());
+              const linkNode = hasLink ? (
+                <div key="link" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.88em', fontWeight: 600, color: '#1e293b', maxWidth: '100%' }}>
+                  <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Link:</span>
+                  <a
+                    href={linkVal.startsWith('http') ? linkVal : `https://${linkVal}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#1e293b', textDecoration: 'underline', textDecorationColor: 'rgba(30, 41, 59, 0.4)', fontWeight: 600, fontSize: '1em', maxWidth: '100%', overflow: 'hidden' }}
+                  >
+                    <AutoSizeTextarea
+                      singleLine
+                      style={{ fontSize: '1em', fontWeight: 600, color: '#1e293b' }}
+                      value={linkVal}
+                      placeholder="GitHub / Live Demo Link..."
+                      onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, link: val } : p))}
+                    />
+                  </a>
+                </div>
+              ) : null;
+
+              const activeNodes = [];
+              if (hasRole) activeNodes.push({ type: 'role', node: roleNode });
+              if (hasTech) activeNodes.push({ type: 'tech', node: techNode });
+              if (hasLink) activeNodes.push({ type: 'link', node: linkNode });
+
+              if (activeNodes.length === 0) return null;
+
+              if (activeNodes.length === 3) {
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%', marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {roleNode}
+                      {techNode}
+                    </div>
+                    <div>
+                      {linkNode}
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', width: '100%', marginBottom: '4px' }}>
+                  {activeNodes.map(n => n.node)}
+                </div>
+              );
+            })()}
             <ul className={styles.bulletsList}>
               {proj.bullets.map((bullet: string, bulletIdx: number) => {
                 const inputId = `bullet-input-project-${proj.id}-${bulletIdx}`;

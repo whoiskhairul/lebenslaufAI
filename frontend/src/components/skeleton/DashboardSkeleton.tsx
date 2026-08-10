@@ -12,7 +12,7 @@ export const KanbanCardSkeleton: React.FC = () => {
           <Skeleton variant="text" width="60%" height={14} />
         </div>
       </div>
-      
+
       <div className={styles.cardMeta}>
         <Skeleton variant="rect" width={75} height={22} style={{ borderRadius: '4px' }} />
         <Skeleton variant="rect" width={85} height={22} style={{ borderRadius: '4px' }} />

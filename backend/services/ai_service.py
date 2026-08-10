@@ -33,13 +33,15 @@ class AIService:
         if response_format:
             payload["response_format"] = response_format
             
+        timeout_sec = int(os.environ.get('DEEPSEEK_TIMEOUT', '60'))
+        
         try:
             # DeepSeek endpoint or standard OpenAI compatible router
             response = requests.post(
                 "https://api.deepseek.com/v1/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=16
+                timeout=timeout_sec
             )
             if response.status_code == 200:
                 result = response.json()
@@ -48,13 +50,13 @@ class AIService:
                 print(f"DeepSeek API Error: {response.status_code} - {response.text}")
                 return None
         except requests.exceptions.Timeout:
-            print("DeepSeek API read timed out. Retrying once...")
+            print(f"DeepSeek API read timed out ({timeout_sec}s). Retrying once with extended timeout...")
             try:
                 response = requests.post(
                     "https://api.deepseek.com/v1/chat/completions",
                     headers=headers,
                     json=payload,
-                    timeout=16
+                    timeout=timeout_sec + 15
                 )
                 if response.status_code == 200:
                     result = response.json()
@@ -133,16 +135,14 @@ class AIService:
     def generate_executive_summary(cls, profile_data, api_key=None):
         profile_text = json.dumps(profile_data, default=str)
         system_prompt = (
-            """
-            Act as an expert technical resume writer. Write a concise, 3-sentence professional summary for a  resume using the provided data.
-            Synthesize the candidate's work experiences, projects, and skills.
-
-            Follow these strict rules:
-            1. Sentence 1: State candidate's title and core technical skills (e.g., Python, React).
-            2. Sentence 2: Highlight a quantifiable achievement from a project or internship.
-            3. Sentence 3: Mention candidate's experience with version control (Git) or agile teamwork, plus my eagerness to contribute to business goals.
-            4. Tone: Use strong action verbs. Eliminate generic fluff like "highly motivated" or "passionate."
-            """
+            "You are an expert executive resume writer.\n"
+            "Write a smart, 3-sentence professional summary grounded STRICTLY in concrete evidence from the provided candidate profile.\n\n"
+            "CRITICAL RULES FOR SMART SUMMARY:\n"
+            "1. NO GENERIC BUZZWORDS: Never use empty claims like 'highly motivated', 'passionate', 'results-oriented', 'hardworking', or 'proven leader'.\n"
+            "2. SENTENCE 1 (Role & Core Tech Stack): State the candidate's exact title and top 3-4 specific technical tools/frameworks (e.g. React, Node.js, PostgreSQL) demonstrated in their experience.\n"
+            "3. SENTENCE 2 (Action + Tech + Metric/Outcome): Highlight a specific technical accomplishment using an Action Verb + Tool/Methodology + Quantifiable Impact or measurable output (e.g., 'Engineered automated CI/CD pipelines reducing deployment latency by 35%').\n"
+            "4. SENTENCE 3 (Domain Engineering Focus): State candidate's core domain engineering strength (e.g., microservice architecture, frontend performance optimization, or REST API design) grounded in actual master profile projects/roles.\n"
+            "5. Concise Length: Keep under 65 words total."
         )
         user_content = f"MASTER_PROFILE:\n{profile_text}\n\nExecutive Summary:"
         res = cls.call_deepseek(system_prompt, user_content, api_key=api_key)
@@ -154,18 +154,20 @@ class AIService:
     @staticmethod
     def _mock_generate_executive_summary(profile_data):
         p_info = profile_data.get('personal_info', {})
-        title = p_info.get('title') or "Software Developer"
+        title = p_info.get('title') or "Software Engineer"
         skills = profile_data.get('skills', [])
-        skill_names = ", ".join([s.get('name') for s in skills[:4] if s.get('name')]) or "modern web technologies"
+        skill_names = ", ".join([s.get('name') for s in skills[:3] if s.get('name')]) or "TypeScript, React, Node.js"
         exps = profile_data.get('work_experiences', [])
-        exp_count = len(exps)
         projs = profile_data.get('projects', [])
-        proj_count = len(projs)
-
+        
+        top_exp = exps[0] if exps else {}
+        exp_comp = top_exp.get('company') or "production environment"
+        exp_pos = top_exp.get('position') or title
+        
         return (
-            f"Accomplished {title} with proven expertise in {skill_names}. "
-            f"Demonstrated track record across {exp_count} key industry roles and {proj_count} featured technical projects. "
-            f"Adept at building resilient, scalable systems while delivering measurable business value and collaborating across multi-disciplinary teams."
+            f"Results-driven {title} specializing in {skill_names} across scalable web platforms. "
+            f"Engineered high-performance web components and automated data workflows at {exp_comp}, delivering reliable end-to-end system features. "
+            f"Focused on clean code architecture, API integration, and continuous deployment across multi-tier software projects."
         )
 
     @staticmethod

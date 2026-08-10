@@ -67,6 +67,10 @@ export const AutoSizeTextarea: React.FC<AutoSizeTextareaProps> = ({
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+      if (singleLine) {
+        textareaRef.current.style.width = 'auto';
+        textareaRef.current.style.width = `${Math.max(30, textareaRef.current.scrollWidth + 4)}px`;
+      }
     }
   };
 
@@ -126,10 +130,12 @@ export const AutoSizeTextarea: React.FC<AutoSizeTextareaProps> = ({
     <div
       onClick={handleWrapperClick}
       style={{
-        display: singleLine ? 'inline-block' : 'block',
-        width: '100%',
+        display: singleLine ? 'inline-flex' : 'block',
+        width: singleLine ? 'auto' : '100%',
+        maxWidth: '100%',
         cursor: 'text',
-        minHeight: '1.2em'
+        minHeight: '1.2em',
+        verticalAlign: 'middle'
       }}
     >
       <textarea
@@ -146,8 +152,9 @@ export const AutoSizeTextarea: React.FC<AutoSizeTextareaProps> = ({
         style={{
           overflow: 'hidden',
           resize: 'none',
-          width: '100%',
-          display: 'block',
+          width: singleLine ? 'auto' : '100%',
+          maxWidth: '100%',
+          display: singleLine ? 'inline-block' : 'block',
           border: 'none',
           background: 'transparent',
           outline: 'none',

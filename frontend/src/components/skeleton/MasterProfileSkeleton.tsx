@@ -8,11 +8,11 @@ export const MasterProfileSkeleton: React.FC = () => {
       {/* Profile Header Banner Skeleton */}
       <div className={styles.profileBanner}>
         <Skeleton variant="avatar" width={100} height={100} />
-        
+
         <div className={styles.bannerInfo}>
           <Skeleton variant="text" width={260} height={32} />
           <Skeleton variant="text" width={180} height={20} />
-          
+
           <div style={{ display: 'flex', gap: '1rem', marginTop: '4px' }}>
             <Skeleton variant="text" width={120} height={16} />
             <Skeleton variant="text" width={140} height={16} />
@@ -82,7 +82,7 @@ export const MasterProfileSkeleton: React.FC = () => {
           <Skeleton variant="text" width={140} height={24} />
           <Skeleton variant="rect" width={100} height={36} />
         </div>
-        
+
         <div className={styles.skillsGrid}>
           {[80, 110, 95, 120, 85, 105, 90, 115, 75].map((w, idx) => (
             <Skeleton key={idx} variant="rect" width={w} height={32} style={{ borderRadius: '999px' }} />
