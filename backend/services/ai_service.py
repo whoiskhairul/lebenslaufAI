@@ -8,12 +8,17 @@ class AIService:
     def _get_api_key(api_key=None):
         if api_key:
             return api_key
+        provider = os.environ.get('ACTIVE_AI_PROVIDER', 'deepseek').lower().strip()
+        if provider == 'gemini':
+            return os.environ.get('GEMINI_API_KEY', '').strip()
         return os.environ.get('DEEPSEEK_API_KEY', '').strip()
 
     @staticmethod
     def call_deepseek(system_prompt, user_content, response_format=None, api_key=None):
+        provider = os.environ.get('ACTIVE_AI_PROVIDER', 'deepseek').lower().strip()
         key = AIService._get_api_key(api_key)
         if not key:
+            print(f"AI Service Error: API key missing for provider '{provider}'")
             return None
         
         headers = {
@@ -21,8 +26,20 @@ class AIService:
             "Authorization": f"Bearer {key}"
         }
         
+        if provider == 'gemini':
+            model = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+            base_url = os.environ.get('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai/').rstrip('/')
+            url = f"{base_url}/chat/completions"
+        else:
+            model = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
+            base_url = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com').rstrip('/')
+            if not base_url.endswith('/v1'):
+                url = f"{base_url}/v1/chat/completions"
+            else:
+                url = f"{base_url}/chat/completions"
+
         payload = {
-            "model": os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat'),
+            "model": model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}
@@ -36,9 +53,8 @@ class AIService:
         timeout_sec = int(os.environ.get('DEEPSEEK_TIMEOUT', '60'))
         
         try:
-            # DeepSeek endpoint or standard OpenAI compatible router
             response = requests.post(
-                "https://api.deepseek.com/v1/chat/completions",
+                url,
                 headers=headers,
                 json=payload,
                 timeout=timeout_sec
@@ -47,13 +63,13 @@ class AIService:
                 result = response.json()
                 return result['choices'][0]['message']['content']
             else:
-                print(f"DeepSeek API Error: {response.status_code} - {response.text}")
+                print(f"AI API Error ({provider}): {response.status_code} - {response.text}")
                 return None
         except requests.exceptions.Timeout:
-            print(f"DeepSeek API read timed out ({timeout_sec}s). Retrying once with extended timeout...")
+            print(f"AI API ({provider}) read timed out ({timeout_sec}s). Retrying once with extended timeout...")
             try:
                 response = requests.post(
-                    "https://api.deepseek.com/v1/chat/completions",
+                    url,
                     headers=headers,
                     json=payload,
                     timeout=timeout_sec + 15
@@ -62,10 +78,10 @@ class AIService:
                     result = response.json()
                     return result['choices'][0]['message']['content']
             except Exception as retry_err:
-                print(f"DeepSeek retry failed: {retry_err}")
+                print(f"AI API ({provider}) retry failed: {retry_err}")
                 return None
         except Exception as e:
-            print(f"DeepSeek HTTP request failed: {e}")
+            print(f"AI HTTP request failed ({provider}): {e}")
             return None
 
     @classmethod

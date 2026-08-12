@@ -136,7 +136,8 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
   let spacingStyle: React.CSSProperties = {};
   if (unit.sectionId) {
     const isLastItem = (() => {
-      if (sec?.type === 'summary' || sec?.type === 'custom') return true;
+      if (sec?.type === 'summary') return unit.type === 'summary';
+      if (sec?.type === 'custom') return true;
       if (sec?.type === 'experience') {
         return unit.type === 'experience-item' && unit.itemData?.id === editableExperiences[editableExperiences.length - 1]?.id;
       }
@@ -176,9 +177,8 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
     })();
 
     if (isLastItem) {
-      if (localStyles.spacing !== undefined) {
-        spacingStyle = { marginBottom: `${localStyles.spacing}px` };
-      }
+      const spacingVal = localStyles.spacing !== undefined ? localStyles.spacing : 4;
+      spacingStyle = { marginBottom: `${spacingVal}px` };
     } else {
       if (localStyles.itemGap !== undefined) {
         spacingStyle = { marginBottom: `${localStyles.itemGap}px` };
@@ -522,6 +522,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
         <div className={styles.resumeContacts} style={contactsStyleOverride}>
           {editablePersonalInfo.location && (
             <AutoSizeTextarea
+              singleLine
               value={editablePersonalInfo.location}
               onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, location: val }))}
             />
@@ -531,6 +532,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
               {editablePersonalInfo.location && <span>•</span>}
               <a href={`mailto:${editablePersonalInfo.email}`} target="_blank" rel="noopener noreferrer">
                 <AutoSizeTextarea
+                  singleLine
                   value={editablePersonalInfo.email}
                   onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, email: val }))}
                 />
@@ -542,6 +544,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
               {(editablePersonalInfo.location || editablePersonalInfo.email) && <span>•</span>}
               <a href={editablePersonalInfo.website.startsWith('http') ? editablePersonalInfo.website : `https://${editablePersonalInfo.website}`} target="_blank" rel="noopener noreferrer">
                 <AutoSizeTextarea
+                  singleLine
                   value={editablePersonalInfo.website}
                   onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, website: val }))}
                 />
@@ -553,6 +556,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
               {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website) && <span>•</span>}
               <a href={`tel:${editablePersonalInfo.phone}`} target="_blank" rel="noopener noreferrer">
                 <AutoSizeTextarea
+                  singleLine
                   value={editablePersonalInfo.phone}
                   onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, phone: val }))}
                 />
@@ -564,6 +568,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
               {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website || editablePersonalInfo.phone) && <span>•</span>}
               <a href={editablePersonalInfo.linkedin.startsWith('http') ? editablePersonalInfo.linkedin : `https://${editablePersonalInfo.linkedin}`} target="_blank" rel="noopener noreferrer">
                 <AutoSizeTextarea
+                  singleLine
                   value={editablePersonalInfo.linkedin}
                   onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, linkedin: val }))}
                 />
@@ -575,6 +580,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
               {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website || editablePersonalInfo.phone || editablePersonalInfo.linkedin) && <span>•</span>}
               <a href={editablePersonalInfo.github.startsWith('http') ? editablePersonalInfo.github : `https://${editablePersonalInfo.github}`} target="_blank" rel="noopener noreferrer">
                 <AutoSizeTextarea
+                  singleLine
                   value={editablePersonalInfo.github}
                   onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, github: val }))}
                 />
@@ -1072,81 +1078,73 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
             </div>
             <div className={isPP ? styles.ppRightCol : styles.germanRightCol}>
               {(() => {
-                const roleNode = hasRole ? (
-                  <div key="role" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'text', fontSize: '0.88em', color: '#1e293b', fontWeight: 600, maxWidth: '100%' }}>
-                    <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Role:</span>
-                    <AutoSizeTextarea
-                      singleLine
-                      style={{ fontSize: '1em', fontWeight: 600, color: '#1e293b' }}
-                      value={proj.role || ''}
-                      placeholder="Your Role / Contributions..."
-                      onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
-                    />
-                  </div>
-                ) : null;
-
-                const techNode = hasTech ? (
-                  <div key="tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'text', fontSize: '0.88em', color: '#334155', fontWeight: 600, maxWidth: '100%' }}>
-                    <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Tech:</span>
-                    <AutoSizeTextarea
-                      singleLine
-                      style={{ fontSize: '1em', fontWeight: 600, color: '#334155', fontStyle: 'italic' }}
-                      value={techString}
-                      placeholder="Technologies used (e.g. React, Node.js, Python)..."
-                      onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
-                        ...p,
-                        technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
-                      } : p))}
-                    />
-                  </div>
-                ) : null;
-
-                const linkVal = proj.link || proj.github_url || proj.demo_url || '';
-                const hasLink = Boolean(linkVal && linkVal.trim());
-                const linkNode = hasLink ? (
-                  <div key="link" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.88em', fontWeight: 600, color: '#1e293b', maxWidth: '100%' }}>
-                    <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Link:</span>
-                    <a
-                      href={linkVal.startsWith('http') ? linkVal : `https://${linkVal}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: '#1e293b', textDecoration: 'underline', textDecorationColor: 'rgba(30, 41, 59, 0.4)', fontWeight: 600, fontSize: '1em', maxWidth: '100%', overflow: 'hidden' }}
-                    >
+                const activeNodes = [];
+                if (hasRole) {
+                  activeNodes.push(
+                    <div key="role" style={{ display: 'inline-flex', alignItems: 'center', cursor: 'text', fontSize: '0.88em', color: '#1e293b', fontWeight: 500 }}>
                       <AutoSizeTextarea
                         singleLine
-                        style={{ fontSize: '1em', fontWeight: 600, color: '#1e293b' }}
-                        value={linkVal}
-                        placeholder="GitHub / Live Demo Link..."
-                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, link: val } : p))}
+                        style={{ fontSize: '1em', fontWeight: 500, color: '#1e293b' }}
+                        value={proj.role || ''}
+                        placeholder="Your Role / Contributions..."
+                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
                       />
-                    </a>
-                  </div>
-                ) : null;
-
-                const activeNodes = [];
-                if (hasRole) activeNodes.push({ type: 'role', node: roleNode });
-                if (hasTech) activeNodes.push({ type: 'tech', node: techNode });
-                if (hasLink) activeNodes.push({ type: 'link', node: linkNode });
-
-                if (activeNodes.length === 0) return null;
-
-                if (activeNodes.length === 3) {
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%', marginBottom: '4px' }}>
-                      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', maxWidth: '100%' }}>
-                        {roleNode}
-                        {techNode}
-                      </div>
-                      <div style={{ maxWidth: '100%' }}>
-                        {linkNode}
-                      </div>
+                    </div>
+                  );
+                }
+                if (hasTech) {
+                  activeNodes.push(
+                    <div key="tech" style={{ display: 'inline-flex', alignItems: 'center', cursor: 'text', fontSize: '0.88em', color: '#334155', fontWeight: 400 }}>
+                      <AutoSizeTextarea
+                        singleLine
+                        style={{ fontSize: '1em', fontWeight: 400, color: '#334155', fontStyle: 'italic' }}
+                        value={techString}
+                        placeholder="Technologies used..."
+                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
+                          ...p,
+                          technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
+                        } : p))}
+                      />
                     </div>
                   );
                 }
 
+                const linkVal = proj.link || proj.github_url || proj.demo_url || '';
+                const hasLink = Boolean(linkVal && linkVal.trim());
+                if (hasLink) {
+                  activeNodes.push(
+                    <div key="link" style={{ display: 'inline-flex', alignItems: 'center', fontSize: '0.88em', fontWeight: 500, color: '#1e293b' }}>
+                      <a
+                        href={linkVal.startsWith('http') ? linkVal : `https://${linkVal}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: '#1e293b', textDecoration: 'underline', textDecorationColor: 'rgba(30, 41, 59, 0.4)', fontWeight: 500, fontSize: '1em', overflow: 'hidden' }}
+                      >
+                        <AutoSizeTextarea
+                          singleLine
+                          style={{ fontSize: '1em', fontWeight: 500, color: '#1e293b' }}
+                          value={linkVal}
+                          placeholder="GitHub / Live Demo Link..."
+                          onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, link: val } : p))}
+                        />
+                      </a>
+                    </div>
+                  );
+                }
+
+                if (activeNodes.length === 0) return null;
+
                 return (
-                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', width: '100%', maxWidth: '100%', marginBottom: '4px' }}>
-                    {activeNodes.map(n => n.node)}
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', width: '100%', maxWidth: '100%', marginBottom: '4px' }}>
+                    {activeNodes.reduce((acc: React.ReactNode[], node, idx) => {
+                      if (idx > 0) {
+                        acc.push(
+                          <span key={`sep-${idx}`} style={{ color: '#94a3b8', fontSize: '0.85em', userSelect: 'none' }}>|</span>
+                        );
+                      }
+                      acc.push(node);
+                      return acc;
+                    }, [])}
                   </div>
                 );
               })()}
@@ -1218,81 +1216,73 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
               </div>
             )}
             {(() => {
-              const roleNode = hasRole ? (
-                <div key="role" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'text', fontSize: '0.88em', color: '#1e293b', fontWeight: 600, maxWidth: '100%' }}>
-                  <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Role:</span>
-                  <AutoSizeTextarea
-                    singleLine
-                    style={{ fontSize: '1em', fontWeight: 600, color: '#1e293b' }}
-                    value={proj.role || ''}
-                    placeholder="Your Role / Contributions..."
-                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
-                  />
-                </div>
-              ) : null;
-
-              const techNode = hasTech ? (
-                <div key="tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'text', fontSize: '0.88em', color: '#334155', fontWeight: 600, maxWidth: '100%' }}>
-                  <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Tech:</span>
-                  <AutoSizeTextarea
-                    singleLine
-                    style={{ fontSize: '1em', fontWeight: 600, color: '#334155', fontStyle: 'italic' }}
-                    value={techString}
-                    placeholder="Technologies used (e.g. React, Node.js, Python)..."
-                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
-                      ...p,
-                      technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
-                    } : p))}
-                  />
-                </div>
-              ) : null;
-
-              const linkVal = proj.link || proj.github_url || proj.demo_url || '';
-              const hasLink = Boolean(linkVal && linkVal.trim());
-              const linkNode = hasLink ? (
-                <div key="link" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.88em', fontWeight: 600, color: '#1e293b', maxWidth: '100%' }}>
-                  <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Link:</span>
-                  <a
-                    href={linkVal.startsWith('http') ? linkVal : `https://${linkVal}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: '#1e293b', textDecoration: 'underline', textDecorationColor: 'rgba(30, 41, 59, 0.4)', fontWeight: 600, fontSize: '1em', maxWidth: '100%', overflow: 'hidden' }}
-                  >
+              const activeNodes = [];
+              if (hasRole) {
+                activeNodes.push(
+                  <div key="role" style={{ display: 'inline-flex', alignItems: 'center', cursor: 'text', fontSize: '0.88em', color: '#1e293b', fontWeight: 500 }}>
                     <AutoSizeTextarea
                       singleLine
-                      style={{ fontSize: '1em', fontWeight: 600, color: '#1e293b' }}
-                      value={linkVal}
-                      placeholder="GitHub / Live Demo Link..."
-                      onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, link: val } : p))}
+                      style={{ fontSize: '1em', fontWeight: 500, color: '#1e293b' }}
+                      value={proj.role || ''}
+                      placeholder="Your Role / Contributions..."
+                      onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
                     />
-                  </a>
-                </div>
-              ) : null;
-
-              const activeNodes = [];
-              if (hasRole) activeNodes.push({ type: 'role', node: roleNode });
-              if (hasTech) activeNodes.push({ type: 'tech', node: techNode });
-              if (hasLink) activeNodes.push({ type: 'link', node: linkNode });
-
-              if (activeNodes.length === 0) return null;
-
-              if (activeNodes.length === 3) {
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%', marginBottom: '4px' }}>
-                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      {roleNode}
-                      {techNode}
-                    </div>
-                    <div>
-                      {linkNode}
-                    </div>
+                  </div>
+                );
+              }
+              if (hasTech) {
+                activeNodes.push(
+                  <div key="tech" style={{ display: 'inline-flex', alignItems: 'center', cursor: 'text', fontSize: '0.88em', color: '#334155', fontWeight: 400 }}>
+                    <AutoSizeTextarea
+                      singleLine
+                      style={{ fontSize: '1em', fontWeight: 400, color: '#334155', fontStyle: 'italic' }}
+                      value={techString}
+                      placeholder="Technologies used..."
+                      onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
+                        ...p,
+                        technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
+                      } : p))}
+                    />
                   </div>
                 );
               }
 
+              const linkVal = proj.link || proj.github_url || proj.demo_url || '';
+              const hasLink = Boolean(linkVal && linkVal.trim());
+              if (hasLink) {
+                activeNodes.push(
+                  <div key="link" style={{ display: 'inline-flex', alignItems: 'center', fontSize: '0.88em', fontWeight: 500, color: '#1e293b' }}>
+                    <a
+                      href={linkVal.startsWith('http') ? linkVal : `https://${linkVal}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#1e293b', textDecoration: 'underline', textDecorationColor: 'rgba(30, 41, 59, 0.4)', fontWeight: 500, fontSize: '1em', overflow: 'hidden' }}
+                    >
+                      <AutoSizeTextarea
+                        singleLine
+                        style={{ fontSize: '1em', fontWeight: 500, color: '#1e293b' }}
+                        value={linkVal}
+                        placeholder="GitHub / Live Demo Link..."
+                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, link: val } : p))}
+                      />
+                    </a>
+                  </div>
+                );
+              }
+
+              if (activeNodes.length === 0) return null;
+
               return (
-                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', width: '100%', marginBottom: '4px' }}>
-                  {activeNodes.map(n => n.node)}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', width: '100%', marginBottom: '4px' }}>
+                  {activeNodes.reduce((acc: React.ReactNode[], node, idx) => {
+                    if (idx > 0) {
+                      acc.push(
+                        <span key={`sep-${idx}`} style={{ color: '#94a3b8', fontSize: '0.85em', userSelect: 'none' }}>|</span>
+                      );
+                    }
+                    acc.push(node);
+                    return acc;
+                  }, [])}
                 </div>
               );
             })()}
