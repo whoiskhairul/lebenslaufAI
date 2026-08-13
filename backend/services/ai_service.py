@@ -123,10 +123,15 @@ class AIService:
         system_prompt = (
             "You are an objective ATS (Applicant Tracking System) Scoring Algorithm.\n"
             "Compare the Candidate's Active CV Details (including summary, work experience, projects, and skills) against the target Job Description.\n"
-            "CRITICAL:\n"
-            "- 'matched_keywords' MUST contain all job requirement keywords that ARE explicitly present in the candidate's active skills or experience text.\n"
-            "- 'missing_keywords' MUST contain ONLY job requirement keywords that are NOT currently present in the candidate's active skills or experience text.\n"
-            "- Calculate 'score' strictly based on the ratio of matched_keywords versus total required job keywords (0-100 scale).\n"
+            "CRITICAL REQUIREMENT - SEMANTIC MATCHING:\n"
+            "- Perform semantic synonym matching (e.g. count 'React.js', 'ReactJS', and 'React' as matching; count 'Amazon Web Services' and 'AWS' as matching).\n"
+            "- 'matched_keywords' MUST contain all job requirements that are semantically present in the candidate's active profile.\n"
+            "- 'missing_keywords' MUST contain only job requirement keywords that are NOT semantically present in the profile.\n\n"
+            "SCORING METRICS (Strict 50/30/20 Weights):\n"
+            "Calculate the final 'score' (0-100 scale) as a weighted combination of:\n"
+            "1. Keyword Match (50%): Ratio of semantically matched keywords to total required job description keywords.\n"
+            "2. Experience Depth (30%): Evaluation of whether the critical matched skills are actively demonstrated in the work experience descriptions/bullets rather than just listed in a static skills block.\n"
+            "3. Structural & Formatting Quality (20%): Presence of contact details, professional summary, structured work experiences (with bullets), projects, and general compliance with resume length/layout guidelines.\n\n"
             "Return ONLY a JSON object matching this schema:\n"
             "{\n"
             "  \"score\": 0-100,\n"
@@ -255,6 +260,15 @@ class AIService:
             f"{aggressive_instruction}"
             "Tailor the user's resume summary, experience bullets, and project bullets to match the job description.\n"
             "Simultaneously audit the tailored resume against the job description and calculate an accurate ATS match report.\n"
+            "CRITICAL REQUIREMENT - SEMANTIC MATCHING:\n"
+            "- Perform semantic synonym matching when checking keywords (e.g. 'React.js' and 'React' are considered matching).\n"
+            "- 'matched_keywords' MUST contain all job requirements that are semantically present in the candidate's active profile.\n"
+            "- 'missing_keywords' MUST contain only job requirement keywords that are NOT semantically present in the profile.\n\n"
+            "SCORING METRICS (Strict 50/30/20 Weights):\n"
+            "Calculate the final ats_report 'score' (0-100 scale) as a weighted combination of:\n"
+            "1. Keyword Match (50%): Ratio of semantically matched keywords to total required job description keywords.\n"
+            "2. Experience Depth (30%): Evaluation of whether the critical matched skills are actively demonstrated in the work experience descriptions/bullets rather than just listed in a static skills block.\n"
+            "3. Structural & Formatting Quality (20%): Presence of contact details, professional summary, structured work experiences (with bullets), projects, and general compliance with resume length/layout guidelines.\n\n"
             "CRITICAL: Do NOT invent/fabricate skills, jobs, dates, or degrees.\n"
             "Return ONLY a JSON object matching this schema:\n"
             "{\n"
@@ -492,27 +506,82 @@ class AIService:
                     elif isinstance(s, str):
                         profile_skills.append(s.lower())
             profile_str = json.dumps(profile, default=str).lower()
+            personal = profile.get('personal_info', {}) or {}
+            experiences = profile.get('work_experiences', []) or []
+            projects = profile.get('projects', []) or []
+            educations = profile.get('educations', []) or []
+            summary = profile.get('summary', '') or personal.get('summary', '') or ''
         elif isinstance(profile, str):
             profile_str = profile.lower()
             profile_skills = []
+            personal = {}
+            experiences = []
+            projects = []
+            educations = []
+            summary = ""
         else:
             profile_str = ""
             profile_skills = []
+            personal = {}
+            experiences = []
+            projects = []
+            educations = []
+            summary = ""
 
+        # 1. Structural Score (Max 20 points)
+        struct_score = 0
+        
+        # Check contact details (max 5 pts)
+        contact_pts = 0
+        if personal.get('email'): contact_pts += 2
+        if personal.get('phone'): contact_pts += 2
+        if personal.get('location'): contact_pts += 1
+        struct_score += contact_pts
+        
+        # Check professional summary (max 5 pts)
+        if summary.strip():
+            struct_score += 5
+            
+        # Check work experiences & bullets structure (max 5 pts)
+        if experiences:
+            struct_score += 2
+            has_bullets = any(exp.get('bullets') for exp in experiences if isinstance(exp, dict))
+            if has_bullets:
+                struct_score += 3
+                
+        # Check projects/educations presence (max 5 pts)
+        proj_edu_pts = 0
+        if projects: proj_edu_pts += 3
+        if educations: proj_edu_pts += 2
+        struct_score += proj_edu_pts
+
+        # 2. Keyword Match Score (Max 50 points) and Experience Depth Score (Max 30 points)
         matched = []
         missing = []
+        exp_matched_count = 0
+        
+        exp_text = " ".join([json.dumps(exp, default=str) for exp in experiences]).lower()
 
         for keyword in job_keywords:
             kw_lower = keyword.lower()
-            if kw_lower in profile_skills or any(kw_lower in s for s in profile_skills) or kw_lower in profile_str:
+            is_matched = (kw_lower in profile_skills or 
+                          any(kw_lower in s for s in profile_skills) or 
+                          kw_lower in profile_str)
+            if is_matched:
                 matched.append(keyword)
+                if kw_lower in exp_text:
+                    exp_matched_count += 1
             else:
                 missing.append(keyword)
 
         if not job_keywords:
-            score = 75
+            keyword_score = 40
+            depth_score = 20
         else:
-            score = int((len(matched) / len(job_keywords)) * 60) + 30
+            keyword_score = (len(matched) / len(job_keywords)) * 50
+            depth_score = (exp_matched_count / len(job_keywords)) * 30
+
+        final_score = int(struct_score + keyword_score + depth_score)
 
         suggestions = []
         for miss in missing:
@@ -521,7 +590,7 @@ class AIService:
             suggestions.append("Outstanding match! Maintain core formatting and emphasize specific metric highlights.")
 
         return {
-            "score": min(score, 100),
+            "score": min(final_score, 100),
             "matched_keywords": matched,
             "missing_keywords": missing,
             "suggestions": suggestions

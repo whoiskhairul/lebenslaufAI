@@ -244,12 +244,37 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
 }) => {
   const [keywordFilter, setKeywordFilter] = useState<'all' | 'matched' | 'missing'>('all');
   const [modalSkill, setModalSkill] = useState<string | null>(null);
+  const [displayScore, setDisplayScore] = useState(0);
 
   if (!report) {
     return <ATSDashboardSkeleton />;
   }
 
   const score = report.score;
+
+  // Score count-up micro-animation
+  useEffect(() => {
+    let start = 0;
+    const end = score;
+    if (start === end) {
+      setDisplayScore(end);
+      return;
+    }
+    
+    const duration = 750; // ms
+    const increment = end > start ? 1 : -1;
+    const stepTime = Math.abs(Math.floor(duration / (end - start)));
+    
+    const timer = setInterval(() => {
+      start += increment;
+      setDisplayScore(start);
+      if (start === end) {
+        clearInterval(timer);
+      }
+    }, Math.max(stepTime, 6));
+
+    return () => clearInterval(timer);
+  }, [score]);
 
   const defaultCategories = ['technical', 'frameworks', 'tools', 'databases', 'cloud', 'soft_skills', 'languages'];
   const userCats = (existingCategories || []).map(c => c.toLowerCase().trim()).filter(Boolean);
@@ -328,7 +353,7 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
                 </svg>
                 <div className={styles.scoreText}>
                   <span className={styles.scoreValue} style={{ color: scoreTheme.color }}>
-                    {score}
+                    {displayScore}
                   </span>
                   <span className={styles.scoreLabel}>Score</span>
                 </div>
@@ -344,9 +369,9 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
             <div className={styles.breakdownCard}>
               <div className={styles.sectionTitle}>Score Breakdown</div>
               {[
-                { name: 'Keyword Coverage', val: report?.breakdown?.keywords ?? 0, weight: '45%' },
-                { name: 'Section Structure', val: report?.breakdown?.structure ?? 0, weight: '25%' },
-                { name: 'Bullet Quality & Metrics', val: report?.breakdown?.bullets ?? 0, weight: '30%' }
+                { name: 'Keyword Match', val: report?.breakdown?.keywords ?? 0, weight: '50%' },
+                { name: 'Experience Depth', val: report?.breakdown?.bullets ?? 0, weight: '30%' },
+                { name: 'Structure & Formatting', val: report?.breakdown?.structure ?? 0, weight: '20%' }
               ].map((item, idx) => (
                 <div key={idx} className={styles.barRow}>
                   <div className={styles.barMeta}>

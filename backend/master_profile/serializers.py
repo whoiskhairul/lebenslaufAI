@@ -21,6 +21,16 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ('id', 'user')
 
+    def to_internal_value(self, data):
+        # Clean URL link field if present in data
+        if 'link' in data and data['link']:
+            link_val = str(data['link']).strip()
+            if link_val and not link_val.lower().startswith(('http://', 'https://')):
+                if hasattr(data, '_mutable'):
+                    data = data.copy()
+                data['link'] = 'https://' + link_val
+        return super().to_internal_value(data)
+
 class SkillSerializer(serializers.ModelSerializer):
     class Meta:
         model = Skill

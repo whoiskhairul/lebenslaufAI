@@ -23,6 +23,7 @@ const templateClassMap: { [key: string]: string } = {
 
 import { ResumeVersion, EditorProps, RenderableUnit } from './editor/types/editor.types';
 import { parseDate, formatDate } from './editor/utils/dateUtils';
+import { formatPhoneNumber } from './editor/utils/phoneUtils';
 import { renderFormattedTitle } from './editor/utils/titleUtils';
 import { renderFormattedLanguageList } from './editor/utils/languageUtils';
 import { AutoSizeTextarea, MeasuringContext } from './editor/components/AutoSizeTextarea';
@@ -696,7 +697,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
                 full_name: profileObj.personal_info.full_name || '',
                 title: profileObj.personal_info.title || '',
                 email: profileObj.personal_info.email || '',
-                phone: profileObj.personal_info.phone || '',
+                phone: formatPhoneNumber(profileObj.personal_info.phone || ''),
                 location: profileObj.personal_info.location || '',
                 date_of_birth: profileObj.personal_info.date_of_birth || '',
                 nationality: profileObj.personal_info.nationality || '',
@@ -803,7 +804,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           full_name: profile.personal_info.full_name || '',
           title: profile.personal_info.title || '',
           email: profile.personal_info.email || '',
-          phone: profile.personal_info.phone || '',
+          phone: formatPhoneNumber(profile.personal_info.phone || ''),
           location: profile.personal_info.location || '',
           date_of_birth: profile.personal_info.date_of_birth || '',
           nationality: profile.personal_info.nationality || '',
@@ -854,7 +855,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           title: p.title || '',
           role: p.role || '',
           technologies: p.technologies || p.tech_stack || tailoredP?.technologies || [],
-          date: p.date || ''
+          date: p.date || '',
+          link: p.link || tailoredP?.link || ''
         };
       });
       setEditableProjects(mappedProjects);
@@ -872,6 +874,9 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         });
       }
       if (customData.headerStyles) setHeaderStyles(customData.headerStyles);
+      if (customData.categoryOrder) setCategoryOrder(customData.categoryOrder);
+      if (typeof customData.languagesFirst === 'boolean') setLanguagesFirst(customData.languagesFirst);
+      if (customData.languagesTitle) setLanguagesTitle(customData.languagesTitle);
     } else {
       setHeaderStyles({});
       const detailsAny = ver.tailored_details as any;
@@ -1276,6 +1281,39 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     });
   };
 
+  const handleMoveSkillCategory = (catName: string, direction: 'up' | 'down') => {
+    const itSkills = editableSkills.filter(sk => (sk.category || '').toLowerCase().trim() !== 'languages');
+    const uniqueCats = Array.from(new Set(itSkills.map(sk => (sk.category || 'technical').toLowerCase().trim())));
+
+    const normalizedOrder = categoryOrder.map(c => c.toLowerCase().trim());
+    const currentItCats = normalizedOrder.filter(c => uniqueCats.includes(c));
+    const extraCats = uniqueCats.filter(c => !currentItCats.includes(c));
+    let currentList = [...currentItCats, ...extraCats];
+
+    if (categoryOrder.length === 0) {
+      const defaultOrder = ['programming languages', 'frameworks & libraries', 'databases', 'cloud & devops', 'development tools', 'testing'];
+      currentList.sort((a, b) => {
+        const idxA = defaultOrder.indexOf(a);
+        const idxB = defaultOrder.indexOf(b);
+        return (idxA !== -1 ? idxA : 100) - (idxB !== -1 ? idxB : 100);
+      });
+    }
+
+    const targetCat = catName.toLowerCase().trim();
+    const idx = currentList.indexOf(targetCat);
+    if (idx === -1) return;
+
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= currentList.length) return;
+
+    const updatedList = [...currentList];
+    const temp = updatedList[idx];
+    updatedList[idx] = updatedList[newIdx];
+    updatedList[newIdx] = temp;
+
+    setCategoryOrder(updatedList);
+  };
+
   const handleAddExperienceBullet = (expIdx: number, bulletIdx: number = -1) => {
     setEditableExperiences(prev => prev.map((exp, i) => {
       if (i === expIdx) {
@@ -1522,28 +1560,32 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
           const langSkills = editableSkills.filter(s => (s.category || '').toLowerCase().trim() === 'languages');
           const itSkills = editableSkills.filter(s => (s.category || '').toLowerCase().trim() !== 'languages');
-          const uniqueCats = Array.from(new Set(itSkills.map(s => s.category || 'technical')));
-          const itCategories = categoryOrder.filter(c => uniqueCats.includes(c));
+          const uniqueCats = Array.from(new Set(itSkills.map(s => (s.category || 'technical').toLowerCase().trim())));
+
+          const normalizedOrder = categoryOrder.map(c => c.toLowerCase().trim());
+          const itCategories = normalizedOrder.filter(c => uniqueCats.includes(c));
           const extraCats = uniqueCats.filter(c => !itCategories.includes(c));
           const finalCategories = [...itCategories, ...extraCats];
 
-          finalCategories.sort((a, b) => {
-            const getCategoryOrderScore = (cat: string) => {
-              const order = [
-                'programming languages',
-                'frameworks & libraries',
-                'databases',
-                'cloud & devops',
-                'development tools',
-                'testing'
-              ];
-              const idx = order.indexOf(cat.toLowerCase().trim());
-              if (idx !== -1) return idx;
-              if (cat.toLowerCase().trim() === 'languages') return 999;
-              return 100;
-            };
-            return getCategoryOrderScore(a) - getCategoryOrderScore(b);
-          });
+          if (categoryOrder.length === 0) {
+            finalCategories.sort((a, b) => {
+              const getCategoryOrderScore = (cat: string) => {
+                const order = [
+                  'programming languages',
+                  'frameworks & libraries',
+                  'databases',
+                  'cloud & devops',
+                  'development tools',
+                  'testing'
+                ];
+                const idx = order.indexOf(cat.toLowerCase().trim());
+                if (idx !== -1) return idx;
+                if (cat.toLowerCase().trim() === 'languages') return 999;
+                return 100;
+              };
+              return getCategoryOrderScore(a) - getCategoryOrderScore(b);
+            });
+          }
 
           const addLanguagesUnit = () => {
             if (langSkills.length > 0) {
@@ -1553,7 +1595,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
           const addITSkillsUnits = () => {
             finalCategories.forEach((cat) => {
-              const catSkills = itSkills.filter(s => (s.category || 'technical') === cat);
+              const catSkills = itSkills.filter(s => (s.category || 'technical').toLowerCase().trim() === cat);
               if (catSkills.length > 0) {
                 unitsList.push({
                   type: 'skills-category',
@@ -1951,7 +1993,10 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           customization: {
             sections,
             customStyles,
-            headerStyles
+            headerStyles,
+            categoryOrder,
+            languagesFirst,
+            languagesTitle
           }
         };
         if (currentVersion.id.startsWith('unsaved_')) {
@@ -2084,28 +2129,32 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
     const items: React.ReactNode[] = [];
     const langSkills = editableSkills.filter(sk => (sk.category || '').toLowerCase().trim() === 'languages');
     const itSkills = editableSkills.filter(sk => (sk.category || '').toLowerCase().trim() !== 'languages');
-    const uniqueCats = Array.from(new Set(itSkills.map(sk => sk.category || 'technical')));
-    const itCategories = categoryOrder.filter(c => uniqueCats.includes(c));
+    const uniqueCats = Array.from(new Set(itSkills.map(sk => (sk.category || 'technical').toLowerCase().trim())));
+
+    const normalizedOrder = categoryOrder.map(c => c.toLowerCase().trim());
+    const itCategories = normalizedOrder.filter(c => uniqueCats.includes(c));
     const extraCats = uniqueCats.filter(c => !itCategories.includes(c));
     const finalCategories = [...itCategories, ...extraCats];
 
-    finalCategories.sort((a, b) => {
-      const getCategoryOrderScore = (cat: string) => {
-        const order = [
-          'programming languages',
-          'frameworks & libraries',
-          'databases',
-          'cloud & devops',
-          'development tools',
-          'testing'
-        ];
-        const idx = order.indexOf(cat.toLowerCase().trim());
-        if (idx !== -1) return idx;
-        if (cat.toLowerCase().trim() === 'languages') return 999;
-        return 100;
-      };
-      return getCategoryOrderScore(a) - getCategoryOrderScore(b);
-    });
+    if (categoryOrder.length === 0) {
+      finalCategories.sort((a, b) => {
+        const getCategoryOrderScore = (cat: string) => {
+          const order = [
+            'programming languages',
+            'frameworks & libraries',
+            'databases',
+            'cloud & devops',
+            'development tools',
+            'testing'
+          ];
+          const idx = order.indexOf(cat.toLowerCase().trim());
+          if (idx !== -1) return idx;
+          if (cat.toLowerCase().trim() === 'languages') return 999;
+          return 100;
+        };
+        return getCategoryOrderScore(a) - getCategoryOrderScore(b);
+      });
+    }
 
     const pushLang = () => {
       if (langSkills.length > 0) {
@@ -2119,7 +2168,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
     const pushIT = () => {
       finalCategories.forEach(cat => {
-        const catSkills = itSkills.filter(sk => (sk.category || 'technical') === cat);
+        const catSkills = itSkills.filter(sk => (sk.category || 'technical').toLowerCase().trim() === cat);
         if (catSkills.length > 0) {
           items.push(
             <div key={`skills-category-${cat}`} data-measuring-id={`skills-category-${cat}`} style={{ width: '100%' }}>
@@ -2232,6 +2281,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
         setLanguagesTitle={setLanguagesTitle}
         targetLanguage={targetLanguage}
         categoryOrder={categoryOrder}
+        handleMoveSkillCategory={handleMoveSkillCategory}
         getLocalizedCategoryName={getLocalizedCategoryName}
         getAlertsFor={getAlertsFor}
       />
@@ -2982,6 +3032,80 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                             </div>
                           )}
 
+                          {secItem.type === 'experience' && (
+                            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <h5 style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--foreground, #0f172a)' }}>
+                                    Work Experience Manager
+                                  </h5>
+                                  <span style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)' }}>
+                                    Manage position, company name, location, and dates
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddExperience()}
+                                  style={{
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    color: '#ffffff',
+                                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                    border: 'none',
+                                    padding: '5px 10px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 4px rgba(99, 102, 241, 0.25)',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                >
+                                  + New Experience
+                                </button>
+                              </div>
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+                                {editableExperiences.map((exp, eIdx) => (
+                                  <div key={exp.id || `exp_${eIdx}`} className={styles.projectCard}>
+                                    <div className={styles.projectInputGroup} style={{ width: '100%' }}>
+                                      <label className={styles.projectInputLabel}>🏢 Company Name & Location</label>
+                                      <input
+                                        type="text"
+                                        className={styles.projectInput}
+                                        style={{ width: '100%' }}
+                                        placeholder="e.g. Acme Corporation, Munich"
+                                        value={`${exp.company || ''}${exp.location ? `, ${exp.location}` : ''}`}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          const commaIndex = val.indexOf(',');
+                                          let newComp = val;
+                                          let newLoc = '';
+                                          if (commaIndex !== -1) {
+                                            newComp = val.substring(0, commaIndex).trim();
+                                            newLoc = val.substring(commaIndex + 1).trim();
+                                          } else {
+                                            newComp = val;
+                                          }
+                                          setEditableExperiences(prev => prev.map((item, i) => i === eIdx ? { ...item, company: newComp, location: newLoc } : item));
+                                        }}
+                                      />
+                                    </div>
+                                    <div className={styles.projectInputGroup} style={{ width: '100%', marginTop: '6px' }}>
+                                      <label className={styles.projectInputLabel}>💼 Position / Job Title</label>
+                                      <input
+                                        type="text"
+                                        className={styles.projectInput}
+                                        style={{ width: '100%' }}
+                                        placeholder="e.g. Senior Software Engineer"
+                                        value={exp.position || ''}
+                                        onChange={(e) => setEditableExperiences(prev => prev.map((item, i) => i === eIdx ? { ...item, position: e.target.value } : item))}
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
                           {secItem.type === 'projects' && (
                             <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -3170,50 +3294,93 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                               <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                 IT Skills Categories
                               </div>
-                              {Array.from(new Set(editableSkills.filter(s => (s.category || '').toLowerCase().trim() !== 'languages').map(s => (s.category || 'technical').toLowerCase().trim()))).map((catName, catIdx) => {
-                                const categorySkills = editableSkills.filter(s => (s.category || 'technical').toLowerCase().trim() === catName);
-                                const originalCategory = categorySkills[0]?.category || catName;
-                                const displayHeader = getLocalizedCategoryName(originalCategory);
-                                const isExpanded = !!expandedSkillCats[catName];
+                              {(() => {
+                                const itSkills = editableSkills.filter(s => (s.category || '').toLowerCase().trim() !== 'languages');
+                                const uniqueCats = Array.from(new Set(itSkills.map(s => (s.category || 'technical').toLowerCase().trim())));
+                                const normalizedOrder = categoryOrder.map(c => c.toLowerCase().trim());
+                                const orderedCats = normalizedOrder.filter(c => uniqueCats.includes(c));
+                                const remainingCats = uniqueCats.filter(c => !orderedCats.includes(c));
+                                const finalSideCats = [...orderedCats, ...remainingCats];
 
-                                return (
-                                  <div
-                                    key={`skill_cat_panel_${catIdx}`}
-                                    style={{
-                                      background: 'var(--card-bg, rgba(255, 255, 255, 0.8))',
-                                      border: '1px solid var(--card-border, rgba(226, 232, 240, 0.8))',
-                                      borderRadius: 'var(--radius-md, 10px)',
-                                      overflow: 'hidden',
-                                      backdropFilter: 'blur(8px)',
-                                      boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
-                                      transition: 'all 0.2s ease'
-                                    }}
-                                  >
-                                    {/* Accordion Header Bar */}
+                                if (categoryOrder.length === 0) {
+                                  const defaultOrder = ['programming languages', 'frameworks & libraries', 'databases', 'cloud & devops', 'development tools', 'testing'];
+                                  finalSideCats.sort((a, b) => {
+                                    const idxA = defaultOrder.indexOf(a);
+                                    const idxB = defaultOrder.indexOf(b);
+                                    return (idxA !== -1 ? idxA : 100) - (idxB !== -1 ? idxB : 100);
+                                  });
+                                }
+
+                                return finalSideCats.map((catName, catIdx) => {
+                                  const categorySkills = editableSkills.filter(s => (s.category || 'technical').toLowerCase().trim() === catName);
+                                  const originalCategory = categorySkills[0]?.category || catName;
+                                  const displayHeader = getLocalizedCategoryName(originalCategory);
+                                  const isExpanded = !!expandedSkillCats[catName];
+
+                                  return (
                                     <div
-                                      onClick={() => setExpandedSkillCats(prev => ({ ...prev, [catName]: !prev[catName] }))}
+                                      key={`skill_cat_panel_${catIdx}`}
                                       style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        padding: '10px 12px',
-                                        cursor: 'pointer',
-                                        background: isExpanded ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
-                                        userSelect: 'none',
-                                        borderBottom: isExpanded ? '1px solid var(--card-border, #e2e8f0)' : 'none'
+                                        background: 'var(--card-bg, rgba(255, 255, 255, 0.8))',
+                                        border: '1px solid var(--card-border, rgba(226, 232, 240, 0.8))',
+                                        borderRadius: 'var(--radius-md, 10px)',
+                                        overflow: 'hidden',
+                                        backdropFilter: 'blur(8px)',
+                                        boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
+                                        transition: 'all 0.2s ease'
                                       }}
                                     >
-                                      <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--foreground, #0f172a)' }}>
-                                        {displayHeader} <span style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)', fontWeight: 500 }}>({categorySkills.length})</span>
-                                      </span>
-                                      <span style={{ fontSize: '11px', color: 'var(--primary, #6366f1)', fontWeight: 600 }}>
-                                        {isExpanded ? 'Collapse ▲' : 'Expand ▼'}
-                                      </span>
-                                    </div>
+                                      {/* Accordion Header Bar */}
+                                      <div
+                                        onClick={() => setExpandedSkillCats(prev => ({ ...prev, [catName]: !prev[catName] }))}
+                                        style={{
+                                          display: 'flex',
+                                          justifyContent: 'space-between',
+                                          alignItems: 'center',
+                                          padding: '10px 12px',
+                                          cursor: 'pointer',
+                                          background: isExpanded ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+                                          userSelect: 'none',
+                                          borderBottom: isExpanded ? '1px solid var(--card-border, #e2e8f0)' : 'none'
+                                        }}
+                                      >
+                                        <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--foreground, #0f172a)' }}>
+                                          {displayHeader} <span style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)', fontWeight: 500 }}>({categorySkills.length})</span>
+                                        </span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                          <button
+                                            type="button"
+                                            disabled={catIdx === 0}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleMoveSkillCategory(catName, 'up');
+                                            }}
+                                            style={{ opacity: catIdx === 0 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--foreground, #0f172a)', cursor: 'pointer', padding: '2px' }}
+                                            title="Move Category Up"
+                                          >
+                                            <ArrowUp size={13} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={catIdx === finalSideCats.length - 1}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleMoveSkillCategory(catName, 'down');
+                                            }}
+                                            style={{ opacity: catIdx === finalSideCats.length - 1 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--foreground, #0f172a)', cursor: 'pointer', padding: '2px' }}
+                                            title="Move Category Down"
+                                          >
+                                            <ArrowDown size={13} />
+                                          </button>
+                                          <span style={{ fontSize: '11px', color: 'var(--primary, #6366f1)', fontWeight: 600, marginLeft: '4px' }}>
+                                            {isExpanded ? 'Collapse ▲' : 'Expand ▼'}
+                                          </span>
+                                        </div>
+                                      </div>
 
-                                    {/* Collapsible Content Body */}
-                                    {isExpanded && (
-                                      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                      {/* Collapsible Content Body */}
+                                      {isExpanded && (
+                                        <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                         {/* Category Title Rename */}
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                                           <label style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)', whiteSpace: 'nowrap', fontWeight: 600 }}>Title:</label>
@@ -3333,7 +3500,8 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                     )}
                                   </div>
                                 );
-                              })}
+                              });
+                            })()}
 
                               <Button
                                 type="button"

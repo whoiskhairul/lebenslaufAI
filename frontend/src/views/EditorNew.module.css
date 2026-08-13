@@ -1494,15 +1494,20 @@
 }
 
 .bulletDot {
-  width: 3px;
-  height: 3px;
-  background-color: currentColor;
-  opacity: 0.55;
-  border-radius: 50%;
-  margin-top: calc((var(--line-height-mult, 1.4) * 1em / 2) - 1.5px);
+  display: inline-block;
   margin-right: 8px;
   flex-shrink: 0;
-  display: inline-block;
+  color: currentColor;
+  opacity: 0.9;
+  font-size: 1.05em;
+  line-height: 1;
+  user-select: none;
+  background: transparent !important;
+  width: auto !important;
+  height: auto !important;
+  border-radius: 0 !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
 }
 
 .bulletItem:hover .bulletControls,
@@ -1825,12 +1830,16 @@
 .bulletDot {
   display: inline-block;
   flex-shrink: 0;
-  width: 3px;
-  height: 3px;
-  background-color: currentColor;
-  opacity: 0.55;
-  border-radius: 50%;
-  margin-top: 6px;
+  margin-right: 8px;
+  color: currentColor;
+  opacity: 0.9;
+  font-size: 1.05em;
+  line-height: 1;
+  user-select: none;
+  background: transparent !important;
+  width: auto !important;
+  height: auto !important;
+  border-radius: 0 !important;
 }
 
 .bulletContent {
@@ -1853,12 +1862,7 @@
   text-decoration-color: #1d4ed8;
 }
 
-@media print {
-  a[href] {
-    color: #1d4ed8 !important;
-    text-decoration: underline !important;
-  }
-}
+
 
 .resumeSkills {
   display: flex;
@@ -2677,6 +2681,21 @@
     margin: 0 !important;
     padding: 0 !important;
     height: auto !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .bulletDot {
+    color: #000000 !important;
+    opacity: 1 !important;
+    display: inline-block !important;
+    visibility: visible !important;
+    background: transparent !important;
+    width: auto !important;
+    height: auto !important;
+    border-radius: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .no-print {
