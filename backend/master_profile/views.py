@@ -159,13 +159,19 @@ class ImportCVView(APIView):
         api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
         
         from services.ai_service import AIService
-        parsed_cv = AIService.parse_resume_cv(cv_text, api_key=api_key)
-        parsed_safe = json.loads(json.dumps(parsed_cv, default=str))
+        try:
+            parsed_cv = AIService.parse_resume_cv(cv_text, api_key=api_key)
+            parsed_safe = json.loads(json.dumps(parsed_cv, default=str))
 
-        return Response({
-            "success": True,
-            "data": parsed_safe
-        })
+            return Response({
+                "success": True,
+                "data": parsed_safe
+            })
+        except ValueError as err:
+            return Response({
+                "success": False,
+                "error": {"message": str(err)}
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
 class GenerateSummaryView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -208,10 +214,16 @@ class GenerateSummaryView(APIView):
         api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
 
         from services.ai_service import AIService
-        summary = AIService.generate_executive_summary(profile_serialized, api_key=api_key)
+        try:
+            summary = AIService.generate_executive_summary(profile_serialized, api_key=api_key)
 
-        return Response({
-            "success": True,
-            "summary": summary
-        })
+            return Response({
+                "success": True,
+                "summary": summary
+            })
+        except ValueError as err:
+            return Response({
+                "success": False,
+                "error": {"message": str(err)}
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 

@@ -487,17 +487,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
               )}
 
 
-              {/* Tailored Documents Reference List */}
+              {/* Tailored Document Reference */}
               {resumeVersions.filter(v => v.application === selectedApp.id).length > 0 && (
                 <div className={styles.sidebarField}>
-                  <label>Tailored Documents</label>
+                  <label>Tailored Document</label>
                   <div className={styles.versionsList}>
-                    {resumeVersions.filter(v => v.application === selectedApp.id).map((v, i) => (
+                    {resumeVersions.filter(v => v.application === selectedApp.id).map((v) => (
                       <div key={v.id} className={styles.versionItem}>
                         <div className={styles.versionInfo}>
                           <FileText size={16} className={styles.docIcon} />
                           <div>
-                            <p className={styles.versionName}>Tailored Resume v{i + 1}</p>
+                            <p className={styles.versionName}>Tailored Resume</p>
                             <span className={styles.versionDate}>
                               Score: <strong style={{ color: v.ats_score > 80 ? 'var(--success)' : 'var(--warning)' }}>{v.ats_score}%</strong> • {new Date(v.created_at).toLocaleDateString()}
                             </span>

@@ -166,7 +166,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     personalDetailsOffset?: number;
     headingSecondaryColor?: string;
     dateFormat: 'MM/YYYY' | 'MMM YYYY' | 'YYYY';
-    pageSize: 'A4' | 'Letter';
+    pageSize: 'A4';
     fontFamily?: string;
   }>({
     fontSize: 13,
@@ -311,16 +311,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     }
   };
 
-  // 500ms debounced live score update on canvas edit
-  useEffect(() => {
-    if (scoreDebounceTimerRef.current) clearTimeout(scoreDebounceTimerRef.current);
-    scoreDebounceTimerRef.current = setTimeout(() => {
-      fetchATSScore();
-    }, 500);
-    return () => {
-      if (scoreDebounceTimerRef.current) clearTimeout(scoreDebounceTimerRef.current);
-    };
-  }, [editableSummary, editableExperiences, editableSkills, editableProjects, editableEducations, sections, jobDescription, position, company]);
+  // Note: ATS score is retrieved from currentVersion.tailored_details.ats_report or calculated locally via liveAtsReport.
+  // We remove automatic debounced API calls to /resume/ats/score to avoid consuming API credits on page load/edits.
 
   // Track manually injected / removed skills for reliable 100% green matched tag transfer
   const [userInjectedSkills, setUserInjectedSkills] = useState<string[]>([]);
@@ -635,12 +627,14 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     }
   };
 
-  // Sync category ordering on skills changes
+  // Sync category ordering on skills changes (preserving custom category order)
   useEffect(() => {
     const itSkills = editableSkills.filter(s => (s.category || '').toLowerCase().trim() !== 'languages');
-    const uniqueCats = Array.from(new Set(itSkills.map(s => s.category || 'technical')));
+    const uniqueCats = Array.from(new Set(itSkills.map(s => (s.category || 'technical').toLowerCase().trim())));
     setCategoryOrder(prev => {
-      const filteredPrev = prev.filter(c => uniqueCats.includes(c));
+      if (prev.length === 0) return uniqueCats;
+      const normalizedPrev = prev.map(c => c.toLowerCase().trim());
+      const filteredPrev = normalizedPrev.filter(c => uniqueCats.includes(c));
       const added = uniqueCats.filter(c => !filteredPrev.includes(c));
       return [...filteredPrev, ...added];
     });
@@ -651,7 +645,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     const handleResize = () => {
       if (viewportRef.current) {
         const viewportWidth = viewportRef.current.clientWidth - 40;
-        const pageWidth = customStyles.pageSize === 'A4' ? 794 : 816;
+        const pageWidth = 794;
         setScale(Math.min(1, viewportWidth / pageWidth));
       }
     };
@@ -870,7 +864,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       if (customData.customStyles) {
         setCustomStyles({
           ...customStyles,
-          ...customData.customStyles
+          ...customData.customStyles,
+          pageSize: customData.customStyles?.pageSize || 'A4'
         });
       }
       if (customData.headerStyles) setHeaderStyles(customData.headerStyles);
@@ -908,7 +903,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         pageMargin: undefined,
         bulletSpacing: 4,
         dateFormat: 'MM/YYYY',
-        pageSize: 'Letter'
+        pageSize: 'A4'
       });
     }
   };
@@ -1643,16 +1638,18 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       setMeasuredHeights(measured);
 
       // Distribute stream across isolated pages
-      const pageHeight = customStyles.pageSize === 'A4' ? 1123 : 1056;
-      const pageMargin = customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32));
+      const pageHeight = 1123;
+      const pageMargin = customStyles.pageMargin || 32;
 
-      // Usable inner content height for allowedPageContentHeight zone with 24px buffer
+      // Usable inner content height for allowedPageContentHeight zone (exact top/bottom margin bounds)
       const printableContentHeight = pageHeight - 2 * pageMargin;
-      const totalPrintableHeight = printableContentHeight - 24;
+      const activeColumnLimit = printableContentHeight;
 
       // Helper to compute unit effective height directly from true measured DOM height
       const getUnitEffectiveHeight = (u: RenderableUnit): number => {
-        return measured[u.id] || 0;
+        const baseHeight = measured[u.id] || 0;
+        const unitGap = u.type === 'section-title' ? (customStyles.sectionSpacing || 14) : 4;
+        return baseHeight + unitGap;
       };
 
       const newPages: RenderableUnit[][] = [[]];
@@ -1675,7 +1672,6 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
         // Determine columns division mapping
         const isSidebarColumn = template === 'creative_tech' && (unit.sectionId === 'skills' || unit.type === 'contacts-static');
-        const activeColumnLimit = totalPrintableHeight;
 
         let shouldPushPage = false;
 
@@ -1965,11 +1961,11 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           experiences: editableExperiences.map(e => ({
             id: e.id,
             bullets: e.bullets,
-            company: e.company,
-            position: e.position,
-            location: e.location,
-            start_date: e.start_date,
-            end_date: e.end_date
+            company: e.company || '',
+            position: e.position || '',
+            location: e.location || '',
+            start_date: e.start_date || '',
+            end_date: e.end_date || ''
           })),
           original_profile: {
             ...currentVersion.tailored_details.original_profile,
@@ -1979,11 +1975,11 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
             },
             work_experiences: editableExperiences.map(e => ({
               id: e.id,
-              company: e.company,
-              position: e.position,
-              location: e.location,
-              start_date: e.start_date,
-              end_date: e.end_date,
+              company: e.company || '',
+              position: e.position || '',
+              location: e.location || '',
+              start_date: e.start_date || '',
+              end_date: e.end_date || '',
               bullets: e.bullets
             })),
             skills: editableSkills,
@@ -2014,11 +2010,21 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
             setCurrentVersion(res.data);
           }
         } else {
-          await api.patch(`/resume/versions/${currentVersion.id}`, {
+          const res = await api.patch(`/resume/versions/${currentVersion.id}`, {
             tailored_summary: editableSummary,
             tailored_details: updatedDetails,
             template: template
           });
+          if (res.data) {
+            setCurrentVersion(res.data);
+          } else {
+            setCurrentVersion(prev => prev ? ({
+              ...prev,
+              tailored_summary: editableSummary,
+              tailored_details: updatedDetails as any,
+              template: template
+            }) : prev);
+          }
         }
       } else {
         const letterRes = await api.get('/resume/letters');
@@ -2310,7 +2316,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
         __html: `
         @media print {
           @page {
-            size: ${customStyles.pageSize === 'A4' ? 'A4' : 'letter'} portrait !important;
+            size: 210mm 297mm !important;
             margin: 0 !important;
           }
         }
@@ -2878,13 +2884,13 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   </div>
 
                   <div className={styles.sliderGroup}>
-                    <label>Page Margin: <strong>{customStyles.pageMargin || (template === 'german_style_cv' ? 77 : (template === 'pixel_perfect_pdf' ? 48 : 32))}px</strong></label>
+                    <label>Page Margin: <strong>{customStyles.pageMargin || 32}px</strong></label>
                     <input
                       type="range"
-                      min="20"
+                      min="15"
                       max="90"
                       step="0.5"
-                      value={customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32))}
+                      value={customStyles.pageMargin || 32}
                       onChange={(e) => setCustomStyles(s => ({ ...s, pageMargin: parseFloat(e.target.value) }))}
                     />
                   </div>
@@ -3742,24 +3748,22 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                 <div className={styles.slidersTwinGrid}>
                   <div className={styles.sliderGroup}>
-                    <label>Page Size: <strong>{customStyles.pageSize}</strong></label>
-                    <select
-                      value={customStyles.pageSize}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, pageSize: e.target.value as 'A4' | 'Letter' }))}
+                    <label>Paper Standard: <strong>DIN A4</strong></label>
+                    <div
                       style={{
                         width: '100%',
                         padding: '8px 12px',
                         borderRadius: '6px',
                         border: '1px solid var(--card-border, #cbd5e1)',
-                        background: 'white',
-                        fontSize: '13px',
-                        outline: 'none',
-                        color: 'var(--text-main, #1e293b)'
+                        background: 'rgba(99, 102, 241, 0.05)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: 'var(--primary, #4f46e5)',
+                        boxSizing: 'border-box'
                       }}
                     >
-                      <option value="A4">A4 (210mm x 297mm)</option>
-                      <option value="Letter">Letter (8.5in x 11in)</option>
-                    </select>
+                      A4 (210mm × 297mm)
+                    </div>
                   </div>
 
                   <div className={styles.sliderGroup}>
@@ -4003,12 +4007,12 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       position: 'absolute',
                       left: '-9999px',
                       top: 0,
-                      width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`,
+                      width: '210mm',
                       height: 'auto',
                       visibility: 'hidden',
                       pointerEvents: 'none',
                       boxSizing: 'border-box',
-                      padding: `${customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32))}px`,
+                      padding: `${customStyles.pageMargin || 32}px`,
                       fontSize: `${customStyles.fontSize}px`,
                       lineHeight: customStyles.lineHeight,
                       '--base-font-size': `${customStyles.fontSize}px`,
@@ -4086,17 +4090,18 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 <MeasuringContext.Provider value={false}>
                   <div ref={viewportRef} className={styles.canvasViewport}>
                     <div
+                      className={styles.pagesScaledWrapper}
                       style={{
                         transform: `scale(${scale})`,
                         transformOrigin: 'top center',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '24px',
-                        width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`
+                        width: '210mm'
                       }}
                     >
                       {pages.map((pageUnits, pageIdx) => {
-                        const pageMargin = customStyles.pageMargin || (template === 'german_style_cv' ? 76.8 : (template === 'pixel_perfect_pdf' ? 48 : 32));
+                        const pageMargin = customStyles.pageMargin || 32;
                         const isCreative = template === 'creative_tech';
 
                         // Content inside this page
@@ -4110,10 +4115,11 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                             <div
                               className={`${styles.pageContainer} ${styles[templateClassMap[template] || template] || ''}`}
                               style={{
-                                width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`,
-                                height: `${customStyles.pageSize === 'A4' ? 1123 : 1056}px`,
-                                '--print-page-width': customStyles.pageSize === 'A4' ? '210mm' : '8.5in',
-                                '--print-page-height': customStyles.pageSize === 'A4' ? '297mm' : '11in',
+                                width: '210mm',
+                                height: '297mm',
+                                '--print-page-width': '210mm',
+                                '--print-page-height': '297mm',
+                                '--print-page-margin': `${pageMargin}px`,
                                 padding: `${pageMargin}px`,
                                 boxSizing: 'border-box',
                                 fontSize: `${customStyles.fontSize}px`,
@@ -4175,22 +4181,23 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 <MeasuringContext.Provider value={false}>
                   <div ref={viewportRef} className={styles.canvasViewport}>
                     <div
+                      className={styles.pagesScaledWrapper}
                       style={{
                         transform: `scale(${scale})`,
                         transformOrigin: 'top center',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '24px',
-                        width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`
+                        width: '210mm'
                       }}
                     >
                       <div
                         className={`${styles.pageContainer} ${styles.letterPage}`}
                         style={{
-                          width: `${customStyles.pageSize === 'A4' ? 794 : 816}px`,
-                          height: `${customStyles.pageSize === 'A4' ? 1123 : 1056}px`,
-                          '--print-page-width': customStyles.pageSize === 'A4' ? '210mm' : '8.5in',
-                          '--print-page-height': customStyles.pageSize === 'A4' ? '297mm' : '11in',
+                          width: '210mm',
+                          height: '297mm',
+                          '--print-page-width': '210mm',
+                          '--print-page-height': '297mm',
                           padding: '75px 75px 75px 75px', // Modern German A4 margins (~2 cm margins)
                           boxSizing: 'border-box',
                           background: '#ffffff',

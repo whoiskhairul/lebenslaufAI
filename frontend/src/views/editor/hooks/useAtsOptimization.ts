@@ -84,15 +84,7 @@ export const useAtsOptimization = (
     }
   };
 
-  useEffect(() => {
-    if (scoreDebounceTimerRef.current) clearTimeout(scoreDebounceTimerRef.current);
-    scoreDebounceTimerRef.current = setTimeout(() => {
-      fetchATSScore();
-    }, 500);
-    return () => {
-      if (scoreDebounceTimerRef.current) clearTimeout(scoreDebounceTimerRef.current);
-    };
-  }, [editableSummary, editableExperiences, editableSkills, editableProjects, editableEducations, sections, jobDescription, position, company]);
+  // Automatic API calls to /resume/ats/score removed to prevent API key credit consumption on page refresh/edits
 
   const handleInjectSkill = (skillName: string, category?: string) => {
     createSnapshot(`Before inject skill '${skillName}'`);

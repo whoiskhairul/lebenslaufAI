@@ -17,12 +17,18 @@ class ATSScoreView(APIView):
                 "error": {"message": "Both job_description and cv_details are required."}
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        report = AIService.analyze_ats(cv_details, job_description, api_key=api_key)
+        try:
+            report = AIService.analyze_ats(cv_details, job_description, api_key=api_key)
 
-        return Response({
-            "success": True,
-            "ats_report": report
-        }, status=status.HTTP_200_OK)
+            return Response({
+                "success": True,
+                "ats_report": report
+            }, status=status.HTTP_200_OK)
+        except ValueError as err:
+            return Response({
+                "success": False,
+                "error": {"message": str(err)}
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
 
 class ATSOptimizeView(APIView):
@@ -39,25 +45,31 @@ class ATSOptimizeView(APIView):
                 "error": {"message": "Job description and CV details are required for structural optimization."}
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        report = AIService.analyze_ats(cv_details, job_description, api_key=api_key)
-        missing_kw = report.get("missing_keywords", [])
+        try:
+            report = AIService.analyze_ats(cv_details, job_description, api_key=api_key)
+            missing_kw = report.get("missing_keywords", [])
 
-        proposals = []
-        if isinstance(missing_kw, list) and len(missing_kw) > 0:
-            proposals.append({
-                "id": "inject_missing_skills",
-                "type": "add_skills",
-                "title": f"Add {len(missing_kw[:5])} Missing Technical Skills",
-                "description": f"Inject keywords directly matching the target position: {', '.join(missing_kw[:5])}.",
-                "action": "add_skills",
-                "skills_to_add": missing_kw[:5]
-            })
+            proposals = []
+            if isinstance(missing_kw, list) and len(missing_kw) > 0:
+                proposals.append({
+                    "id": "inject_missing_skills",
+                    "type": "add_skills",
+                    "title": f"Add {len(missing_kw[:5])} Missing Technical Skills",
+                    "description": f"Inject keywords directly matching the target position: {', '.join(missing_kw[:5])}.",
+                    "action": "add_skills",
+                    "skills_to_add": missing_kw[:5]
+                })
 
-        return Response({
-            "success": True,
-            "ats_report": report,
-            "proposals": proposals
-        }, status=status.HTTP_200_OK)
+            return Response({
+                "success": True,
+                "ats_report": report,
+                "proposals": proposals
+            }, status=status.HTTP_200_OK)
+        except ValueError as err:
+            return Response({
+                "success": False,
+                "error": {"message": str(err)}
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
 
 class ATSRulesView(APIView):
