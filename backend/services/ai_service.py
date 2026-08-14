@@ -111,8 +111,7 @@ class AIService:
             except ValueError:
                 pass
                 
-        # Mock Fallback Engine if API fails or API Key is missing
-        return cls._mock_parse_job_description(job_text)
+        raise ValueError("AI Service failed to parse job description. Please ensure a valid API key is configured.")
 
     @classmethod
     def analyze_ats(cls, profile_data, job_data, api_key=None):
@@ -150,7 +149,7 @@ class AIService:
             except ValueError:
                 pass
                 
-        return cls._mock_analyze_ats(profile_data, job_data)
+        raise ValueError("AI Service failed to analyze ATS compatibility. Please check your API key or try again later.")
 
     @classmethod
     def generate_executive_summary(cls, profile_data, api_key=None):
@@ -170,7 +169,7 @@ class AIService:
         if res:
             return res.strip().strip('"')
             
-        return cls._mock_generate_executive_summary(profile_data)
+        raise ValueError("AI Service failed to generate executive summary. Please check your API key or try again later.")
 
     @staticmethod
     def _mock_generate_executive_summary(profile_data):
@@ -333,10 +332,7 @@ class AIService:
             except ValueError:
                 pass
                 
-        mock_res = cls._mock_tailor_resume(profile_data, job_data)
-        mock_res['tailored_skills'] = sorted_skills
-        mock_res['tailored_projects'] = sorted_projects
-        return mock_res
+        raise ValueError("AI Service failed to tailor resume. Please check your API key or try again later.")
 
     @classmethod
     def write_cover_letter(cls, profile_data, job_data, tone="professional", length="medium", api_key=None, target_language="en"):
@@ -435,20 +431,14 @@ class AIService:
             )
             return result_text
             
-        return cls._mock_write_cover_letter(profile_data, job_data, tone, length)
+        raise ValueError("AI Service failed to generate cover letter. Please check your API key or try again later.")
 
     # ================= MOCK FALLBACK IMPLEMENTATIONS =================
 
     @staticmethod
     def _mock_parse_job_description(text):
-        # Extract common tech keywords if found
         sample_keywords = ["React", "TypeScript", "Node.js", "Django", "PostgreSQL", "Python", "Docker", "AWS", "Kubernetes", "Git"]
         found_keywords = [k for k in sample_keywords if k.lower() in text.lower()]
-        if not found_keywords:
-            found_keywords = ["React", "TypeScript", "Django"]
-            
-        company = "Target Company"
-        position = "Software Engineer"
         
         # Simple regex approximation
         lines = [line.strip() for line in text.split('\n') if line.strip()]
@@ -778,7 +768,7 @@ Sincerely,
             except ValueError:
                 pass
                 
-        return cls._mock_parse_resume_cv(cv_text)
+        raise ValueError("AI Service failed to parse resume content. Please check your API key configuration or try again.")
 
     @classmethod
     def _mock_parse_resume_cv(cls, cv_text):
@@ -967,7 +957,7 @@ Sincerely,
         if rephrased:
             return rephrased.strip().strip('"')
             
-        return cls._mock_rephrase_block(text, instruction)
+        raise ValueError("AI Service failed to rephrase text block. Please check your API key configuration or try again.")
 
     @staticmethod
     def _mock_rephrase_block(text, instruction):

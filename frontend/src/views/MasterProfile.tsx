@@ -5,7 +5,7 @@ import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { MasterProfileSkeleton } from '../components/skeleton/MasterProfileSkeleton';
 import {
-  User, Briefcase, FolderGit2, Dumbbell, GraduationCap, Award, Trash2, Plus, Edit3, Check, X, Upload, Brain, Wand2, Sparkles, Lock
+  User, Briefcase, FolderGit2, Dumbbell, GraduationCap, Award, Trash2, Plus, Edit3, Check, X, Upload, Brain, Wand2, Sparkles, Lock, AlertCircle
 } from 'lucide-react';
 import styles from './MasterProfile.module.css';
 
@@ -181,9 +181,12 @@ export const MasterProfile: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
+  const [parseError, setParseError] = useState<string | null>(null);
+
   const handleParseCV = async () => {
     if (!cvText.trim() && !selectedFile) return;
     setIsParsing(true);
+    setParseError(null);
     try {
       let res;
       if (selectedFile) {
@@ -227,9 +230,10 @@ export const MasterProfile: React.FC = () => {
 
         setImportStep(2);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to parse CV. Make sure the text is correct.');
+      const serverMsg = err?.response?.data?.error?.message;
+      setParseError(serverMsg || 'AI Parsing service is currently unavailable. Please check your API key in Settings or try again later.');
     } finally {
       setIsParsing(false);
     }
@@ -1333,6 +1337,7 @@ export const MasterProfile: React.FC = () => {
                 setCvText('');
                 setSelectedFile(null);
                 setParsedData(null);
+                setParseError(null);
               }}>
                 <X size={20} />
               </button>
@@ -1343,17 +1348,35 @@ export const MasterProfile: React.FC = () => {
                 <p className={styles.stepDesc}>
                   Upload your CV text (.txt) or PDF (.pdf) file or paste your CV raw text details here to trigger automatic AI parsing.
                 </p>
+
+                {parseError && (
+                  <div className={styles.errorAlertBanner}>
+                    <AlertCircle size={18} className={styles.errorAlertIcon} />
+                    <div className={styles.errorAlertContent}>
+                      <strong>AI Parsing Error</strong>
+                      <span>{parseError}</span>
+                    </div>
+                    <button className={styles.errorDismissBtn} onClick={() => setParseError(null)}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+
                 <div className={styles.fileInputGroup}>
                   <label htmlFor="cvUpload" className={styles.fileLabel}>
                     <Upload size={16} /> {selectedFile ? selectedFile.name : 'Choose text or PDF CV file...'}
                   </label>
-                  <input id="cvUpload" type="file" accept=".txt,.json,.pdf" onChange={handleFileUpload} style={{ display: 'none' }} />
+                  <input id="cvUpload" type="file" accept=".txt,.json,.pdf" onChange={(e) => {
+                    setParseError(null);
+                    handleFileUpload(e);
+                  }} style={{ display: 'none' }} />
                 </div>
                 <textarea
                   className={styles.cvTextarea}
                   placeholder="Or paste your raw CV text here (Experiences, Education, Skills, etc.)..."
                   value={cvText}
                   onChange={(e) => {
+                    setParseError(null);
                     setCvText(e.target.value);
                     if (selectedFile) setSelectedFile(null);
                   }}
@@ -1365,6 +1388,7 @@ export const MasterProfile: React.FC = () => {
                     setCvText('');
                     setSelectedFile(null);
                     setParsedData(null);
+                    setParseError(null);
                   }}>Cancel</Button>
                   <Button onClick={handleParseCV} isLoading={isParsing} disabled={!cvText.trim() && !selectedFile}>
                     <Brain size={16} /> Parse CV

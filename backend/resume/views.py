@@ -85,39 +85,45 @@ class ResumeTailorView(APIView):
         if application_id:
             application = Application.objects.filter(user=user, id=application_id).first()
 
-        # 2. Extract Job Details if missing
-        if not company or not position:
-            job_details = AIService.parse_job_description(job_description, api_key=api_key)
-            company = company or job_details.get('company', 'Target Company')
-            position = position or job_details.get('position', 'Role Candidate')
-        else:
-            job_details = {
-                "company": company,
-                "position": position,
-                "keywords": []
-            }
+        try:
+            # 2. Extract Job Details if missing
+            if not company or not position:
+                job_details = AIService.parse_job_description(job_description, api_key=api_key)
+                company = company or job_details.get('company', 'Target Company')
+                position = position or job_details.get('position', 'Role Candidate')
+            else:
+                job_details = {
+                    "company": company,
+                    "position": position,
+                    "keywords": []
+                }
 
-        # Sync unedited job description to the application if linked
-        if application:
-            if not application.job_description:
-                application.job_description = job_description
-                application.save()
+            # Sync unedited job description to the application if linked
+            if application:
+                if not application.job_description:
+                    application.job_description = job_description
+                    application.save()
 
-        # 3. Single-Pass DeepSeek Tailoring & ATS Auditing
-        tailored_result = AIService.tailor_resume(profile_serialized, job_details, api_key=api_key, target_language=target_language, aggressive_mode=aggressive_mode)
+            # 3. Single-Pass DeepSeek Tailoring & ATS Auditing
+            tailored_result = AIService.tailor_resume(profile_serialized, job_details, api_key=api_key, target_language=target_language, aggressive_mode=aggressive_mode)
 
-        # Retrieve single-pass ats_report or fallback if missing
-        ats_report = tailored_result.get('ats_report')
-        if not ats_report or not isinstance(ats_report, dict) or 'score' not in ats_report:
-            tailored_profile_data = {
-                "personal_info": profile_serialized.get('personal_info', {}),
-                "summary": tailored_result.get('tailored_summary', ''),
-                "work_experiences": tailored_result.get('tailored_experiences', []),
-                "skills": tailored_result.get('tailored_skills', profile_serialized.get('skills', [])),
-                "projects": tailored_result.get('tailored_projects', profile_serialized.get('projects', [])),
-                "educations": profile_serialized.get('educations', [])
-            }
-            ats_report = AIService.analyze_ats(tailored_profile_data, job_details, api_key=api_key)
+            # Retrieve single-pass ats_report or fallback if missing
+            ats_report = tailored_result.get('ats_report')
+            if not ats_report or not isinstance(ats_report, dict) or 'score' not in ats_report:
+                tailored_profile_data = {
+                    "personal_info": profile_serialized.get('personal_info', {}),
+                    "summary": tailored_result.get('tailored_summary', ''),
+                    "work_experiences": tailored_result.get('tailored_experiences', []),
+                    "skills": tailored_result.get('tailored_skills', profile_serialized.get('skills', [])),
+                    "projects": tailored_result.get('tailored_projects', profile_serialized.get('projects', [])),
+                    "educations": profile_serialized.get('educations', [])
+                }
+                ats_report = AIService.analyze_ats(tailored_profile_data, job_details, api_key=api_key)
+        except ValueError as err:
+            return Response({
+                "success": False,
+                "error": {"message": str(err)}
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         # Agent 4: Run deterministic hallucination validator
         validation_alerts = AIService.validate_hallucinations(
@@ -142,25 +148,42 @@ class ResumeTailorView(APIView):
 
         save_version = request.data.get('save_version', True)
 
-        # 5. Create immutable saved version
+        # 5. Save or update the single resume version for this application
         if save_version:
-            resume_version = ResumeVersion.objects.create(
-                user=user,
-                application=application,
-                title=f"Resume for {position} at {company}",
-                target_company=company,
-                target_role=position,
-                ats_score=ats_report.get('score', 70),
-                tailored_summary=tailored_result.get('tailored_summary', ''),
-                tailored_details=details_safe,
-                explanations=explanations_safe,
-                validation_alerts=validation_alerts,
-                template=template
-            )
+            if application:
+                resume_version, created = ResumeVersion.objects.update_or_create(
+                    user=user,
+                    application=application,
+                    defaults={
+                        "title": f"Resume for {position} at {company}",
+                        "target_company": company,
+                        "target_role": position,
+                        "ats_score": ats_report.get('score', 70),
+                        "tailored_summary": tailored_result.get('tailored_summary', ''),
+                        "tailored_details": details_safe,
+                        "explanations": explanations_safe,
+                        "validation_alerts": validation_alerts,
+                        "template": template
+                    }
+                )
+            else:
+                resume_version = ResumeVersion.objects.create(
+                    user=user,
+                    application=application,
+                    title=f"Resume for {position} at {company}",
+                    target_company=company,
+                    target_role=position,
+                    ats_score=ats_report.get('score', 70),
+                    tailored_summary=tailored_result.get('tailored_summary', ''),
+                    tailored_details=details_safe,
+                    explanations=explanations_safe,
+                    validation_alerts=validation_alerts,
+                    template=template
+                )
             return Response({
                 "success": True,
                 "data": ResumeVersionSerializer(resume_version).data
-            }, status=status.HTTP_201_CREATED)
+            }, status=status.HTTP_200_OK if application else status.HTTP_201_CREATED)
         else:
             from datetime import datetime
             temp_version = ResumeVersion(
@@ -244,24 +267,43 @@ class CoverLetterGenerateView(APIView):
             profile_serialized = FullProfileSerializer(profile_data).data
 
         # Call AI
-        letter_content = AIService.write_cover_letter(profile_serialized, job_details, tone, length, api_key=api_key, target_language=target_language)
+        try:
+            letter_content = AIService.write_cover_letter(profile_serialized, job_details, tone, length, api_key=api_key, target_language=target_language)
 
-        # Create Letter record
-        cover_letter = CoverLetterVersion.objects.create(
-            user=user,
-            application=application,
-            target_company=company,
-            target_role=position,
-            content=letter_content,
-            tone=tone,
-            length=length
-        )
+            # Save or update single Cover Letter for this application
+            if application:
+                cover_letter, created = CoverLetterVersion.objects.update_or_create(
+                    user=user,
+                    application=application,
+                    defaults={
+                        "target_company": company,
+                        "target_role": position,
+                        "content": letter_content,
+                        "tone": tone,
+                        "length": length
+                    }
+                )
+            else:
+                cover_letter = CoverLetterVersion.objects.create(
+                    user=user,
+                    application=application,
+                    target_company=company,
+                    target_role=position,
+                    content=letter_content,
+                    tone=tone,
+                    length=length
+                )
 
-        return Response({
-            "success": True,
-            "data": CoverLetterVersionSerializer(cover_letter).data,
-            "content": letter_content
-        }, status=status.HTTP_201_CREATED)
+            return Response({
+                "success": True,
+                "data": CoverLetterVersionSerializer(cover_letter).data,
+                "content": letter_content
+            }, status=status.HTTP_200_OK if application else status.HTTP_201_CREATED)
+        except ValueError as err:
+            return Response({
+                "success": False,
+                "error": {"message": str(err)}
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
 class ResumeRephraseView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -290,11 +332,17 @@ class ResumeRephraseView(APIView):
         profile_serialized = FullProfileSerializer(profile_data).data
         
         api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
-        rephrased = AIService.rephrase_text(text, instruction, profile_serialized, api_key=api_key)
-        return Response({
-            "success": True,
-            "rephrased_text": rephrased
-        }, status=status.HTTP_200_OK)
+        try:
+            rephrased = AIService.rephrase_block(text, instruction, profile_serialized, api_key=api_key)
+            return Response({
+                "success": True,
+                "rephrased": rephrased
+            })
+        except ValueError as err:
+            return Response({
+                "success": False,
+                "error": {"message": str(err)}
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
 class ATSScoreCheckView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -312,10 +360,16 @@ class ATSScoreCheckView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
-        ats_report = AIService.analyze_ats(cv_details, job_description, api_key=api_key)
+        try:
+            ats_report = AIService.analyze_ats(cv_details, job_description, api_key=api_key)
 
-        return Response({
-            "success": True,
-            "ats_report": ats_report
-        }, status=status.HTTP_200_OK)
+            return Response({
+                "success": True,
+                "ats_report": ats_report
+            }, status=status.HTTP_200_OK)
+        except ValueError as err:
+            return Response({
+                "success": False,
+                "error": {"message": str(err)}
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
