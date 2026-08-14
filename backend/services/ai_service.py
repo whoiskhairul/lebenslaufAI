@@ -8,12 +8,17 @@ class AIService:
     def _get_api_key(api_key=None):
         if api_key:
             return api_key
+        provider = os.environ.get('ACTIVE_AI_PROVIDER', 'deepseek').lower().strip()
+        if provider == 'gemini':
+            return os.environ.get('GEMINI_API_KEY', '').strip()
         return os.environ.get('DEEPSEEK_API_KEY', '').strip()
 
     @staticmethod
     def call_deepseek(system_prompt, user_content, response_format=None, api_key=None):
+        provider = os.environ.get('ACTIVE_AI_PROVIDER', 'deepseek').lower().strip()
         key = AIService._get_api_key(api_key)
         if not key:
+            print(f"AI Service Error: API key missing for provider '{provider}'")
             return None
         
         headers = {
@@ -21,8 +26,20 @@ class AIService:
             "Authorization": f"Bearer {key}"
         }
         
+        if provider == 'gemini':
+            model = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+            base_url = os.environ.get('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai/').rstrip('/')
+            url = f"{base_url}/chat/completions"
+        else:
+            model = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
+            base_url = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com').rstrip('/')
+            if not base_url.endswith('/v1'):
+                url = f"{base_url}/v1/chat/completions"
+            else:
+                url = f"{base_url}/chat/completions"
+
         payload = {
-            "model": os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat'),
+            "model": model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}
@@ -36,9 +53,8 @@ class AIService:
         timeout_sec = int(os.environ.get('DEEPSEEK_TIMEOUT', '60'))
         
         try:
-            # DeepSeek endpoint or standard OpenAI compatible router
             response = requests.post(
-                "https://api.deepseek.com/v1/chat/completions",
+                url,
                 headers=headers,
                 json=payload,
                 timeout=timeout_sec
@@ -47,13 +63,13 @@ class AIService:
                 result = response.json()
                 return result['choices'][0]['message']['content']
             else:
-                print(f"DeepSeek API Error: {response.status_code} - {response.text}")
+                print(f"AI API Error ({provider}): {response.status_code} - {response.text}")
                 return None
         except requests.exceptions.Timeout:
-            print(f"DeepSeek API read timed out ({timeout_sec}s). Retrying once with extended timeout...")
+            print(f"AI API ({provider}) read timed out ({timeout_sec}s). Retrying once with extended timeout...")
             try:
                 response = requests.post(
-                    "https://api.deepseek.com/v1/chat/completions",
+                    url,
                     headers=headers,
                     json=payload,
                     timeout=timeout_sec + 15
@@ -62,10 +78,10 @@ class AIService:
                     result = response.json()
                     return result['choices'][0]['message']['content']
             except Exception as retry_err:
-                print(f"DeepSeek retry failed: {retry_err}")
+                print(f"AI API ({provider}) retry failed: {retry_err}")
                 return None
         except Exception as e:
-            print(f"DeepSeek HTTP request failed: {e}")
+            print(f"AI HTTP request failed ({provider}): {e}")
             return None
 
     @classmethod
@@ -107,10 +123,15 @@ class AIService:
         system_prompt = (
             "You are an objective ATS (Applicant Tracking System) Scoring Algorithm.\n"
             "Compare the Candidate's Active CV Details (including summary, work experience, projects, and skills) against the target Job Description.\n"
-            "CRITICAL:\n"
-            "- 'matched_keywords' MUST contain all job requirement keywords that ARE explicitly present in the candidate's active skills or experience text.\n"
-            "- 'missing_keywords' MUST contain ONLY job requirement keywords that are NOT currently present in the candidate's active skills or experience text.\n"
-            "- Calculate 'score' strictly based on the ratio of matched_keywords versus total required job keywords (0-100 scale).\n"
+            "CRITICAL REQUIREMENT - SEMANTIC MATCHING:\n"
+            "- Perform semantic synonym matching (e.g. count 'React.js', 'ReactJS', and 'React' as matching; count 'Amazon Web Services' and 'AWS' as matching).\n"
+            "- 'matched_keywords' MUST contain all job requirements that are semantically present in the candidate's active profile.\n"
+            "- 'missing_keywords' MUST contain only job requirement keywords that are NOT semantically present in the profile.\n\n"
+            "SCORING METRICS (Strict 50/30/20 Weights):\n"
+            "Calculate the final 'score' (0-100 scale) as a weighted combination of:\n"
+            "1. Keyword Match (50%): Ratio of semantically matched keywords to total required job description keywords.\n"
+            "2. Experience Depth (30%): Evaluation of whether the critical matched skills are actively demonstrated in the work experience descriptions/bullets rather than just listed in a static skills block.\n"
+            "3. Structural & Formatting Quality (20%): Presence of contact details, professional summary, structured work experiences (with bullets), projects, and general compliance with resume length/layout guidelines.\n\n"
             "Return ONLY a JSON object matching this schema:\n"
             "{\n"
             "  \"score\": 0-100,\n"
@@ -239,6 +260,15 @@ class AIService:
             f"{aggressive_instruction}"
             "Tailor the user's resume summary, experience bullets, and project bullets to match the job description.\n"
             "Simultaneously audit the tailored resume against the job description and calculate an accurate ATS match report.\n"
+            "CRITICAL REQUIREMENT - SEMANTIC MATCHING:\n"
+            "- Perform semantic synonym matching when checking keywords (e.g. 'React.js' and 'React' are considered matching).\n"
+            "- 'matched_keywords' MUST contain all job requirements that are semantically present in the candidate's active profile.\n"
+            "- 'missing_keywords' MUST contain only job requirement keywords that are NOT semantically present in the profile.\n\n"
+            "SCORING METRICS (Strict 50/30/20 Weights):\n"
+            "Calculate the final ats_report 'score' (0-100 scale) as a weighted combination of:\n"
+            "1. Keyword Match (50%): Ratio of semantically matched keywords to total required job description keywords.\n"
+            "2. Experience Depth (30%): Evaluation of whether the critical matched skills are actively demonstrated in the work experience descriptions/bullets rather than just listed in a static skills block.\n"
+            "3. Structural & Formatting Quality (20%): Presence of contact details, professional summary, structured work experiences (with bullets), projects, and general compliance with resume length/layout guidelines.\n\n"
             "CRITICAL: Do NOT invent/fabricate skills, jobs, dates, or degrees.\n"
             "Return ONLY a JSON object matching this schema:\n"
             "{\n"
@@ -476,27 +506,82 @@ class AIService:
                     elif isinstance(s, str):
                         profile_skills.append(s.lower())
             profile_str = json.dumps(profile, default=str).lower()
+            personal = profile.get('personal_info', {}) or {}
+            experiences = profile.get('work_experiences', []) or []
+            projects = profile.get('projects', []) or []
+            educations = profile.get('educations', []) or []
+            summary = profile.get('summary', '') or personal.get('summary', '') or ''
         elif isinstance(profile, str):
             profile_str = profile.lower()
             profile_skills = []
+            personal = {}
+            experiences = []
+            projects = []
+            educations = []
+            summary = ""
         else:
             profile_str = ""
             profile_skills = []
+            personal = {}
+            experiences = []
+            projects = []
+            educations = []
+            summary = ""
 
+        # 1. Structural Score (Max 20 points)
+        struct_score = 0
+        
+        # Check contact details (max 5 pts)
+        contact_pts = 0
+        if personal.get('email'): contact_pts += 2
+        if personal.get('phone'): contact_pts += 2
+        if personal.get('location'): contact_pts += 1
+        struct_score += contact_pts
+        
+        # Check professional summary (max 5 pts)
+        if summary.strip():
+            struct_score += 5
+            
+        # Check work experiences & bullets structure (max 5 pts)
+        if experiences:
+            struct_score += 2
+            has_bullets = any(exp.get('bullets') for exp in experiences if isinstance(exp, dict))
+            if has_bullets:
+                struct_score += 3
+                
+        # Check projects/educations presence (max 5 pts)
+        proj_edu_pts = 0
+        if projects: proj_edu_pts += 3
+        if educations: proj_edu_pts += 2
+        struct_score += proj_edu_pts
+
+        # 2. Keyword Match Score (Max 50 points) and Experience Depth Score (Max 30 points)
         matched = []
         missing = []
+        exp_matched_count = 0
+        
+        exp_text = " ".join([json.dumps(exp, default=str) for exp in experiences]).lower()
 
         for keyword in job_keywords:
             kw_lower = keyword.lower()
-            if kw_lower in profile_skills or any(kw_lower in s for s in profile_skills) or kw_lower in profile_str:
+            is_matched = (kw_lower in profile_skills or 
+                          any(kw_lower in s for s in profile_skills) or 
+                          kw_lower in profile_str)
+            if is_matched:
                 matched.append(keyword)
+                if kw_lower in exp_text:
+                    exp_matched_count += 1
             else:
                 missing.append(keyword)
 
         if not job_keywords:
-            score = 75
+            keyword_score = 40
+            depth_score = 20
         else:
-            score = int((len(matched) / len(job_keywords)) * 60) + 30
+            keyword_score = (len(matched) / len(job_keywords)) * 50
+            depth_score = (exp_matched_count / len(job_keywords)) * 30
+
+        final_score = int(struct_score + keyword_score + depth_score)
 
         suggestions = []
         for miss in missing:
@@ -505,7 +590,7 @@ class AIService:
             suggestions.append("Outstanding match! Maintain core formatting and emphasize specific metric highlights.")
 
         return {
-            "score": min(score, 100),
+            "score": min(final_score, 100),
             "matched_keywords": matched,
             "missing_keywords": missing,
             "suggestions": suggestions

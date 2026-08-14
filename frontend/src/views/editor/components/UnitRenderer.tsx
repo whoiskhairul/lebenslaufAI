@@ -2,6 +2,7 @@ import React from 'react';
 import { RenderableUnit } from '../types/editor.types';
 import { renderFormattedTitle } from '../utils/titleUtils';
 import { renderFormattedLanguageList } from '../utils/languageUtils';
+import { formatPhoneNumber } from '../utils/phoneUtils';
 import { AutoSizeTextarea } from './AutoSizeTextarea';
 import { HeaderSettingsPopover } from './HeaderSettingsPopover';
 import { SectionSettingsPopover } from './SectionSettingsPopover';
@@ -9,6 +10,15 @@ import {
   Settings, ChevronUp, ChevronDown, Plus, Sparkles, X, ArrowUp, ArrowDown, Trash, EyeOff
 } from 'lucide-react';
 import styles from '../../EditorNew.module.css';
+
+const ensureAbsoluteUrl = (url: string) => {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
+};
 
 export interface UnitRendererProps {
   unit: RenderableUnit;
@@ -65,6 +75,7 @@ export interface UnitRendererProps {
   setLanguagesTitle: (val: string) => void;
   targetLanguage: 'en' | 'de';
   categoryOrder: string[];
+  handleMoveSkillCategory?: (catName: string, dir: 'up' | 'down') => void;
   getLocalizedCategoryName: (cat: string) => string;
   getAlertsFor: (section: string) => any[];
 }
@@ -124,6 +135,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
   setLanguagesTitle,
   targetLanguage,
   categoryOrder,
+  handleMoveSkillCategory,
   getLocalizedCategoryName,
   getAlertsFor
 }) => {
@@ -136,7 +148,8 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
   let spacingStyle: React.CSSProperties = {};
   if (unit.sectionId) {
     const isLastItem = (() => {
-      if (sec?.type === 'summary' || sec?.type === 'custom') return true;
+      if (sec?.type === 'summary') return unit.type === 'summary';
+      if (sec?.type === 'custom') return true;
       if (sec?.type === 'experience') {
         return unit.type === 'experience-item' && unit.itemData?.id === editableExperiences[editableExperiences.length - 1]?.id;
       }
@@ -150,20 +163,23 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
         const langSkills = editableSkills.filter(sk => (sk.category || '').toLowerCase().trim() === 'languages');
         const itSkills = editableSkills.filter(sk => (sk.category || '').toLowerCase().trim() !== 'languages');
         const uniqueCats = Array.from(new Set(itSkills.map(sk => (sk.category || 'technical').toLowerCase().trim())));
-        const itCategories = categoryOrder.filter(c => uniqueCats.includes(c));
+        const normalizedOrder = categoryOrder.map(c => c.toLowerCase().trim());
+        const itCategories = normalizedOrder.filter(c => uniqueCats.includes(c));
         const extraCats = uniqueCats.filter(c => !itCategories.includes(c));
         const finalCategories = [...itCategories, ...extraCats];
 
-        finalCategories.sort((a, b) => {
-          const getCategoryOrderScore = (cat: string) => {
-            const order = ['programming languages', 'frameworks & libraries', 'databases', 'cloud & devops', 'development tools', 'testing'];
-            const idx = order.indexOf(cat.toLowerCase().trim());
-            if (idx !== -1) return idx;
-            if (cat.toLowerCase().trim() === 'languages') return 999;
-            return 100;
-          };
-          return getCategoryOrderScore(a) - getCategoryOrderScore(b);
-        });
+        if (categoryOrder.length === 0) {
+          finalCategories.sort((a, b) => {
+            const getCategoryOrderScore = (cat: string) => {
+              const order = ['programming languages', 'frameworks & libraries', 'databases', 'cloud & devops', 'development tools', 'testing'];
+              const idx = order.indexOf(cat.toLowerCase().trim());
+              if (idx !== -1) return idx;
+              if (cat.toLowerCase().trim() === 'languages') return 999;
+              return 100;
+            };
+            return getCategoryOrderScore(a) - getCategoryOrderScore(b);
+          });
+        }
 
         const lastCat = languagesFirst
           ? (finalCategories.length > 0 ? finalCategories[finalCategories.length - 1] : 'languages')
@@ -176,9 +192,8 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
     })();
 
     if (isLastItem) {
-      if (localStyles.spacing !== undefined) {
-        spacingStyle = { marginBottom: `${localStyles.spacing}px` };
-      }
+      const spacingVal = localStyles.spacing !== undefined ? localStyles.spacing : 4;
+      spacingStyle = { marginBottom: `${spacingVal}px` };
     } else {
       if (localStyles.itemGap !== undefined) {
         spacingStyle = { marginBottom: `${localStyles.itemGap}px` };
@@ -320,10 +335,12 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                   <div className={styles.ppContactItem}>
                     <span className={styles.ppContactLabel}>Website:</span>
                     <span className={styles.ppContactVal}>
-                      <AutoSizeTextarea
-                        value={editablePersonalInfo.website}
-                        onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, website: val }))}
-                      />
+                      <a href={ensureAbsoluteUrl(editablePersonalInfo.website)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'block', width: '100%' }}>
+                        <AutoSizeTextarea
+                          value={editablePersonalInfo.website}
+                          onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, website: val }))}
+                        />
+                      </a>
                     </span>
                   </div>
                 )}
@@ -334,8 +351,9 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                     <span className={styles.ppContactLabel}>Phone:</span>
                     <span className={styles.ppContactVal}>
                       <AutoSizeTextarea
-                        value={editablePersonalInfo.phone}
+                        value={formatPhoneNumber(editablePersonalInfo.phone)}
                         onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, phone: val }))}
+                        onBlur={() => setEditablePersonalInfo((p: any) => ({ ...p, phone: formatPhoneNumber(p.phone) }))}
                       />
                     </span>
                   </div>
@@ -344,10 +362,12 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                   <div className={styles.ppContactItem}>
                     <span className={styles.ppContactLabel}>LinkedIn:</span>
                     <span className={styles.ppContactVal}>
-                      <AutoSizeTextarea
-                        value={editablePersonalInfo.linkedin}
-                        onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, linkedin: val }))}
-                      />
+                      <a href={ensureAbsoluteUrl(editablePersonalInfo.linkedin)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'block', width: '100%' }}>
+                        <AutoSizeTextarea
+                          value={editablePersonalInfo.linkedin}
+                          onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, linkedin: val }))}
+                        />
+                      </a>
                     </span>
                   </div>
                 )}
@@ -355,10 +375,12 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                   <div className={styles.ppContactItem}>
                     <span className={styles.ppContactLabel}>GitHub:</span>
                     <span className={styles.ppContactVal}>
-                      <AutoSizeTextarea
-                        value={editablePersonalInfo.github}
-                        onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, github: val }))}
-                      />
+                      <a href={ensureAbsoluteUrl(editablePersonalInfo.github)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'block', width: '100%' }}>
+                        <AutoSizeTextarea
+                          value={editablePersonalInfo.github}
+                          onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, github: val }))}
+                        />
+                      </a>
                     </span>
                   </div>
                 )}
@@ -427,14 +449,16 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                     </span>
                   </div>
                 )}
-                {editablePersonalInfo.website && (
+                 {editablePersonalInfo.website && (
                   <div className={styles.germanContactItem}>
                     <span className={styles.germanContactLabel}>Website:</span>
                     <span className={styles.germanContactVal}>
-                      <AutoSizeTextarea
-                        value={editablePersonalInfo.website}
-                        onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, website: val }))}
-                      />
+                      <a href={ensureAbsoluteUrl(editablePersonalInfo.website)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'block', width: '100%' }}>
+                        <AutoSizeTextarea
+                          value={editablePersonalInfo.website}
+                          onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, website: val }))}
+                        />
+                      </a>
                     </span>
                   </div>
                 )}
@@ -445,8 +469,9 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                     <span className={styles.germanContactLabel}>Telefon:</span>
                     <span className={styles.germanContactVal}>
                       <AutoSizeTextarea
-                        value={editablePersonalInfo.phone}
+                        value={formatPhoneNumber(editablePersonalInfo.phone)}
                         onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, phone: val }))}
+                        onBlur={() => setEditablePersonalInfo((p: any) => ({ ...p, phone: formatPhoneNumber(p.phone) }))}
                       />
                     </span>
                   </div>
@@ -455,10 +480,12 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                   <div className={styles.germanContactItem}>
                     <span className={styles.germanContactLabel}>LinkedIn:</span>
                     <span className={styles.germanContactVal}>
-                      <AutoSizeTextarea
-                        value={editablePersonalInfo.linkedin}
-                        onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, linkedin: val }))}
-                      />
+                      <a href={ensureAbsoluteUrl(editablePersonalInfo.linkedin)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'block', width: '100%' }}>
+                        <AutoSizeTextarea
+                          value={editablePersonalInfo.linkedin}
+                          onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, linkedin: val }))}
+                        />
+                      </a>
                     </span>
                   </div>
                 )}
@@ -466,10 +493,12 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                   <div className={styles.germanContactItem}>
                     <span className={styles.germanContactLabel}>GitHub:</span>
                     <span className={styles.germanContactVal}>
-                      <AutoSizeTextarea
-                        value={editablePersonalInfo.github}
-                        onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, github: val }))}
-                      />
+                      <a href={ensureAbsoluteUrl(editablePersonalInfo.github)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'block', width: '100%' }}>
+                        <AutoSizeTextarea
+                          value={editablePersonalInfo.github}
+                          onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, github: val }))}
+                        />
+                      </a>
                     </span>
                   </div>
                 )}
@@ -522,6 +551,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
         <div className={styles.resumeContacts} style={contactsStyleOverride}>
           {editablePersonalInfo.location && (
             <AutoSizeTextarea
+              singleLine
               value={editablePersonalInfo.location}
               onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, location: val }))}
             />
@@ -529,8 +559,9 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
           {editablePersonalInfo.email && (
             <>
               {editablePersonalInfo.location && <span>•</span>}
-              <a href={`mailto:${editablePersonalInfo.email}`} target="_blank" rel="noopener noreferrer">
+              <a href={`mailto:${editablePersonalInfo.email}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'inline-block', verticalAlign: 'baseline' }}>
                 <AutoSizeTextarea
+                  singleLine
                   value={editablePersonalInfo.email}
                   onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, email: val }))}
                 />
@@ -540,8 +571,9 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
           {editablePersonalInfo.website && (
             <>
               {(editablePersonalInfo.location || editablePersonalInfo.email) && <span>•</span>}
-              <a href={editablePersonalInfo.website.startsWith('http') ? editablePersonalInfo.website : `https://${editablePersonalInfo.website}`} target="_blank" rel="noopener noreferrer">
+              <a href={ensureAbsoluteUrl(editablePersonalInfo.website)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'inline-block', verticalAlign: 'baseline' }}>
                 <AutoSizeTextarea
+                  singleLine
                   value={editablePersonalInfo.website}
                   onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, website: val }))}
                 />
@@ -551,10 +583,12 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
           {editablePersonalInfo.phone && (
             <>
               {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website) && <span>•</span>}
-              <a href={`tel:${editablePersonalInfo.phone}`} target="_blank" rel="noopener noreferrer">
+              <a href={`tel:${editablePersonalInfo.phone}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'inline-block', verticalAlign: 'baseline' }}>
                 <AutoSizeTextarea
-                  value={editablePersonalInfo.phone}
+                  singleLine
+                  value={formatPhoneNumber(editablePersonalInfo.phone)}
                   onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, phone: val }))}
+                  onBlur={() => setEditablePersonalInfo((p: any) => ({ ...p, phone: formatPhoneNumber(p.phone) }))}
                 />
               </a>
             </>
@@ -562,8 +596,9 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
           {editablePersonalInfo.linkedin && (
             <>
               {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website || editablePersonalInfo.phone) && <span>•</span>}
-              <a href={editablePersonalInfo.linkedin.startsWith('http') ? editablePersonalInfo.linkedin : `https://${editablePersonalInfo.linkedin}`} target="_blank" rel="noopener noreferrer">
+              <a href={ensureAbsoluteUrl(editablePersonalInfo.linkedin)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'inline-block', verticalAlign: 'baseline' }}>
                 <AutoSizeTextarea
+                  singleLine
                   value={editablePersonalInfo.linkedin}
                   onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, linkedin: val }))}
                 />
@@ -573,8 +608,9 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
           {editablePersonalInfo.github && (
             <>
               {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website || editablePersonalInfo.phone || editablePersonalInfo.linkedin) && <span>•</span>}
-              <a href={editablePersonalInfo.github.startsWith('http') ? editablePersonalInfo.github : `https://${editablePersonalInfo.github}`} target="_blank" rel="noopener noreferrer">
+              <a href={ensureAbsoluteUrl(editablePersonalInfo.github)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'inline-block', verticalAlign: 'baseline' }}>
                 <AutoSizeTextarea
+                  singleLine
                   value={editablePersonalInfo.github}
                   onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, github: val }))}
                 />
@@ -640,6 +676,19 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
             </button>
             <button
               type="button"
+              className={styles.deleteBlockBtn}
+              title="Hide Section"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm(`Hide section "${unit.titleText}"? You can re-enable it in the sidebar.`)) {
+                  setSections(prev => prev.map(s => s.id === unit.sectionId ? { ...s, visible: false } : s));
+                }
+              }}
+            >
+              <EyeOff size={12} />
+            </button>
+            <button
+              type="button"
               className={styles.aiSectionBtn}
               title="AI Polish & Section Tailor"
               onClick={(e) => {
@@ -661,19 +710,6 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
               }}
             >
               <Settings size={12} />
-            </button>
-            <button
-              type="button"
-              className={styles.deleteBlockBtn}
-              title="Hide Section"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (window.confirm(`Hide section "${unit.titleText}"? You can re-enable it in the sidebar.`)) {
-                  setSections(prev => prev.map(s => s.id === unit.sectionId ? { ...s, visible: false } : s));
-                }
-              }}
-            >
-              <EyeOff size={12} />
             </button>
           </div>
         )}
@@ -831,10 +867,11 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                   onChange={(val) => setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, position: val } : e))}
                 />
               </h4>
-              <div className={isPP ? styles.ppJobMeta : styles.germanJobMeta}>
-                <span className={isPP ? styles.ppCompany : styles.germanCompany}>
+              <div className={isPP ? styles.ppJobMeta : styles.germanJobMeta} style={{ width: '100%' }}>
+                <span className={isPP ? styles.ppCompany : styles.germanCompany} style={{ display: 'block', width: '100%' }}>
                   <AutoSizeTextarea
                     value={`${exp.company || ''}${exp.location ? `, ${exp.location}` : ''}`}
+                    placeholder="Company Name, Location"
                     onChange={(val) => {
                       const commaIndex = val.indexOf(',');
                       let newComp = val;
@@ -842,6 +879,8 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                       if (commaIndex !== -1) {
                         newComp = val.substring(0, commaIndex).trim();
                         newLoc = val.substring(commaIndex + 1).trim();
+                      } else {
+                        newComp = val;
                       }
                       setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, company: newComp, location: newLoc } : e));
                     }}
@@ -861,7 +900,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                     const key = `exp-bullet-${expIdx}-${bulletIdx}`;
                     return (
                       <li key={bulletIdx} onClick={handleContainerClickToFocus} className={`${isPP ? styles.ppBulletItem : styles.germanBulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                        <span className={styles.bulletDot} />
+                        <span className={styles.bulletDot}>•</span>
                         {renderHoverAiControls(key, bullet, [
                           { label: "Action Verbs", prompt: "Make it punchier starting with strong active verbs" },
                           { label: "Metrics & ROI", prompt: "Highlight quantifiable metrics, percentage gains, or ROI" },
@@ -923,9 +962,10 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                 />
               </span>
             </div>
-            <div className={styles.itemCompany}>
+            <div className={styles.itemCompany} style={{ width: '100%' }}>
               <AutoSizeTextarea
                 value={`${exp.company || ''}${exp.location ? `, ${exp.location}` : ''}`}
+                placeholder="Company Name, Location"
                 onChange={(val) => {
                   const commaIndex = val.indexOf(',');
                   let newComp = val;
@@ -933,6 +973,8 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                   if (commaIndex !== -1) {
                     newComp = val.substring(0, commaIndex).trim();
                     newLoc = val.substring(commaIndex + 1).trim();
+                  } else {
+                    newComp = val;
                   }
                   setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, company: newComp, location: newLoc } : e));
                 }}
@@ -951,7 +993,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                   const key = `exp-bullet-${expIdx}-${bulletIdx}`;
                   return (
                     <li key={bulletIdx} className={`${styles.bulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                      <span className={styles.bulletDot} />
+                      <span className={styles.bulletDot}>•</span>
                       {renderHoverAiControls(key, bullet, [
                         { label: "Action Verbs", prompt: "Make it punchier starting with strong active verbs" },
                         { label: "Metrics & ROI", prompt: "Highlight quantifiable metrics, percentage gains, or ROI" },
@@ -1072,81 +1114,73 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
             </div>
             <div className={isPP ? styles.ppRightCol : styles.germanRightCol}>
               {(() => {
-                const roleNode = hasRole ? (
-                  <div key="role" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'text', fontSize: '0.88em', color: '#1e293b', fontWeight: 600, maxWidth: '100%' }}>
-                    <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Role:</span>
-                    <AutoSizeTextarea
-                      singleLine
-                      style={{ fontSize: '1em', fontWeight: 600, color: '#1e293b' }}
-                      value={proj.role || ''}
-                      placeholder="Your Role / Contributions..."
-                      onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
-                    />
-                  </div>
-                ) : null;
-
-                const techNode = hasTech ? (
-                  <div key="tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'text', fontSize: '0.88em', color: '#334155', fontWeight: 600, maxWidth: '100%' }}>
-                    <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Tech:</span>
-                    <AutoSizeTextarea
-                      singleLine
-                      style={{ fontSize: '1em', fontWeight: 600, color: '#334155', fontStyle: 'italic' }}
-                      value={techString}
-                      placeholder="Technologies used (e.g. React, Node.js, Python)..."
-                      onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
-                        ...p,
-                        technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
-                      } : p))}
-                    />
-                  </div>
-                ) : null;
-
-                const linkVal = proj.link || proj.github_url || proj.demo_url || '';
-                const hasLink = Boolean(linkVal && linkVal.trim());
-                const linkNode = hasLink ? (
-                  <div key="link" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.88em', fontWeight: 600, color: '#1e293b', maxWidth: '100%' }}>
-                    <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Link:</span>
-                    <a
-                      href={linkVal.startsWith('http') ? linkVal : `https://${linkVal}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: '#1e293b', textDecoration: 'underline', textDecorationColor: 'rgba(30, 41, 59, 0.4)', fontWeight: 600, fontSize: '1em', maxWidth: '100%', overflow: 'hidden' }}
-                    >
+                const activeNodes = [];
+                if (hasRole) {
+                  activeNodes.push(
+                    <div key="role" style={{ display: 'inline-flex', alignItems: 'center', cursor: 'text', fontSize: '0.88em', color: '#1e293b', fontWeight: 500 }}>
                       <AutoSizeTextarea
                         singleLine
-                        style={{ fontSize: '1em', fontWeight: 600, color: '#1e293b' }}
-                        value={linkVal}
-                        placeholder="GitHub / Live Demo Link..."
-                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, link: val } : p))}
+                        style={{ fontSize: '1em', fontWeight: 500, color: '#1e293b' }}
+                        value={proj.role || ''}
+                        placeholder="Your Role / Contributions..."
+                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
                       />
-                    </a>
-                  </div>
-                ) : null;
-
-                const activeNodes = [];
-                if (hasRole) activeNodes.push({ type: 'role', node: roleNode });
-                if (hasTech) activeNodes.push({ type: 'tech', node: techNode });
-                if (hasLink) activeNodes.push({ type: 'link', node: linkNode });
-
-                if (activeNodes.length === 0) return null;
-
-                if (activeNodes.length === 3) {
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%', marginBottom: '4px' }}>
-                      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', maxWidth: '100%' }}>
-                        {roleNode}
-                        {techNode}
-                      </div>
-                      <div style={{ maxWidth: '100%' }}>
-                        {linkNode}
-                      </div>
+                    </div>
+                  );
+                }
+                if (hasTech) {
+                  activeNodes.push(
+                    <div key="tech" style={{ display: 'inline-flex', alignItems: 'center', cursor: 'text', fontSize: '0.88em', color: '#334155', fontWeight: 400 }}>
+                      <AutoSizeTextarea
+                        singleLine
+                        style={{ fontSize: '1em', fontWeight: 400, color: '#334155', fontStyle: 'italic' }}
+                        value={techString}
+                        placeholder="Technologies used..."
+                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
+                          ...p,
+                          technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
+                        } : p))}
+                      />
                     </div>
                   );
                 }
 
+                const linkVal = proj.link || proj.github_url || proj.demo_url || '';
+                const hasLink = Boolean(linkVal && linkVal.trim());
+                if (hasLink) {
+                  activeNodes.push(
+                    <div key="link" style={{ display: 'inline-flex', alignItems: 'center', fontSize: '0.88em', fontWeight: 500, color: '#1e293b' }}>
+                      <a
+                        href={linkVal.startsWith('http') ? linkVal : `https://${linkVal}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: '#1e293b', textDecoration: 'underline', textDecorationColor: 'rgba(30, 41, 59, 0.4)', fontWeight: 500, fontSize: '1em', overflow: 'hidden' }}
+                      >
+                        <AutoSizeTextarea
+                          singleLine
+                          style={{ fontSize: '1em', fontWeight: 500, color: '#1e293b' }}
+                          value={linkVal}
+                          placeholder="GitHub / Live Demo Link..."
+                          onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, link: val } : p))}
+                        />
+                      </a>
+                    </div>
+                  );
+                }
+
+                if (activeNodes.length === 0) return null;
+
                 return (
-                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', width: '100%', maxWidth: '100%', marginBottom: '4px' }}>
-                    {activeNodes.map(n => n.node)}
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', width: '100%', maxWidth: '100%', marginBottom: '4px' }}>
+                    {activeNodes.reduce((acc: React.ReactNode[], node, idx) => {
+                      if (idx > 0) {
+                        acc.push(
+                          <span key={`sep-${idx}`} style={{ color: '#94a3b8', fontSize: '0.85em', userSelect: 'none' }}>|</span>
+                        );
+                      }
+                      acc.push(node);
+                      return acc;
+                    }, [])}
                   </div>
                 );
               })()}
@@ -1156,7 +1190,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                   const key = `proj-bullet-${projIdx}-${bulletIdx}`;
                   return (
                     <li key={bulletIdx} className={`${isPP ? styles.ppBulletItem : styles.germanBulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                      <span className={styles.bulletDot} />
+                      <span className={styles.bulletDot}>•</span>
                       {renderHoverAiControls(key, bullet, [
                         { label: "Action Verbs", prompt: "Make it punchier with strong active verbs" },
                         { label: "Tech Stack", prompt: "Highlight modern tech stack & system architecture" },
@@ -1218,81 +1252,73 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
               </div>
             )}
             {(() => {
-              const roleNode = hasRole ? (
-                <div key="role" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'text', fontSize: '0.88em', color: '#1e293b', fontWeight: 600, maxWidth: '100%' }}>
-                  <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Role:</span>
-                  <AutoSizeTextarea
-                    singleLine
-                    style={{ fontSize: '1em', fontWeight: 600, color: '#1e293b' }}
-                    value={proj.role || ''}
-                    placeholder="Your Role / Contributions..."
-                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
-                  />
-                </div>
-              ) : null;
-
-              const techNode = hasTech ? (
-                <div key="tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'text', fontSize: '0.88em', color: '#334155', fontWeight: 600, maxWidth: '100%' }}>
-                  <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Tech:</span>
-                  <AutoSizeTextarea
-                    singleLine
-                    style={{ fontSize: '1em', fontWeight: 600, color: '#334155', fontStyle: 'italic' }}
-                    value={techString}
-                    placeholder="Technologies used (e.g. React, Node.js, Python)..."
-                    onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
-                      ...p,
-                      technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
-                    } : p))}
-                  />
-                </div>
-              ) : null;
-
-              const linkVal = proj.link || proj.github_url || proj.demo_url || '';
-              const hasLink = Boolean(linkVal && linkVal.trim());
-              const linkNode = hasLink ? (
-                <div key="link" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.88em', fontWeight: 600, color: '#1e293b', maxWidth: '100%' }}>
-                  <span style={{ fontSize: '1em', color: '#1e293b', fontStyle: 'normal', fontWeight: 600, flexShrink: 0 }}>Link:</span>
-                  <a
-                    href={linkVal.startsWith('http') ? linkVal : `https://${linkVal}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: '#1e293b', textDecoration: 'underline', textDecorationColor: 'rgba(30, 41, 59, 0.4)', fontWeight: 600, fontSize: '1em', maxWidth: '100%', overflow: 'hidden' }}
-                  >
+              const activeNodes = [];
+              if (hasRole) {
+                activeNodes.push(
+                  <div key="role" style={{ display: 'inline-flex', alignItems: 'center', cursor: 'text', fontSize: '0.88em', color: '#1e293b', fontWeight: 500 }}>
                     <AutoSizeTextarea
                       singleLine
-                      style={{ fontSize: '1em', fontWeight: 600, color: '#1e293b' }}
-                      value={linkVal}
-                      placeholder="GitHub / Live Demo Link..."
-                      onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, link: val } : p))}
+                      style={{ fontSize: '1em', fontWeight: 500, color: '#1e293b' }}
+                      value={proj.role || ''}
+                      placeholder="Your Role / Contributions..."
+                      onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
                     />
-                  </a>
-                </div>
-              ) : null;
-
-              const activeNodes = [];
-              if (hasRole) activeNodes.push({ type: 'role', node: roleNode });
-              if (hasTech) activeNodes.push({ type: 'tech', node: techNode });
-              if (hasLink) activeNodes.push({ type: 'link', node: linkNode });
-
-              if (activeNodes.length === 0) return null;
-
-              if (activeNodes.length === 3) {
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%', marginBottom: '4px' }}>
-                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      {roleNode}
-                      {techNode}
-                    </div>
-                    <div>
-                      {linkNode}
-                    </div>
+                  </div>
+                );
+              }
+              if (hasTech) {
+                activeNodes.push(
+                  <div key="tech" style={{ display: 'inline-flex', alignItems: 'center', cursor: 'text', fontSize: '0.88em', color: '#334155', fontWeight: 400 }}>
+                    <AutoSizeTextarea
+                      singleLine
+                      style={{ fontSize: '1em', fontWeight: 400, color: '#334155', fontStyle: 'italic' }}
+                      value={techString}
+                      placeholder="Technologies used..."
+                      onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
+                        ...p,
+                        technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
+                      } : p))}
+                    />
                   </div>
                 );
               }
 
+              const linkVal = proj.link || proj.github_url || proj.demo_url || '';
+              const hasLink = Boolean(linkVal && linkVal.trim());
+              if (hasLink) {
+                activeNodes.push(
+                  <div key="link" style={{ display: 'inline-flex', alignItems: 'center', fontSize: '0.88em', fontWeight: 500, color: '#1e293b' }}>
+                    <a
+                      href={linkVal.startsWith('http') ? linkVal : `https://${linkVal}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#1e293b', textDecoration: 'underline', textDecorationColor: 'rgba(30, 41, 59, 0.4)', fontWeight: 500, fontSize: '1em', overflow: 'hidden' }}
+                    >
+                      <AutoSizeTextarea
+                        singleLine
+                        style={{ fontSize: '1em', fontWeight: 500, color: '#1e293b' }}
+                        value={linkVal}
+                        placeholder="GitHub / Live Demo Link..."
+                        onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, link: val } : p))}
+                      />
+                    </a>
+                  </div>
+                );
+              }
+
+              if (activeNodes.length === 0) return null;
+
               return (
-                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', width: '100%', marginBottom: '4px' }}>
-                  {activeNodes.map(n => n.node)}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', width: '100%', marginBottom: '4px' }}>
+                  {activeNodes.reduce((acc: React.ReactNode[], node, idx) => {
+                    if (idx > 0) {
+                      acc.push(
+                        <span key={`sep-${idx}`} style={{ color: '#94a3b8', fontSize: '0.85em', userSelect: 'none' }}>|</span>
+                      );
+                    }
+                    acc.push(node);
+                    return acc;
+                  }, [])}
                 </div>
               );
             })()}
@@ -1302,7 +1328,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                 const key = `proj-bullet-${projIdx}-${bulletIdx}`;
                 return (
                   <li key={bulletIdx} onClick={handleContainerClickToFocus} className={`${styles.bulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                    <span className={styles.bulletDot} />
+                    <span className={styles.bulletDot}>•</span>
                     {renderHoverAiControls(key, bullet, [
                       { label: "Action Verbs", prompt: "Make it punchier with strong active verbs" },
                       { label: "Tech Stack", prompt: "Highlight modern tech stack & system architecture" },
@@ -1446,7 +1472,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                   const key = `edu-bullet-${eduIdx}-${bulletIdx}`;
                   return (
                     <li key={bulletIdx} className={`${isPP ? styles.ppBulletItem : styles.germanBulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                      <span className={styles.bulletDot} />
+                      <span className={styles.bulletDot}>•</span>
                       {renderHoverAiControls(key, bullet, [
                         { label: "Concise", prompt: "Make concise and academic" },
                         { label: "Coursework", prompt: "Highlight key relevant technical coursework & projects" },
@@ -1536,7 +1562,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                 const key = `edu-bullet-${eduIdx}-${bulletIdx}`;
                 return (
                   <li key={bulletIdx} className={`${styles.bulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                    <span className={styles.bulletDot} />
+                    <span className={styles.bulletDot}>•</span>
                     {renderHoverAiControls(key, bullet, [
                       { label: "Concise", prompt: "Make concise and academic" },
                       { label: "Coursework", prompt: "Highlight key relevant technical coursework & projects" },
@@ -1620,7 +1646,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'flex-start', paddingLeft: '24px', width: '100%' }}>
-          <span className={styles.bulletDot} />
+          <span className={styles.bulletDot}>•</span>
           <div style={{ flex: 1 }}>
             {(() => {
               const rawLangs = skillsList.map(s => s.name).join(', ');
@@ -1669,7 +1695,27 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
         onMouseLeave={() => setHoveredSectionId(null)}
       >
         {!isMeasuring && (
-          <div className={`${styles.itemControls} no-print`} style={{ left: '-48px' }}>
+          <div className={`${styles.itemControls} no-print`} style={{ left: '-82px' }}>
+            {handleMoveSkillCategory && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleMoveSkillCategory(cat, 'up')}
+                  className={styles.moveItemBtn}
+                  title="Move Category Up"
+                >
+                  <ArrowUp size={12} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMoveSkillCategory(cat, 'down')}
+                  className={styles.moveItemBtn}
+                  title="Move Category Down"
+                >
+                  <ArrowDown size={12} />
+                </button>
+              </>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -1686,7 +1732,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
         )}
 
         <div style={{ display: 'flex', alignItems: 'flex-start', paddingLeft: '24px', width: '100%' }}>
-          <span className={styles.bulletDot} />
+          <span className={styles.bulletDot}>•</span>
           <strong style={{ fontWeight: 700, marginRight: '5px', color: 'var(--text-color, #1e293b)' }}>
             {catLabel}:
           </strong>

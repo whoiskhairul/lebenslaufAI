@@ -74,6 +74,9 @@ export interface ResumeVersion {
       sections?: any[];
       customStyles?: any;
       headerStyles?: any;
+      categoryOrder?: string[];
+      languagesFirst?: boolean;
+      languagesTitle?: string;
     };
   };
   explanations: Array<{

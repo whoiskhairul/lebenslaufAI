@@ -40,7 +40,7 @@ export const AutoSizeTextarea: React.FC<AutoSizeTextareaProps> = ({
           fontFamily: 'inherit',
           fontWeight: 'inherit',
           color: 'inherit',
-          padding: '2px 0',
+          padding: '1px 3px',
           minHeight: '1.2em',
           boxSizing: 'border-box',
           ...style
@@ -66,10 +66,12 @@ export const AutoSizeTextarea: React.FC<AutoSizeTextareaProps> = ({
   const adjustHeight = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight + 2}px`;
       if (singleLine) {
         textareaRef.current.style.width = 'auto';
-        textareaRef.current.style.width = `${Math.max(30, textareaRef.current.scrollWidth + 4)}px`;
+        const hasVal = Boolean(localVal || value);
+        const minW = hasVal ? 5 : 30;
+        textareaRef.current.style.width = `${Math.max(minW, textareaRef.current.scrollWidth + 6)}px`;
       }
     }
   };
@@ -135,7 +137,7 @@ export const AutoSizeTextarea: React.FC<AutoSizeTextareaProps> = ({
         maxWidth: '100%',
         cursor: 'text',
         minHeight: '1.2em',
-        verticalAlign: 'middle'
+        verticalAlign: 'baseline'
       }}
     >
       <textarea
@@ -158,8 +160,10 @@ export const AutoSizeTextarea: React.FC<AutoSizeTextareaProps> = ({
           border: 'none',
           background: 'transparent',
           outline: 'none',
-          padding: 0,
-          margin: 0,
+          padding: '1px 3px',
+          margin: '-1px -3px',
+          boxSizing: 'border-box',
+          verticalAlign: 'baseline',
           color: 'inherit',
           fontFamily: 'inherit',
           fontSize: 'inherit',
