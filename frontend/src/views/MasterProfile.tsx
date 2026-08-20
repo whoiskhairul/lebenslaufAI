@@ -25,6 +25,7 @@ interface PersonalInfo {
   github?: string;
   website?: string;
   image_url?: string;
+  signature_image?: string;
 }
 
 interface WorkExperience {
@@ -100,7 +101,8 @@ export const MasterProfile: React.FC = () => {
       linkedin: '',
       github: '',
       website: '',
-      image_url: ''
+      image_url: '',
+      signature_image: ''
     },
     work_experiences: [],
     projects: [],
@@ -111,6 +113,7 @@ export const MasterProfile: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSigDragOver, setIsSigDragOver] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [msg, setMsg] = useState({ type: '', text: '' });
 
@@ -179,6 +182,47 @@ export const MasterProfile: React.FC = () => {
       }));
     };
     reader.readAsDataURL(file);
+  };
+
+  const processAndSetSignatureFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (readerEvent) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imgData.data;
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            if (r > 200 && g > 200 && b > 200) {
+              data[i + 3] = 0;
+            }
+          }
+          ctx.putImageData(imgData, 0, 0);
+          const base64 = canvas.toDataURL('image/png');
+          setProfile(prev => ({
+            ...prev,
+            personal_info: { ...prev.personal_info, signature_image: base64 }
+          }));
+        }
+      };
+      img.src = readerEvent.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processAndSetSignatureFile(file);
+    }
   };
 
   const [parseError, setParseError] = useState<string | null>(null);
@@ -837,6 +881,119 @@ export const MasterProfile: React.FC = () => {
                           </Button>
                         )}
                       </div>
+                    </div>
+                  </div>
+
+                  <div className={styles.formGrid} style={{ marginTop: '16px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+                      <label htmlFor="infoSignatureUpload" style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main, #1e293b)' }}>Signature Image</label>
+                      {profile.personal_info.signature_image ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '320px' }}>
+                          <div
+                            style={{
+                              position: 'relative',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '16px',
+                              borderRadius: '8px',
+                              border: '1px solid var(--card-border, #e2e8f0)',
+                              backgroundColor: '#ffffff',
+                              backgroundImage: 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px), radial-gradient(#e2e8f0 1.5px, transparent 1.5px)',
+                              backgroundSize: '12px 12px',
+                              backgroundPosition: '0 0, 6px 6px',
+                              minHeight: '60px',
+                              boxSizing: 'border-box'
+                            }}
+                          >
+                            <img
+                              src={profile.personal_info.signature_image}
+                              alt="Signature Preview"
+                              style={{ maxHeight: '44px', maxWidth: '100%', objectFit: 'contain' }}
+                            />
+                          </div>
+                          
+                          <Button
+                            type="button"
+                            variant="danger"
+                            onClick={() => setProfile({
+                              ...profile,
+                              personal_info: { ...profile.personal_info, signature_image: '' }
+                            })}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              width: '100%',
+                              padding: '8px',
+                              fontSize: '12px',
+                              fontWeight: 600
+                            }}
+                          >
+                            Remove Signature
+                          </Button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '320px' }}>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            id="infoSignatureUpload"
+                            onChange={handleSignatureUpload}
+                            style={{ display: 'none' }}
+                          />
+                          <div
+                            onClick={() => document.getElementById('infoSignatureUpload')?.click()}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setIsSigDragOver(true);
+                            }}
+                            onDragLeave={() => {
+                              setIsSigDragOver(false);
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setIsSigDragOver(false);
+                              const file = e.dataTransfer.files?.[0];
+                              if (file) {
+                                processAndSetSignatureFile(file);
+                              }
+                            }}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '16px',
+                              borderRadius: '8px',
+                              border: isSigDragOver ? '1.5px dashed var(--primary, #6366f1)' : '1.5px dashed var(--card-border, #cbd5e1)',
+                              backgroundColor: isSigDragOver ? '#e0e7ff22' : '#f8fafc',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              textAlign: 'center'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'var(--primary, #6366f1)';
+                              e.currentTarget.style.backgroundColor = '#e0e7ff22';
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSigDragOver) {
+                                e.currentTarget.style.borderColor = 'var(--card-border, #cbd5e1)';
+                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                              }
+                            }}
+                          >
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary, #6366f1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '6px' }}>
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                              <polyline points="17 8 12 3 7 8" />
+                              <line x1="12" y1="3" x2="12" y2="15" />
+                            </svg>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary, #4f46e5)' }}>Upload Signature</span>
+                            <span style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>Transparent background-removed canvas output.</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

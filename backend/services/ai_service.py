@@ -238,6 +238,7 @@ class AIService:
         lang_instruction = (
             "CRITICAL GERMAN LANGUAGE REQUIREMENT:\n"
             "- Translate and write ALL tailored summary, ALL experience bullet points, and ALL project bullet points in GERMAN (Deutsch).\n"
+            "- Translate ALL experience position titles, company locations, education degrees, fields of study, education locations, skill names, skill categories, and personal info titles & locations to GERMAN (Deutsch) (e.g., 'Junior Software Developer' -> 'Junior-Softwareentwickler', 'Computer Science' -> 'Informatik', 'Germany' -> 'Deutschland', 'English' -> 'Englisch', 'fluent' -> 'fließend').\n"
             "- Provide German section header names in 'tailored_section_names': summary -> 'Zusammenfassung', experience -> 'Berufserfahrung', projects -> 'Projekte', education -> 'Ausbildung', skills -> 'Kenntnisse'.\n\n"
             if is_german
             else "Write ALL tailored summary, experience bullets, and project bullets in ENGLISH.\n\n"
@@ -275,15 +276,36 @@ class AIService:
             "  \"tailored_experiences\": [\n"
             "     {\n"
             "       \"id\": \"string (UUID matches work_experience.id)\",\n"
-            "       \"bullets\": [\"string\"]\n"
+            "       \"position\": \"string (MUST be in target language)\",\n"
+            "       \"location\": \"string (MUST be in target language)\",\n"
+            "       \"bullets\": [\"string (MUST be in target language)\"]\n"
             "     }\n"
             "  ],\n"
             "  \"tailored_projects\": [\n"
             "     {\n"
             "       \"id\": \"string (UUID matches project.id)\",\n"
-            "       \"bullets\": [\"string\"]\n"
+            "       \"bullets\": [\"string (MUST be in target language)\"]\n"
             "     }\n"
             "  ],\n"
+            "  \"tailored_educations\": [\n"
+            "     {\n"
+            "       \"id\": \"string (UUID matches education.id)\",\n"
+            "       \"degree\": \"string (MUST be in target language)\",\n"
+            "       \"field_of_study\": \"string (MUST be in target language)\",\n"
+            "       \"location\": \"string (MUST be in target language)\"\n"
+            "     }\n"
+            "  ],\n"
+            "  \"tailored_skills\": [\n"
+            "     {\n"
+            "       \"id\": \"string (UUID matches skill.id)\",\n"
+            "       \"name\": \"string (MUST be in target language)\",\n"
+            "       \"category\": \"string (MUST be in target language)\"\n"
+            "     }\n"
+            "  ],\n"
+            "  \"tailored_personal_info\": {\n"
+            "     \"title\": \"string (MUST be in target language)\",\n"
+            "     \"location\": \"string (MUST be in target language)\"\n"
+            "  },\n"
             "  \"tailored_section_names\": {\n"
             "     \"summary\": \"string\",\n"
             "     \"experience\": \"string\",\n"
@@ -325,103 +347,226 @@ class AIService:
         if result_text:
             try:
                 res = json.loads(result_text)
-                res['tailored_skills'] = sorted_skills
-                if not res.get('tailored_projects'):
+                
+                # Merge AI translated skills
+                ai_skills = res.get('tailored_skills', [])
+                if isinstance(ai_skills, list) and ai_skills:
+                    merged_skills = []
+                    for s in sorted_skills:
+                        matching_ai = next((ai for ai in ai_skills if str(ai.get('id')) == str(s.get('id'))), None)
+                        if matching_ai:
+                            merged_skills.append({
+                                **s,
+                                "name": matching_ai.get('name', s.get('name')),
+                                "category": matching_ai.get('category', s.get('category'))
+                            })
+                        else:
+                            merged_skills.append(s)
+                    res['tailored_skills'] = merged_skills
+                else:
+                    res['tailored_skills'] = sorted_skills
+
+                # Merge AI translated experience fields (position, location)
+                ai_exps = res.get('tailored_experiences', [])
+                if isinstance(ai_exps, list) and ai_exps:
+                    merged_exps = []
+                    for e in ai_exps:
+                        orig_e = next((oe for oe in profile_data.get('work_experiences', []) if str(oe.get('id')) == str(e.get('id'))), None)
+                        if orig_e:
+                            merged_exps.append({
+                                "id": e.get('id'),
+                                "bullets": e.get('bullets', orig_e.get('bullets', [])),
+                                "position": e.get('position', orig_e.get('position', '')),
+                                "location": e.get('location', orig_e.get('location', ''))
+                            })
+                        else:
+                            merged_exps.append(e)
+                    res['tailored_experiences'] = merged_exps
+
+                # Merge AI translated projects
+                ai_projs = res.get('tailored_projects', [])
+                if isinstance(ai_projs, list) and ai_projs:
+                    merged_projs = []
+                    for p in ai_projs:
+                        orig_p = next((op for op in profile_data.get('projects', []) if str(op.get('id')) == str(p.get('id'))), None)
+                        if orig_p:
+                            merged_projs.append({
+                                "id": p.get('id'),
+                                "bullets": p.get('bullets', orig_p.get('bullets', [])),
+                                "title": p.get('title', orig_p.get('title', p.get('name', ''))),
+                                "role": p.get('role', orig_p.get('role', '')),
+                                "technologies": orig_p.get('technologies', p.get('technologies', []))
+                            })
+                        else:
+                            merged_projs.append(p)
+                    res['tailored_projects'] = merged_projs
+                else:
                     res['tailored_projects'] = sorted_projects
+
+                # Merge AI translated education fields (degree, field_of_study, location)
+                ai_edus = res.get('tailored_educations', [])
+                if isinstance(ai_edus, list) and ai_edus:
+                    merged_edus = []
+                    for edu in ai_edus:
+                        orig_edu = next((oe for oe in profile_data.get('educations', []) if str(oe.get('id')) == str(edu.get('id'))), None)
+                        if orig_edu:
+                            merged_edus.append({
+                                "id": edu.get('id'),
+                                "degree": edu.get('degree', orig_edu.get('degree', '')),
+                                "field_of_study": edu.get('field_of_study', orig_edu.get('field_of_study', '')),
+                                "location": edu.get('location', orig_edu.get('location', ''))
+                            })
+                        else:
+                            merged_edus.append(edu)
+                    res['tailored_educations'] = merged_edus
+                else:
+                    res['tailored_educations'] = []
+
+                # Merge AI translated personal info
+                ai_pi = res.get('tailored_personal_info', {})
+                if isinstance(ai_pi, dict) and ai_pi:
+                    res['tailored_personal_info'] = {
+                        "title": ai_pi.get('title', profile_data.get('personal_info', {}).get('title', '')),
+                        "location": ai_pi.get('location', profile_data.get('personal_info', {}).get('location', ''))
+                    }
+                else:
+                    res['tailored_personal_info'] = {}
+
                 return res
             except ValueError:
                 pass
-                
+        
         raise ValueError("AI Service failed to tailor resume. Please check your API key or try again later.")
 
     @classmethod
     def write_cover_letter(cls, profile_data, job_data, tone="professional", length="medium", api_key=None, target_language="en"):
-        profile_text = json.dumps(profile_data, default=str)
-        job_text = json.dumps(job_data, default=str)
-        
+        import json
         from datetime import datetime
         today_str = datetime.now().strftime("%B %d, %Y")
         
         is_german = target_language in ['de', 'deutsch', 'german']
-        lang_prompt = (
-            "CRITICAL: Write the entire cover letter in GERMAN (Deutsch). Use authentic German business phrasing (Bewerbungsschreiben), e.g., 'Sehr geehrte Damen und Herren,' or 'Sehr geehrte/r Frau/Herr [Hiring Manager],', 'Mit freundlichen Grüßen', etc.\n\n"
-            if is_german
-            else "Write the cover letter in ENGLISH.\n\n"
-        )
+        app_language = 'GERMAN' if is_german else 'ENGLISH'
+        
+        # Extract metadata from job_data
+        position = job_data.get('position', '') or 'Not Provided'
+        company = job_data.get('company', '') or 'Not Provided'
+        job_description = job_data.get('job_description', '') or 'Not Provided'
+        company_url = job_data.get('url', '') or 'NOT PROVIDED'
+        contact_person = job_data.get('contact_name', '') or 'NOT PROVIDED'
+        salary_expectation = job_data.get('salary', '') or 'NOT PROVIDED'
+        notes_text = job_data.get('notes', '') or ''
+        
+        ref_number = 'NOT PROVIDED'
+        starting_date = 'NOT PROVIDED'
+        relocation = 'NOT APPLICABLE'
+        referral = 'NONE'
+        motivation = 'NOT PROVIDED'
+        
+        # Format candidate's resume/profile details nicely for the LLM
+        personal_info = profile_data.get('personal_info', {}) or {}
+        full_name = personal_info.get('full_name', '') or ''
+        email = personal_info.get('email', '') or ''
+        phone = personal_info.get('phone', '') or ''
+        location = personal_info.get('location', '') or ''
+        
+        profile_text = json.dumps(profile_data, default=str)
         
         system_prompt = (
-            f"You are a senior technical recruiter, hiring manager, and professional resume writer with 20+ years of experience hiring software engineers in Germany and the EU.\n\n"
-            f"{lang_prompt}"
-            f"Write a personalized, ATS-friendly, human-sounding cover letter for the position the candidate is applying to using the information provided (resume contents, job description, company, and any extra notes).\n\n"
-            f"Today's date is {today_str}.\n\n"
-            f"## Format (Germany)\n"
-            f"Follow the modern German Bewerbungsschreiben format.\n"
-            f"- A4 paper\n"
-            f"- Maximum 1 page (250–380 words)\n"
-            f"- Left-aligned\n"
-            f"- 2 cm margins\n"
-            f"- Clean, modern layout\n"
-            f"- No tables, graphics, emojis, decorative formatting, or excessive bold text\n"
-            f"- Professional PDF-ready formatting\n\n"
-            f"Layout:\n"
-            f"My Header\n"
-            f"(Name, Location, Phone, Email, LinkedIn, GitHub)\n\n"
-            f"Date\n\n"
-            f"Hiring Manager\n"
-            f"Company\n\n"
-            f"Salutation\n\n"
-            f"Body\n\n"
-            f"Closing\n\n"
-            f"My Name\n\n"
-            f"## Structure\n"
-            f"Write four concise paragraphs:\n"
-            f"1. Opening\n"
-            f"- Mention the position.\n"
-            f"- Explain why this company interests me.\n"
-            f"- Briefly summarize why I fit.\n"
-            f"2. Experience\n"
-            f"- Highlight the most relevant internship(s), work, and projects.\n"
-            f"- Match my experience with the job description.\n"
-            f"- Focus on impact, responsibilities, and results rather than listing technologies.\n"
-            f"3. Motivation\n"
-            f"- Show genuine interest in the company.\n"
-            f"- Reference its products, mission, engineering culture, or technologies.\n"
-            f"- Explain why I want to contribute and grow there.\n"
-            f"4. Closing\n"
-            f"- Thank the recruiter.\n"
-            f"- Express enthusiasm for an interview.\n"
-            f"- End professionally.\n\n"
-            f"## Writing Style\n"
-            f"Write like an experienced human—not AI.\n"
-            f"The tone should be:\n"
-            f"- Natural, Professional, Warm, Confident, Humble, Clear, Concise, Intelligent.\n"
-            f"Vary sentence length, avoid repetitive sentence structures, and make the letter read naturally when spoken aloud.\n\n"
-            f"## Humanization Rules\n"
-            f"Avoid AI clichés and generic phrases such as:\n"
-            f"- 'I am writing to express...'\n"
-            f"- 'I am excited to apply...'\n"
-            f"- 'I believe I am a perfect fit...'\n"
-            f"- 'I possess strong...'\n"
-            f"- 'I have always been passionate...'\n"
-            f"- 'I am thrilled...'\n"
-            f"- 'I would be honored...'\n"
-            f"Avoid buzzwords, fluff, exaggerated enthusiasm, and empty adjectives.\n"
-            f"Instead:\n"
-            f"- Show rather than tell. Use specific examples. Let achievements speak for themselves. Sound authentic.\n\n"
-            f"## Content Rules\n"
-            f"Do NOT repeat my resume. Expand on my experiences by explaining: what I built, why it mattered, what problems I solved, and what I learned.\n"
-            f"Every paragraph must add new value. When mentioning technologies, explain how they were used instead of listing them.\n\n"
-            f"## Customization\n"
-            f"Analyze the job description and naturally integrate: required skills, preferred skills, responsibilities, company values, and ATS keywords.\n"
-            f"Tailor every paragraph specifically to this company. Never produce a generic letter.\n\n"
-            f"## Quality Checklist\n"
-            f"Before returning the final letter, silently verify:\n"
-            f"✓ Fits on one A4 page, ✓ 250–380 words, ✓ Reads naturally, ✓ Human-written style, ✓ Company-specific, ✓ ATS-friendly, ✓ No resume repetition, ✓ No invented experience, ✓ No grammar mistakes, ✓ Strong opening and closing, ✓ Every sentence adds value.\n\n"
-            f"Return ONLY the final cover letter text. No preamble, no intro, no conversational filler."
+            "You are an expert German application writer, senior technology recruiter and hiring manager specializing in software-development roles in Germany.\n\n"
+            "Create a highly tailored German or English application cover letter for the position and company provided below.\n\n"
+            "CRITICAL: The cover letter must be highly concise, realistic, and direct. Absolutely NO exaggeration, boastful marketing adjectives, or empty hype is allowed. Keep the tone strictly honest, calm, professional, and evidence-based.\n\n"
+            "The letter must follow current German Bewerbungsschreiben conventions. It must be a natural, credible and individually written application—not a literal translation, a generic template or exaggerated marketing copy.\n\n"
+            "CORE RULES:\n"
+            "1. Never invent achievements, metrics, responsibilities, technologies, qualifications, company facts, language levels, employment dates or motivations.\n"
+            "2. Use only:\n"
+            "   - information supported by the resume,\n"
+            "   - information explicitly provided in the additional facts,\n"
+            "   - requirements stated in the job advertisement,\n"
+            "   - verified company information from an official source.\n"
+            "3. If the job description, company name or resume is missing, do not generate a generic letter. Ask for the missing information first.\n"
+            "4. If a useful metric, result or motivation is missing, do not invent it. Either omit it or mark it privately in the verification notes as information that could strengthen the letter.\n"
+            "5. Match the letter to the advertised role:\n"
+            "   - identify the three to five most important requirements;\n"
+            "   - select the two or three strongest pieces of evidence from the applicant’s background;\n"
+            "   - connect each selected example directly to an employer requirement;\n"
+            "   - prioritize relevant evidence over general claims.\n"
+            "6. Do not repeat the complete resume in prose. The letter must add context, explain motivation and interpret the most relevant evidence.\n"
+            "7. For a software-development position:\n"
+            "   - demonstrate technical ability through concrete projects or professional experience;\n"
+            "   - explain what the applicant implemented, developed, integrated or led;\n"
+            "   - mention technologies only in connection with actual work;\n"
+            "   - show problem-solving, ownership or teamwork through a concrete example;\n"
+            "   - avoid a long technology list.\n"
+            "8. Use a professional, precise and calmly confident tone. The language should be active, concise and evidence-based.\n"
+            "9. Avoid:\n"
+            "   - “Hiermit bewerbe ich …” or any variation.\n"
+            "   - generic praise such as “Ihr innovatives Unternehmen”\n"
+            "   - unsupported adjectives such as “excellent,” “outstanding,” “passionate” or “perfect candidate”\n"
+            "   - clichés such as “team player” without evidence\n"
+            "   - excessive enthusiasm\n"
+            "   - desperate or apologetic language\n"
+            "   - unnecessary conditional constructions such as “würde” and “könnte”\n"
+            "   - a literal translation from English into German\n"
+            "   - American-style self-promotion\n"
+            "   - keyword stuffing\n"
+            "   - invented company-specific motivation\n"
+            "10. Use natural German employment terminology if the output is German. Keep established technical names such as Python, Django, PostgreSQL, Redis, WebSockets, REST API, Docker and CI/CD in their normal technical form.\n"
+            "11. The final letter must fit on one A4 page:\n"
+            "   - approximately 250–350 words;\n"
+            "   - never more than 400 words;\n"
+            "   - four content paragraphs;\n"
+            "   - no paragraph longer than approximately six lines;\n"
+            "   - short, readable sentences.\n"
+            "12. The fields and notes inside the 'verification_notes' JSON block MUST ALWAYS be written in English, regardless of the language of the cover letter or resume. Do NOT translate verification_notes values into German or any other language.\n\n"
+            "REQUIRED STRUCTURE (JSON FORMAT):\n"
+            "You must return ONLY a raw JSON object matching the keys listed below. Do not wrap the JSON object in markdown blocks (such as ```json). The output must start with '{' and end with '}'. Do not include any title labels like 'BEWERBUNGSSCHREIBEN' or markdown formatting like bold '**' around names, subjects, or companies.\n\n"
+            "JSON structure:\n"
+            "{\n"
+            "  \"sender_name\": \"Applicant's full name\",\n"
+            "  \"sender_address\": \"Applicant's address EXACTLY as provided in the resume (Do NOT invent or mock this; leave empty if not provided)\",\n"
+            "  \"sender_phone\": \"Applicant's phone number\",\n"
+            "  \"sender_email\": \"Applicant's email address\",\n"
+            "  \"recipient_contact\": \"Contact person name and title (e.g., Herr Dr. Müller or Frau Schmidt if known, else 'NOT PROVIDED')\",\n"
+            "  \"recipient_company\": \"Target company name (plain text, no bold asterisks '**')\",\n"
+            "  \"recipient_department\": \"Department name (e.g., Human Resources or Engineering) if known, else empty\",\n"
+            "  \"recipient_address\": \"Company street address, postal code, city\",\n"
+            "  \"location\": \"City from which the applicant is applying, taken EXACTLY from the applicant's resume location field. Do NOT invent a location; leave empty if not in the resume\",\n"
+            "  \"date\": \"Today's date EXACTLY as provided in the prompt inputs\",\n"
+            "  \"subject\": \"Subject line without bold markdown asterisks '**' or beta/title prefixes (e.g., 'Bewerbung als [EXACT POSITION] - [REFERENCE NUMBER]')\",\n"
+            "  \"salutation\": \"Formal salutation (e.g., Sehr geehrte Frau Müller, or Sehr geehrte Damen und Herren,)\",\n"
+            "  \"body\": \"The 4 content paragraphs separated by double newlines (\\n\\n). Strictly no bold asterisks '**' anywhere in the body!\",\n"
+            "  \"closing_salutation\": \"Closing formula (e.g., Mit freundlichen Grüßen or Sincerely)\",\n"
+            "  \"candidate_name\": \"Applicant's full name (plain text)\",\n"
+            "  \"verification_notes\": {\n"
+            "    \"requirements_emphasized\": [\"Requirement 1 (MUST BE IN ENGLISH)\", \"Requirement 2 (MUST BE IN ENGLISH)\"],\n"
+            "    \"resume_evidence_used\": [\"Evidence 1 (MUST BE IN ENGLISH)\", \"Evidence 2 (MUST BE IN ENGLISH)\"],\n"
+            "    \"placeholders\": [\"Placeholders or missing facts in English (if any) (MUST BE IN ENGLISH)\"],\n"
+            "    \"confirmation_needed\": [\"Sentences needing verification in English (if any) (MUST BE IN ENGLISH)\"]\n"
+            "  }\n"
+            "}\n"
         )
         
-        user_content = f"MASTER_PROFILE:\n{profile_text}\n\nJOB_DESCRIPTION:\n{job_text}"
-        result_text = cls.call_deepseek(system_prompt, user_content, api_key=api_key)
+        user_content = (
+            f"INPUTS\n\n"
+            f"Target position:\n{position}\n\n"
+            f"Company:\n{company}\n\n"
+            f"Job advertisement:\n{job_description}\n\n"
+            f"Company website or verified company information:\n{company_url}\n\n"
+            f"Contact person:\n{contact_person}\n\n"
+            f"Application language:\n{app_language}\n\n"
+            f"Job reference number:\n{ref_number}\n\n"
+            f"Applicant’s current resume:\n{profile_text}\n\n"
+            f"Verified additional information:\n"
+            f"- Earliest starting date: {starting_date}\n"
+            f"- Salary expectation: {salary_expectation}\n"
+            f"- Relocation requirement: {relocation}\n"
+            f"- Work authorization information: ONLY IF RELEVANT AND VERIFIED\n"
+            f"- Referral or previous contact with the company: {referral}\n"
+            f"- Additional motivation for this company: {motivation}\n"
+            f"- Additional notes/context from applicant: {notes_text or 'None'}\n"
+        )
+        
+        result_text = cls.call_deepseek(system_prompt, user_content, {"type": "json_object"}, api_key=api_key)
         if result_text:
             import re
             result_text = re.sub(
@@ -429,7 +574,17 @@ class AIService:
                 today_str,
                 result_text
             )
-            return result_text
+            # Clean markdown formatting tags like ```json or ``` if present
+            clean_text = result_text.strip()
+            if clean_text.startswith("```"):
+                if clean_text.startswith("```json"):
+                    clean_text = clean_text[7:]
+                else:
+                    clean_text = clean_text[3:]
+                if clean_text.endswith("```"):
+                    clean_text = clean_text[:-3]
+                clean_text = clean_text.strip()
+            return clean_text
             
         raise ValueError("AI Service failed to generate cover letter. Please check your API key or try again later.")
 

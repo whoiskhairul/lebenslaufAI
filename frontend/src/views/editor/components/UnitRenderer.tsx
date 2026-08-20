@@ -20,6 +20,36 @@ const ensureAbsoluteUrl = (url: string) => {
   return `https://${trimmed}`;
 };
 
+const formatDisplayDateRange = (startDate?: string, endDate?: string, lang?: 'en' | 'de') => {
+  const formatSingle = (d?: string) => {
+    if (!d) return '';
+    const trimmed = d.trim();
+    if (trimmed.toLowerCase() === 'present') {
+      return lang === 'de' ? 'Heute' : 'Present';
+    }
+    if (lang === 'de') {
+      let formatted = trimmed;
+      const replacements: Record<string, string> = {
+        'march': 'März', 'mar': 'Mär',
+        'may': 'Mai',
+        'october': 'Oktober', 'oct': 'Okt',
+        'december': 'Dezember', 'dec': 'Dez'
+      };
+      for (const [eng, ger] of Object.entries(replacements)) {
+        const regex = new RegExp(`\\b${eng}\\b`, 'gi');
+        formatted = formatted.replace(regex, ger);
+      }
+      return formatted;
+    }
+    return d;
+  };
+
+  if (!startDate && !endDate) return '';
+  if (startDate && !endDate) return formatSingle(startDate);
+  if (!startDate && endDate) return formatSingle(endDate);
+  return `${formatSingle(startDate)} - ${formatSingle(endDate)}`;
+};
+
 export interface UnitRendererProps {
   unit: RenderableUnit;
   isMeasuring?: boolean;
@@ -311,7 +341,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
               <div className={styles.ppContactCol}>
                 {!!editablePersonalInfo.location?.trim() && (
                   <div className={styles.ppContactItem}>
-                    <span className={styles.ppContactLabel}>Address:</span>
+                    <span className={styles.ppContactLabel}>{targetLanguage === 'de' ? 'Adresse:' : 'Address:'}</span>
                     <span className={styles.ppContactVal}>
                       <AutoSizeTextarea
                         value={editablePersonalInfo.location}
@@ -322,7 +352,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                 )}
                 {!!editablePersonalInfo.email?.trim() && (
                   <div className={styles.ppContactItem}>
-                    <span className={styles.ppContactLabel}>Email:</span>
+                    <span className={styles.ppContactLabel}>{targetLanguage === 'de' ? 'E-Mail:' : 'Email:'}</span>
                     <span className={styles.ppContactVal}>
                       <AutoSizeTextarea
                         value={editablePersonalInfo.email}
@@ -333,7 +363,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                 )}
                 {!!editablePersonalInfo.website?.trim() && (
                   <div className={styles.ppContactItem}>
-                    <span className={styles.ppContactLabel}>Website:</span>
+                    <span className={styles.ppContactLabel}>{targetLanguage === 'de' ? 'Website:' : 'Website:'}</span>
                     <span className={styles.ppContactVal}>
                       <a href={ensureAbsoluteUrl(editablePersonalInfo.website)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'block', width: '100%' }}>
                         <AutoSizeTextarea
@@ -348,7 +378,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
               <div className={styles.ppContactCol}>
                 {!!editablePersonalInfo.phone?.trim() && (
                   <div className={styles.ppContactItem}>
-                    <span className={styles.ppContactLabel}>Phone:</span>
+                    <span className={styles.ppContactLabel}>{targetLanguage === 'de' ? 'Handy:' : 'Phone:'}</span>
                     <span className={styles.ppContactVal}>
                       <AutoSizeTextarea
                         value={formatPhoneNumber(editablePersonalInfo.phone)}
@@ -360,7 +390,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                 )}
                 {!!editablePersonalInfo.linkedin?.trim() && (
                   <div className={styles.ppContactItem}>
-                    <span className={styles.ppContactLabel}>LinkedIn:</span>
+                    <span className={styles.ppContactLabel}>{targetLanguage === 'de' ? 'LinkedIn:' : 'LinkedIn:'}</span>
                     <span className={styles.ppContactVal}>
                       <a href={ensureAbsoluteUrl(editablePersonalInfo.linkedin)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'block', width: '100%' }}>
                         <AutoSizeTextarea
@@ -373,7 +403,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                 )}
                 {!!editablePersonalInfo.github?.trim() && (
                   <div className={styles.ppContactItem}>
-                    <span className={styles.ppContactLabel}>GitHub:</span>
+                    <span className={styles.ppContactLabel}>{targetLanguage === 'de' ? 'GitHub:' : 'GitHub:'}</span>
                     <span className={styles.ppContactVal}>
                       <a href={ensureAbsoluteUrl(editablePersonalInfo.github)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'block', width: '100%' }}>
                         <AutoSizeTextarea
@@ -449,7 +479,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
                     </span>
                   </div>
                 )}
-                 {editablePersonalInfo.website && (
+                {editablePersonalInfo.website && (
                   <div className={styles.germanContactItem}>
                     <span className={styles.germanContactLabel}>Website:</span>
                     <span className={styles.germanContactVal}>
@@ -466,7 +496,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
               <div className={styles.germanContactCol}>
                 {editablePersonalInfo.phone && (
                   <div className={styles.germanContactItem}>
-                    <span className={styles.germanContactLabel}>Telefon:</span>
+                    <span className={styles.germanContactLabel}>Handy:</span>
                     <span className={styles.germanContactVal}>
                       <AutoSizeTextarea
                         value={formatPhoneNumber(editablePersonalInfo.phone)}
@@ -852,7 +882,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
             <div className={isPP ? styles.ppLeftCol : styles.germanLeftCol}>
               <span className={isPP ? styles.ppDateRange : styles.germanDateRange}>
                 <AutoSizeTextarea
-                  value={`${exp.start_date || ''} - ${exp.end_date || ''}`}
+                  value={formatDisplayDateRange(exp.start_date, exp.end_date, targetLanguage)}
                   onChange={(val) => {
                     const parts = val.split(' - ');
                     setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, start_date: parts[0] || '', end_date: parts[1] || '' } : e));
@@ -954,7 +984,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
               </strong>
               <span style={{ fontSize: 'calc(var(--base-font-size, 13px) * 0.92)' }}>
                 <AutoSizeTextarea
-                  value={`${exp.start_date || ''} - ${exp.end_date || ''}`}
+                  value={formatDisplayDateRange(exp.start_date, exp.end_date, targetLanguage)}
                   onChange={(val) => {
                     const parts = val.split(' - ');
                     setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, start_date: parts[0] || '', end_date: parts[1] || '' } : e));
@@ -1427,7 +1457,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
             <div className={isPP ? styles.ppLeftCol : styles.germanLeftCol}>
               <span className={isPP ? styles.ppDateRange : styles.germanDateRange}>
                 <AutoSizeTextarea
-                  value={`${edu.start_date || ''} - ${edu.end_date || ''}`}
+                  value={formatDisplayDateRange(edu.start_date, edu.end_date, targetLanguage)}
                   onChange={(val) => {
                     const parts = val.split(' - ');
                     setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, start_date: parts[0] || '', end_date: parts[1] || '' } : e));
@@ -1533,7 +1563,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
               </strong>
               <span>
                 <AutoSizeTextarea
-                  value={`${edu.start_date || ''} - ${edu.end_date || ''}`}
+                  value={formatDisplayDateRange(edu.start_date, edu.end_date, targetLanguage)}
                   onChange={(val) => {
                     const parts = val.split(' - ');
                     setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, start_date: parts[0] || '', end_date: parts[1] || '' } : e));

@@ -68,7 +68,7 @@ export const AutoSizeTextarea: React.FC<AutoSizeTextareaProps> = ({
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight + 2}px`;
       if (singleLine) {
-        textareaRef.current.style.width = 'auto';
+        textareaRef.current.style.width = '0px';
         const hasVal = Boolean(localVal || value);
         const minW = hasVal ? 5 : 30;
         textareaRef.current.style.width = `${Math.max(minW, textareaRef.current.scrollWidth + 6)}px`;

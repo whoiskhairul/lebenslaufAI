@@ -138,6 +138,8 @@ class ResumeTailorView(APIView):
             "experiences": tailored_result.get('tailored_experiences', []),
             "skills": tailored_result.get('tailored_skills', profile_serialized.get('skills', [])),
             "projects": tailored_result.get('tailored_projects', profile_serialized.get('projects', [])),
+            "educations": tailored_result.get('tailored_educations', []),
+            "personal_info": tailored_result.get('tailored_personal_info', {}),
             "ats_report": ats_report,
             "original_profile": profile_serialized
         }, default=str))
@@ -218,7 +220,13 @@ class CoverLetterGenerateView(APIView):
         length = request.data.get('length', 'medium')
         application_id = request.data.get('application_id', None)
         target_language = request.data.get('target_language', 'en')
+        letter_language = request.data.get('letter_language', 'auto')
         selected_project_ids = request.data.get('selected_project_ids', None)
+
+        if not letter_language or letter_language == 'auto':
+            resolved_lang = target_language or 'en'
+        else:
+            resolved_lang = letter_language
 
         if not job_description:
             return Response({
@@ -243,8 +251,16 @@ class CoverLetterGenerateView(APIView):
         job_details = {
             "company": company,
             "position": position,
+            "job_description": job_description,
             "keywords": []
         }
+        if application:
+            job_details["url"] = application.url or ""
+            job_details["contact_name"] = application.contact_name or ""
+            job_details["contact_email"] = application.contact_email or ""
+            job_details["salary"] = application.salary or ""
+            job_details["location"] = application.location or ""
+            job_details["notes"] = application.notes or ""
 
         # Gather profile or use active tailored canvas details
         cv_details = request.data.get('cv_details', None)
@@ -268,37 +284,13 @@ class CoverLetterGenerateView(APIView):
 
         # Call AI
         try:
-            letter_content = AIService.write_cover_letter(profile_serialized, job_details, tone, length, api_key=api_key, target_language=target_language)
+            letter_content = AIService.write_cover_letter(profile_serialized, job_details, tone, length, api_key=api_key, target_language=resolved_lang)
 
-            # Save or update single Cover Letter for this application
-            if application:
-                cover_letter, created = CoverLetterVersion.objects.update_or_create(
-                    user=user,
-                    application=application,
-                    defaults={
-                        "target_company": company,
-                        "target_role": position,
-                        "content": letter_content,
-                        "tone": tone,
-                        "length": length
-                    }
-                )
-            else:
-                cover_letter = CoverLetterVersion.objects.create(
-                    user=user,
-                    application=application,
-                    target_company=company,
-                    target_role=position,
-                    content=letter_content,
-                    tone=tone,
-                    length=length
-                )
-
+            # Return generated letter content to frontend without saving to the database
             return Response({
                 "success": True,
-                "data": CoverLetterVersionSerializer(cover_letter).data,
                 "content": letter_content
-            }, status=status.HTTP_200_OK if application else status.HTTP_201_CREATED)
+            }, status=status.HTTP_200_OK)
         except ValueError as err:
             return Response({
                 "success": False,
