@@ -422,7 +422,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     headingSecondaryColor: '#3d7ee6',
     textColor: '#334155',
     alignment: 'left',
-    pageMargin: undefined,
+    pageMargin: 48,
     bulletSpacing: 4,
     personalDetailsOffset: 16,
     dateFormat: 'MM/YYYY',
@@ -1157,7 +1157,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         };
       });
       setEditableProjects(mappedProjects);
-      
+
       const rawEdus = ver.tailored_details.educations || [];
       const profileEdus = profile.educations || [];
       const educations = profileEdus.map((edu: any) => {
@@ -1227,7 +1227,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         accentColor: ver.template === 'executive_professional' ? '#1e3a8a' : (ver.template === 'creative_tech' ? '#10b981' : '#0f172a'),
         textColor: '#334155',
         alignment: 'left',
-        pageMargin: undefined,
+        pageMargin: 48,
         bulletSpacing: 4,
         dateFormat: 'MM/YYYY',
         pageSize: 'A4'
@@ -1971,7 +1971,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
       // Distribute stream across isolated pages
       const pageHeight = 1123;
-      const pageMargin = customStyles.pageMargin || 32;
+      const pageMargin = customStyles.pageMargin || 48;
 
       // Usable inner content height for allowedPageContentHeight zone (exact top/bottom margin bounds)
       const printableContentHeight = pageHeight - 2 * pageMargin;
@@ -3347,13 +3347,13 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   </div>
 
                   <div className={styles.sliderGroup}>
-                    <label>Page Margin: <strong>{customStyles.pageMargin || 32}px</strong></label>
+                    <label>Page Margin: <strong>{customStyles.pageMargin || 48}px</strong></label>
                     <input
                       type="range"
                       min="15"
                       max="90"
                       step="0.5"
-                      value={customStyles.pageMargin || 32}
+                      value={customStyles.pageMargin || 48}
                       onChange={(e) => setCustomStyles(s => ({ ...s, pageMargin: parseFloat(e.target.value) }))}
                     />
                   </div>
@@ -3850,127 +3850,127 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                       {/* Collapsible Content Body */}
                                       {isExpanded && (
                                         <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        {/* Category Title Rename */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                                          <label style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)', whiteSpace: 'nowrap', fontWeight: 600 }}>Title:</label>
-                                          <input
-                                            type="text"
-                                            value={displayHeader}
-                                            onChange={(e) => {
-                                              const newCatName = e.target.value;
-                                              if (!newCatName.trim()) return;
-                                              setEditableSkills(prev => prev.map(s => (s.category || 'technical').toLowerCase().trim() === catName ? { ...s, category: newCatName.trim() } : s));
-                                            }}
-                                            style={{
-                                              flex: 1,
-                                              fontSize: '11.5px',
-                                              fontWeight: 700,
-                                              padding: '4px 8px',
-                                              borderRadius: 'var(--radius-sm, 6px)',
-                                              border: '1px solid var(--card-border, #cbd5e1)',
-                                              color: 'var(--primary, #6366f1)',
-                                              background: 'var(--background, #f8fafc)'
-                                            }}
-                                          />
+                                          {/* Category Title Rename */}
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                                            <label style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)', whiteSpace: 'nowrap', fontWeight: 600 }}>Title:</label>
+                                            <input
+                                              type="text"
+                                              value={displayHeader}
+                                              onChange={(e) => {
+                                                const newCatName = e.target.value;
+                                                if (!newCatName.trim()) return;
+                                                setEditableSkills(prev => prev.map(s => (s.category || 'technical').toLowerCase().trim() === catName ? { ...s, category: newCatName.trim() } : s));
+                                              }}
+                                              style={{
+                                                flex: 1,
+                                                fontSize: '11.5px',
+                                                fontWeight: 700,
+                                                padding: '4px 8px',
+                                                borderRadius: 'var(--radius-sm, 6px)',
+                                                border: '1px solid var(--card-border, #cbd5e1)',
+                                                color: 'var(--primary, #6366f1)',
+                                                background: 'var(--background, #f8fafc)'
+                                              }}
+                                            />
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (window.confirm(`Delete category "${displayHeader}" and all its skills?`)) {
+                                                  setEditableSkills(prev => prev.filter(s => (s.category || 'technical').toLowerCase().trim() !== catName));
+                                                }
+                                              }}
+                                              style={{ background: 'transparent', border: 'none', color: 'var(--danger, #ef4444)', cursor: 'pointer', padding: '4px' }}
+                                              title="Delete Category"
+                                            >
+                                              <Trash size={13} />
+                                            </button>
+                                          </div>
+
+                                          {/* List of Skills with Reorder & Delete */}
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                            {categorySkills.map((sk, idx) => (
+                                              <div key={sk.id || idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <input
+                                                  type="text"
+                                                  value={sk.name}
+                                                  onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setEditableSkills(prev => prev.map(item => item.id === sk.id ? { ...item, name: val } : item));
+                                                  }}
+                                                  style={{
+                                                    flex: 1,
+                                                    fontSize: '11.5px',
+                                                    padding: '4px 8px',
+                                                    borderRadius: 'var(--radius-sm, 6px)',
+                                                    border: '1px solid var(--card-border, #cbd5e1)',
+                                                    background: 'var(--background, #ffffff)',
+                                                    color: 'var(--foreground, #1e293b)'
+                                                  }}
+                                                />
+                                                <button
+                                                  type="button"
+                                                  disabled={idx === 0}
+                                                  onClick={() => handleMoveSkillInCategory(sk.id, 'up')}
+                                                  style={{ opacity: idx === 0 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--muted, #64748b)', cursor: 'pointer', padding: '2px' }}
+                                                  title="Move Up"
+                                                >
+                                                  <ArrowUp size={12} />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  disabled={idx === categorySkills.length - 1}
+                                                  onClick={() => handleMoveSkillInCategory(sk.id, 'down')}
+                                                  style={{ opacity: idx === categorySkills.length - 1 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--muted, #64748b)', cursor: 'pointer', padding: '2px' }}
+                                                  title="Move Down"
+                                                >
+                                                  <ArrowDown size={12} />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setEditableSkills(prev => prev.filter(item => item.id !== sk.id))}
+                                                  style={{ background: 'transparent', border: 'none', color: 'var(--danger, #ef4444)', cursor: 'pointer', padding: '2px' }}
+                                                  title="Remove Skill"
+                                                >
+                                                  <X size={12} />
+                                                </button>
+                                              </div>
+                                            ))}
+                                          </div>
+
+                                          {/* Add Skill to this Category */}
                                           <button
                                             type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              if (window.confirm(`Delete category "${displayHeader}" and all its skills?`)) {
-                                                setEditableSkills(prev => prev.filter(s => (s.category || 'technical').toLowerCase().trim() !== catName));
+                                            onClick={() => {
+                                              const skillName = window.prompt(`Add new skill to ${displayHeader}:`, 'New Skill');
+                                              if (skillName && skillName.trim()) {
+                                                const targetCat = categorySkills[0]?.category || catName;
+                                                setEditableSkills(prev => [...prev, { id: `sk_${Date.now()}`, name: skillName.trim(), category: targetCat }]);
                                               }
                                             }}
-                                            style={{ background: 'transparent', border: 'none', color: 'var(--danger, #ef4444)', cursor: 'pointer', padding: '4px' }}
-                                            title="Delete Category"
+                                            style={{
+                                              marginTop: '4px',
+                                              fontSize: '11px',
+                                              background: 'transparent',
+                                              border: 'none',
+                                              color: 'var(--primary, #6366f1)',
+                                              cursor: 'pointer',
+                                              padding: '4px 0',
+                                              fontWeight: 600,
+                                              textAlign: 'left',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '4px'
+                                            }}
                                           >
-                                            <Trash size={13} />
+                                            + Add skill to {displayHeader}
                                           </button>
                                         </div>
-
-                                        {/* List of Skills with Reorder & Delete */}
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                          {categorySkills.map((sk, idx) => (
-                                            <div key={sk.id || idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                              <input
-                                                type="text"
-                                                value={sk.name}
-                                                onChange={(e) => {
-                                                  const val = e.target.value;
-                                                  setEditableSkills(prev => prev.map(item => item.id === sk.id ? { ...item, name: val } : item));
-                                                }}
-                                                style={{
-                                                  flex: 1,
-                                                  fontSize: '11.5px',
-                                                  padding: '4px 8px',
-                                                  borderRadius: 'var(--radius-sm, 6px)',
-                                                  border: '1px solid var(--card-border, #cbd5e1)',
-                                                  background: 'var(--background, #ffffff)',
-                                                  color: 'var(--foreground, #1e293b)'
-                                                }}
-                                              />
-                                              <button
-                                                type="button"
-                                                disabled={idx === 0}
-                                                onClick={() => handleMoveSkillInCategory(sk.id, 'up')}
-                                                style={{ opacity: idx === 0 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--muted, #64748b)', cursor: 'pointer', padding: '2px' }}
-                                                title="Move Up"
-                                              >
-                                                <ArrowUp size={12} />
-                                              </button>
-                                              <button
-                                                type="button"
-                                                disabled={idx === categorySkills.length - 1}
-                                                onClick={() => handleMoveSkillInCategory(sk.id, 'down')}
-                                                style={{ opacity: idx === categorySkills.length - 1 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--muted, #64748b)', cursor: 'pointer', padding: '2px' }}
-                                                title="Move Down"
-                                              >
-                                                <ArrowDown size={12} />
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => setEditableSkills(prev => prev.filter(item => item.id !== sk.id))}
-                                                style={{ background: 'transparent', border: 'none', color: 'var(--danger, #ef4444)', cursor: 'pointer', padding: '2px' }}
-                                                title="Remove Skill"
-                                              >
-                                                <X size={12} />
-                                              </button>
-                                            </div>
-                                          ))}
-                                        </div>
-
-                                        {/* Add Skill to this Category */}
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const skillName = window.prompt(`Add new skill to ${displayHeader}:`, 'New Skill');
-                                            if (skillName && skillName.trim()) {
-                                              const targetCat = categorySkills[0]?.category || catName;
-                                              setEditableSkills(prev => [...prev, { id: `sk_${Date.now()}`, name: skillName.trim(), category: targetCat }]);
-                                            }
-                                          }}
-                                          style={{
-                                            marginTop: '4px',
-                                            fontSize: '11px',
-                                            background: 'transparent',
-                                            border: 'none',
-                                            color: 'var(--primary, #6366f1)',
-                                            cursor: 'pointer',
-                                            padding: '4px 0',
-                                            fontWeight: 600,
-                                            textAlign: 'left',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '4px'
-                                          }}
-                                        >
-                                          + Add skill to {displayHeader}
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              });
-                            })()}
+                                      )}
+                                    </div>
+                                  );
+                                });
+                              })()}
 
                               <Button
                                 type="button"
@@ -4209,7 +4209,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   </div>
                 </div>
 
-                 <div className={styles.slidersTwinGrid}>
+                <div className={styles.slidersTwinGrid}>
                   <div className={styles.sliderGroup}>
                     <label>Paper Standard: <strong>DIN A4</strong></label>
                     <div
@@ -4262,244 +4262,244 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 </div>
 
                 <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '16px', paddingTop: '16px' }}>
-                    <h3 style={{ fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                      ✍️ Signature Settings
-                    </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
-                        <input
-                          type="checkbox"
-                          checked={showSignature}
-                          onChange={(e) => setShowSignature(e.target.checked)}
-                        />
-                        Show Signature on Cover Letter
-                      </label>
+                  <h3 style={{ fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                    ✍️ Signature Settings
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
+                      <input
+                        type="checkbox"
+                        checked={showSignature}
+                        onChange={(e) => setShowSignature(e.target.checked)}
+                      />
+                      Show Signature on Cover Letter
+                    </label>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>Signature Image:</span>
-                        {editablePersonalInfo.signature_image ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <div
-                              style={{
-                                position: 'relative',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '16px',
-                                borderRadius: '8px',
-                                border: '1px solid #cbd5e1',
-                                backgroundColor: '#ffffff',
-                                backgroundImage: 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px), radial-gradient(#e2e8f0 1.5px, transparent 1.5px)',
-                                backgroundSize: '12px 12px',
-                                backgroundPosition: '0 0, 6px 6px',
-                                minHeight: '60px',
-                                width: '100%',
-                                boxSizing: 'border-box'
-                              }}
-                            >
-                              <img
-                                src={editablePersonalInfo.signature_image}
-                                alt="Signature Preview"
-                                style={{ maxHeight: '44px', maxWidth: '100%', objectFit: 'contain' }}
-                              />
-                            </div>
-                            
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                const updatedInfo = { ...editablePersonalInfo, signature_image: '' };
-                                setEditablePersonalInfo(updatedInfo);
-                                liveSignatureRef.current = '';
-                                try {
-                                  if (updatedInfo.id) {
-                                    await api.put(`/master-profile/personal-info/${updatedInfo.id}`, updatedInfo);
-                                  } else {
-                                    const res = await api.post('/master-profile/personal-info', updatedInfo);
-                                    if (res.data && res.data.id) {
-                                      setEditablePersonalInfo(prev => ({ ...prev, id: res.data.id }));
-                                    }
-                                  }
-                                } catch (e) {
-                                  console.error("Failed to delete signature:", e);
-                                }
-                              }}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px',
-                                width: '100%',
-                                padding: '8px',
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                color: '#ef4444',
-                                backgroundColor: '#fef2f2',
-                                border: '1px solid #fee2e2',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#fee2e2';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#fef2f2';
-                              }}
-                            >
-                              <X size={12} />
-                              Remove Signature
-                            </button>
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              id="sigUploadInputSidebar"
-                              style={{ display: 'none' }}
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onload = (readerEvent) => {
-                                    const img = new Image();
-                                    img.onload = async () => {
-                                      const canvas = document.createElement('canvas');
-                                      canvas.width = img.naturalWidth;
-                                      canvas.height = img.naturalHeight;
-                                      const ctx = canvas.getContext('2d');
-                                      if (ctx) {
-                                        ctx.drawImage(img, 0, 0);
-                                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                                        const data = imgData.data;
-                                        for (let i = 0; i < data.length; i += 4) {
-                                          const r = data[i];
-                                          const g = data[i + 1];
-                                          const b = data[i + 2];
-                                          if (r > 200 && g > 200 && b > 200) {
-                                            data[i + 3] = 0;
-                                          }
-                                        }
-                                        ctx.putImageData(imgData, 0, 0);
-                                        const base64 = canvas.toDataURL('image/png');
-                                        const updatedInfo = { ...editablePersonalInfo, signature_image: base64 };
-                                        setEditablePersonalInfo(updatedInfo);
-                                        liveSignatureRef.current = base64;
-                                        try {
-                                          if (updatedInfo.id) {
-                                            await api.put(`/master-profile/personal-info/${updatedInfo.id}`, updatedInfo);
-                                          } else {
-                                            const res = await api.post('/master-profile/personal-info', updatedInfo);
-                                            if (res.data && res.data.id) {
-                                              setEditablePersonalInfo(prev => ({ ...prev, id: res.data.id }));
-                                            }
-                                          }
-                                        } catch (err) {
-                                          console.error("Failed to save signature:", err);
-                                        }
-                                      }
-                                    };
-                                    img.src = readerEvent.target?.result as string;
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              }}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>Signature Image:</span>
+                      {editablePersonalInfo.signature_image ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div
+                            style={{
+                              position: 'relative',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '16px',
+                              borderRadius: '8px',
+                              border: '1px solid #cbd5e1',
+                              backgroundColor: '#ffffff',
+                              backgroundImage: 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px), radial-gradient(#e2e8f0 1.5px, transparent 1.5px)',
+                              backgroundSize: '12px 12px',
+                              backgroundPosition: '0 0, 6px 6px',
+                              minHeight: '60px',
+                              width: '100%',
+                              boxSizing: 'border-box'
+                            }}
+                          >
+                            <img
+                              src={editablePersonalInfo.signature_image}
+                              alt="Signature Preview"
+                              style={{ maxHeight: '44px', maxWidth: '100%', objectFit: 'contain' }}
                             />
-                            <div
-                              onClick={() => document.getElementById('sigUploadInputSidebar')?.click()}
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                setIsSigDragOver(true);
-                              }}
-                              onDragLeave={() => {
-                                setIsSigDragOver(false);
-                              }}
-                              onDrop={(e) => {
-                                e.preventDefault();
-                                setIsSigDragOver(false);
-                                const file = e.dataTransfer.files?.[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onload = (readerEvent) => {
-                                    const img = new Image();
-                                    img.onload = async () => {
-                                      const canvas = document.createElement('canvas');
-                                      canvas.width = img.naturalWidth;
-                                      canvas.height = img.naturalHeight;
-                                      const ctx = canvas.getContext('2d');
-                                      if (ctx) {
-                                        ctx.drawImage(img, 0, 0);
-                                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                                        const data = imgData.data;
-                                        for (let i = 0; i < data.length; i += 4) {
-                                          const r = data[i];
-                                          const g = data[i + 1];
-                                          const b = data[i + 2];
-                                          if (r > 200 && g > 200 && b > 200) {
-                                            data[i + 3] = 0;
-                                          }
-                                        }
-                                        ctx.putImageData(imgData, 0, 0);
-                                        const base64 = canvas.toDataURL('image/png');
-                                        const updatedInfo = { ...editablePersonalInfo, signature_image: base64 };
-                                        setEditablePersonalInfo(updatedInfo);
-                                        liveSignatureRef.current = base64;
-                                        try {
-                                          if (updatedInfo.id) {
-                                            await api.put(`/master-profile/personal-info/${updatedInfo.id}`, updatedInfo);
-                                          } else {
-                                            const res = await api.post('/master-profile/personal-info', updatedInfo);
-                                            if (res.data && res.data.id) {
-                                              setEditablePersonalInfo(prev => ({ ...prev, id: res.data.id }));
-                                            }
-                                          }
-                                        } catch (err) {
-                                          console.error("Failed to save signature:", err);
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const updatedInfo = { ...editablePersonalInfo, signature_image: '' };
+                              setEditablePersonalInfo(updatedInfo);
+                              liveSignatureRef.current = '';
+                              try {
+                                if (updatedInfo.id) {
+                                  await api.put(`/master-profile/personal-info/${updatedInfo.id}`, updatedInfo);
+                                } else {
+                                  const res = await api.post('/master-profile/personal-info', updatedInfo);
+                                  if (res.data && res.data.id) {
+                                    setEditablePersonalInfo(prev => ({ ...prev, id: res.data.id }));
+                                  }
+                                }
+                              } catch (e) {
+                                console.error("Failed to delete signature:", e);
+                              }
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              width: '100%',
+                              padding: '8px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              color: '#ef4444',
+                              backgroundColor: '#fef2f2',
+                              border: '1px solid #fee2e2',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#fee2e2';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#fef2f2';
+                            }}
+                          >
+                            <X size={12} />
+                            Remove Signature
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            id="sigUploadInputSidebar"
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (readerEvent) => {
+                                  const img = new Image();
+                                  img.onload = async () => {
+                                    const canvas = document.createElement('canvas');
+                                    canvas.width = img.naturalWidth;
+                                    canvas.height = img.naturalHeight;
+                                    const ctx = canvas.getContext('2d');
+                                    if (ctx) {
+                                      ctx.drawImage(img, 0, 0);
+                                      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                      const data = imgData.data;
+                                      for (let i = 0; i < data.length; i += 4) {
+                                        const r = data[i];
+                                        const g = data[i + 1];
+                                        const b = data[i + 2];
+                                        if (r > 200 && g > 200 && b > 200) {
+                                          data[i + 3] = 0;
                                         }
                                       }
-                                    };
-                                    img.src = readerEvent.target?.result as string;
+                                      ctx.putImageData(imgData, 0, 0);
+                                      const base64 = canvas.toDataURL('image/png');
+                                      const updatedInfo = { ...editablePersonalInfo, signature_image: base64 };
+                                      setEditablePersonalInfo(updatedInfo);
+                                      liveSignatureRef.current = base64;
+                                      try {
+                                        if (updatedInfo.id) {
+                                          await api.put(`/master-profile/personal-info/${updatedInfo.id}`, updatedInfo);
+                                        } else {
+                                          const res = await api.post('/master-profile/personal-info', updatedInfo);
+                                          if (res.data && res.data.id) {
+                                            setEditablePersonalInfo(prev => ({ ...prev, id: res.data.id }));
+                                          }
+                                        }
+                                      } catch (err) {
+                                        console.error("Failed to save signature:", err);
+                                      }
+                                    }
                                   };
-                                  reader.readAsDataURL(file);
-                                }
-                              }}
-                              style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '16px',
-                                borderRadius: '8px',
-                                border: isSigDragOver ? '1.5px dashed #6366f1' : '1.5px dashed #cbd5e1',
-                                backgroundColor: isSigDragOver ? '#e0e7ff33' : '#f8fafc',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                textAlign: 'center'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.borderColor = '#6366f1';
-                                e.currentTarget.style.backgroundColor = '#e0e7ff33';
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isSigDragOver) {
-                                  e.currentTarget.style.borderColor = '#cbd5e1';
-                                  e.currentTarget.style.backgroundColor = '#f8fafc';
-                                }
-                              }}
-                            >
-                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '6px' }}>
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                <polyline points="17 8 12 3 7 8" />
-                                <line x1="12" y1="3" x2="12" y2="15" />
-                              </svg>
-                              <span style={{ fontSize: '11px', fontWeight: 600, color: '#4f46e5' }}>Upload Signature</span>
-                              <span style={{ fontSize: '9px', color: '#64748b', marginTop: '2px' }}>Drag image or click here. Transparent output.</span>
-                            </div>
+                                  img.src = readerEvent.target?.result as string;
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                          <div
+                            onClick={() => document.getElementById('sigUploadInputSidebar')?.click()}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setIsSigDragOver(true);
+                            }}
+                            onDragLeave={() => {
+                              setIsSigDragOver(false);
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setIsSigDragOver(false);
+                              const file = e.dataTransfer.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (readerEvent) => {
+                                  const img = new Image();
+                                  img.onload = async () => {
+                                    const canvas = document.createElement('canvas');
+                                    canvas.width = img.naturalWidth;
+                                    canvas.height = img.naturalHeight;
+                                    const ctx = canvas.getContext('2d');
+                                    if (ctx) {
+                                      ctx.drawImage(img, 0, 0);
+                                      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                      const data = imgData.data;
+                                      for (let i = 0; i < data.length; i += 4) {
+                                        const r = data[i];
+                                        const g = data[i + 1];
+                                        const b = data[i + 2];
+                                        if (r > 200 && g > 200 && b > 200) {
+                                          data[i + 3] = 0;
+                                        }
+                                      }
+                                      ctx.putImageData(imgData, 0, 0);
+                                      const base64 = canvas.toDataURL('image/png');
+                                      const updatedInfo = { ...editablePersonalInfo, signature_image: base64 };
+                                      setEditablePersonalInfo(updatedInfo);
+                                      liveSignatureRef.current = base64;
+                                      try {
+                                        if (updatedInfo.id) {
+                                          await api.put(`/master-profile/personal-info/${updatedInfo.id}`, updatedInfo);
+                                        } else {
+                                          const res = await api.post('/master-profile/personal-info', updatedInfo);
+                                          if (res.data && res.data.id) {
+                                            setEditablePersonalInfo(prev => ({ ...prev, id: res.data.id }));
+                                          }
+                                        }
+                                      } catch (err) {
+                                        console.error("Failed to save signature:", err);
+                                      }
+                                    }
+                                  };
+                                  img.src = readerEvent.target?.result as string;
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '16px',
+                              borderRadius: '8px',
+                              border: isSigDragOver ? '1.5px dashed #6366f1' : '1.5px dashed #cbd5e1',
+                              backgroundColor: isSigDragOver ? '#e0e7ff33' : '#f8fafc',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              textAlign: 'center'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = '#6366f1';
+                              e.currentTarget.style.backgroundColor = '#e0e7ff33';
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSigDragOver) {
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                              }
+                            }}
+                          >
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '6px' }}>
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                              <polyline points="17 8 12 3 7 8" />
+                              <line x1="12" y1="3" x2="12" y2="15" />
+                            </svg>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#4f46e5' }}>Upload Signature</span>
+                            <span style={{ fontSize: '9px', color: '#64748b', marginTop: '2px' }}>Drag image or click here. Transparent output.</span>
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
+                </div>
 
 
               </div>
@@ -4730,7 +4730,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       visibility: 'hidden',
                       pointerEvents: 'none',
                       boxSizing: 'border-box',
-                      padding: `${customStyles.pageMargin || 32}px`,
+                      padding: `${customStyles.pageMargin || 48}px`,
                       fontSize: `${customStyles.fontSize}px`,
                       lineHeight: customStyles.lineHeight,
                       '--base-font-size': `${customStyles.fontSize}px`,
@@ -4819,7 +4819,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       }}
                     >
                       {pages.map((pageUnits, pageIdx) => {
-                        const pageMargin = customStyles.pageMargin || 32;
+                        const pageMargin = customStyles.pageMargin || 48;
                         const isCreative = template === 'creative_tech';
 
                         // Content inside this page
@@ -5054,7 +5054,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                   }}
                                   placeholder="Cover letter body..."
                                 />
-                                
+
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
                                   <textarea
                                     value={letter.closing_salutation}
@@ -5077,7 +5077,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                     }}
                                     placeholder="Closing salutation..."
                                   />
-                                  
+
                                   {showSignature && editablePersonalInfo.signature_image && (
                                     <ResizableSignature
                                       src={editablePersonalInfo.signature_image}
@@ -5169,8 +5169,8 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                     letter.recipient_contact && letter.recipient_contact !== 'NOT PROVIDED'
                                       ? letter.recipient_contact
                                       : (letter.salutation.toLowerCase().includes('damen') || letter.salutation.toLowerCase().includes('geehrte')
-                                          ? 'Sehr geehrte Damen und Herren'
-                                          : 'Hiring Manager')
+                                        ? 'Sehr geehrte Damen und Herren'
+                                        : 'Hiring Manager')
                                   }
                                   onChange={(e) => updateField('recipient_contact', e.target.value)}
                                   style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', padding: 0, color: '#475569' }}
