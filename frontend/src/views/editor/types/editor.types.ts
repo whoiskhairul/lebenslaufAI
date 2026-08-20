@@ -6,9 +6,11 @@ export interface ResumeVersion {
   ats_score: number;
   tailored_summary: string;
   tailored_details: {
-    experiences: Array<{ id: string; bullets: string[] }>;
+    experiences: Array<{ id: string; bullets: string[]; position?: string; location?: string }>;
     skills?: Array<{ id?: string; name: string; category: string; level?: string }>;
     projects?: Array<{ id?: string; title: string; role?: string; technologies?: string[]; bullets?: string[]; link?: string; github_url?: string; demo_url?: string; date?: string }>;
+    educations?: Array<{ id: string; degree?: string; field_of_study?: string; location?: string }>;
+    personal_info?: { title?: string; location?: string };
     ats_report: {
       score: number;
       matched_keywords: string[];
@@ -17,6 +19,7 @@ export interface ResumeVersion {
     };
     original_profile: {
       personal_info: {
+        id?: string;
         full_name: string;
         title: string;
         email: string;
@@ -30,6 +33,7 @@ export interface ResumeVersion {
         github?: string;
         website?: string;
         image_url?: string;
+        signature_image?: string;
       };
       work_experiences: Array<{
         id: string;
@@ -77,6 +81,7 @@ export interface ResumeVersion {
       categoryOrder?: string[];
       languagesFirst?: boolean;
       languagesTitle?: string;
+      letterStyles?: any;
     };
   };
   explanations: Array<{

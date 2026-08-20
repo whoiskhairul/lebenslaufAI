@@ -31,6 +31,249 @@ import { SectionAiPolishModal } from './editor/components/SectionAiPolishModal';
 import { HeaderSettingsPopover } from './editor/components/HeaderSettingsPopover';
 import { SectionSettingsPopover } from './editor/components/SectionSettingsPopover';
 import { UnitRenderer } from './editor/components/UnitRenderer';
+interface ParsedLetter {
+  sender_name: string;
+  sender_address: string;
+  sender_phone: string;
+  sender_email: string;
+  recipient_contact: string;
+  recipient_company: string;
+  recipient_department: string;
+  recipient_address: string;
+  location: string;
+  date: string;
+  subject: string;
+  salutation: string;
+  body: string;
+  closing_salutation: string;
+  candidate_name: string;
+  verification_notes?: {
+    requirements_emphasized?: string[];
+    resume_evidence_used?: string[];
+    placeholders?: string[];
+    confirmation_needed?: string[];
+  };
+  is_json: boolean;
+}
+
+const getParsedLetter = (content: string, editablePersonalInfo: any): ParsedLetter => {
+  if (!content) {
+    return {
+      sender_name: editablePersonalInfo.full_name || '',
+      sender_address: editablePersonalInfo.location || '',
+      sender_phone: editablePersonalInfo.phone || '',
+      sender_email: editablePersonalInfo.email || '',
+      recipient_contact: '',
+      recipient_company: '',
+      recipient_department: '',
+      recipient_address: '',
+      location: editablePersonalInfo.location?.split(',')?.[0]?.trim() || '',
+      date: new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }),
+      subject: '',
+      salutation: '',
+      body: '',
+      closing_salutation: 'Mit freundlichen Grüßen',
+      candidate_name: editablePersonalInfo.full_name || '',
+      is_json: false
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === 'object') {
+      return {
+        sender_name: parsed.sender_name || '',
+        sender_address: parsed.sender_address || '',
+        sender_phone: parsed.sender_phone || '',
+        sender_email: parsed.sender_email || '',
+        recipient_contact: parsed.recipient_contact || '',
+        recipient_company: parsed.recipient_company || '',
+        recipient_department: parsed.recipient_department || '',
+        recipient_address: parsed.recipient_address || '',
+        location: parsed.location || '',
+        date: parsed.date || '',
+        subject: parsed.subject || '',
+        salutation: parsed.salutation || '',
+        body: parsed.body || '',
+        closing_salutation: parsed.closing_salutation || '',
+        candidate_name: parsed.candidate_name || '',
+        verification_notes: parsed.verification_notes,
+        is_json: true
+      };
+    }
+  } catch (e) {
+    // Not JSON
+  }
+
+  // Legacy plain text parser fallback
+  const lines = content.split('\n');
+  let closingIndex = -1;
+  const triggers = [
+    'mit freundlichen',
+    'sincerely',
+    'best regards',
+    'kind regards',
+    'viele grüße',
+    'freundliche grüße',
+    'hochachtungsvoll',
+    'yours truly',
+    'mit besten',
+    'grüße'
+  ];
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const lineLower = lines[i].toLowerCase().trim();
+    if (triggers.some(t => lineLower.includes(t))) {
+      closingIndex = i;
+      break;
+    }
+  }
+
+  let bodyText = '';
+  let closingText = '';
+  let nameText = '';
+
+  if (closingIndex !== -1) {
+    bodyText = lines.slice(0, closingIndex).join('\n');
+    closingText = lines[closingIndex];
+    nameText = lines.slice(closingIndex + 1).join('\n');
+  } else if (lines.length > 2) {
+    bodyText = lines.slice(0, lines.length - 2).join('\n');
+    closingText = lines[lines.length - 2];
+    nameText = lines[lines.length - 1];
+  } else {
+    bodyText = content;
+  }
+
+  return {
+    sender_name: editablePersonalInfo.full_name || '',
+    sender_address: editablePersonalInfo.location || '',
+    sender_phone: editablePersonalInfo.phone || '',
+    sender_email: editablePersonalInfo.email || '',
+    recipient_contact: '',
+    recipient_company: '',
+    recipient_department: '',
+    recipient_address: '',
+    location: editablePersonalInfo.location?.split(',')?.[0]?.trim() || '',
+    date: new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }),
+    subject: '',
+    salutation: '',
+    body: bodyText,
+    closing_salutation: closingText || 'Mit freundlichen Grüßen',
+    candidate_name: nameText || editablePersonalInfo.full_name || '',
+    is_json: false
+  };
+};
+
+const ResizableSignature: React.FC<{ src: string; height: number; onChange: (h: number) => void }> = ({ src, height, onChange }) => {
+  const [isSelected, setIsSelected] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const startYRef = useRef(0);
+  const startHeightRef = useRef(0);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    startYRef.current = e.clientY;
+    startHeightRef.current = height;
+  };
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaY = e.clientY - startYRef.current;
+      const newHeight = Math.max(20, Math.min(150, startHeightRef.current + deltaY));
+      onChange(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, onChange]);
+
+  useEffect(() => {
+    if (!isSelected) return;
+
+    const handleGlobalClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsSelected(false);
+      }
+    };
+
+    document.addEventListener('click', handleGlobalClick);
+    return () => {
+      document.removeEventListener('click', handleGlobalClick);
+    };
+  }, [isSelected]);
+
+  return (
+    <div
+      ref={containerRef}
+      onClick={(e) => {
+        e.stopPropagation();
+        setIsSelected(true);
+      }}
+      style={{
+        position: 'relative',
+        display: 'inline-block',
+        height: `${height}px`,
+        margin: '4px 0',
+        userSelect: 'none',
+        cursor: 'pointer',
+        padding: '2px'
+      }}
+    >
+      <img
+        src={src}
+        alt="Signature"
+        style={{ height: '100%', width: 'auto', objectFit: 'contain', display: 'block' }}
+      />
+      {isSelected && (
+        <>
+          <div
+            className="no-print"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              border: '1.5px dashed #4f46e5',
+              pointerEvents: 'none',
+              borderRadius: '2px'
+            }}
+          />
+          <div
+            className="no-print"
+            onMouseDown={handleMouseDown}
+            style={{
+              position: 'absolute',
+              bottom: '-4px',
+              right: '-4px',
+              width: '10px',
+              height: '10px',
+              background: '#4f46e5',
+              border: '1.5px solid white',
+              borderRadius: '50%',
+              cursor: 'se-resize',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+              zIndex: 10
+            }}
+          />
+        </>
+      )}
+    </div>
+  );
+};
 
 export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   // Main CV Parameters
@@ -50,6 +293,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const [aggressiveMode, setAggressiveMode] = useState<boolean>(false);
   const [masterProjects, setMasterProjects] = useState<Array<{ id: string; title: string; role?: string; technologies?: string[] }>>([]);
   const [masterProfileInfo, setMasterProfileInfo] = useState<any>(null);
+  const liveSignatureRef = useRef<string>('');
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [isProjectsCollapsed, setIsProjectsCollapsed] = useState(false);
   const [isAtsChecking, setIsAtsChecking] = useState<boolean>(false);
@@ -168,6 +412,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     dateFormat: 'MM/YYYY' | 'MMM YYYY' | 'YYYY';
     pageSize: 'A4';
     fontFamily?: string;
+    signatureHeight?: number;
   }>({
     fontSize: 13,
     headingSize: 1.4,
@@ -182,6 +427,17 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     personalDetailsOffset: 16,
     dateFormat: 'MM/YYYY',
     pageSize: 'A4',
+    fontFamily: '',
+    signatureHeight: 48
+  });
+
+  const [letterStyles, setLetterStyles] = useState<{
+    fontSize: number;
+    lineHeight: number;
+    fontFamily: string;
+  }>({
+    fontSize: 13,
+    lineHeight: 1.4,
     fontFamily: ''
   });
 
@@ -221,7 +477,21 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   // Editable CV text grids
   const [editableSummary, setEditableSummary] = useState('');
-  const [editablePersonalInfo, setEditablePersonalInfo] = useState({
+  const [editablePersonalInfo, setEditablePersonalInfo] = useState<{
+    id?: string;
+    full_name: string;
+    title: string;
+    email: string;
+    phone: string;
+    location: string;
+    date_of_birth: string;
+    nationality: string;
+    linkedin: string;
+    github: string;
+    website: string;
+    image_url: string;
+    signature_image?: string;
+  }>({
     full_name: '',
     title: '',
     email: '',
@@ -232,7 +502,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     linkedin: '',
     github: '',
     website: '',
-    image_url: ''
+    image_url: '',
+    signature_image: ''
   });
   const [editableExperiences, setEditableExperiences] = useState<Array<{ id: string; bullets: string[]; company?: string; position?: string; location?: string; start_date?: string; end_date?: string }>>([]);
   const [editableProjects, setEditableProjects] = useState<Array<{ id: string; bullets: string[]; title?: string; role?: string; technologies?: string[] | string; date?: string; link?: string; github_url?: string; demo_url?: string }>>([]);
@@ -504,11 +775,22 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   // Cover Letter states
   const [letterContent, setLetterContent] = useState('');
   const [letterTone, setLetterTone] = useState('professional');
+  const [letterLanguage, setLetterLanguage] = useState<'auto' | 'en' | 'de'>('auto');
+  const [showSignature, setShowSignature] = useState(true);
+  const signatureHeight = customStyles.signatureHeight || 48;
+  const setSignatureHeight = (height: number | ((prev: number) => number)) => {
+    setCustomStyles(s => ({
+      ...s,
+      signatureHeight: typeof height === 'function' ? height(s.signatureHeight || 48) : height
+    }));
+  };
   const [isLetterLoading, setIsLetterLoading] = useState(false);
 
   // Saving states
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveBanner, setShowSaveBanner] = useState(false);
+  const [saveBannerMessage, setSaveBannerMessage] = useState('CV Revision Saved Successfully!');
+  const [isSigDragOver, setIsSigDragOver] = useState(false);
 
   // Interactive AI Recommendation Tooltips
   const [hoveredSuggestion, setHoveredSuggestion] = useState<string | null>(null);
@@ -672,6 +954,16 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         if (profileObj) {
           if (profileObj.personal_info) {
             setMasterProfileInfo(profileObj.personal_info);
+            const liveSig = profileObj.personal_info.signature_image || '';
+            liveSignatureRef.current = liveSig;
+            if (liveSig) {
+              setEditablePersonalInfo(prev => {
+                if (!prev.signature_image) {
+                  return { ...prev, signature_image: liveSig };
+                }
+                return prev;
+              });
+            }
           }
           if (profileObj.projects && profileObj.projects.length > 0) {
             const projs = profileObj.projects.map((p: any) => ({
@@ -688,6 +980,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           if (!initialJobParams?.application_id) {
             if (profileObj.personal_info) {
               setEditablePersonalInfo({
+                id: profileObj.personal_info.id,
                 full_name: profileObj.personal_info.full_name || '',
                 title: profileObj.personal_info.title || '',
                 email: profileObj.personal_info.email || '',
@@ -698,7 +991,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
                 linkedin: profileObj.personal_info.linkedin || '',
                 github: profileObj.personal_info.github || '',
                 website: profileObj.personal_info.website || '',
-                image_url: profileObj.personal_info.image_url || useAuthStore.getState().user?.avatar || ''
+                image_url: profileObj.personal_info.image_url || useAuthStore.getState().user?.avatar || '',
+                signature_image: profileObj.personal_info.signature_image || ''
               });
               if (profileObj.personal_info.summary) {
                 setEditableSummary(profileObj.personal_info.summary);
@@ -764,14 +1058,20 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
         try {
           const res = await api.get('/resume/versions');
-          const matched = res.data.find((v: any) => v.application === initialJobParams.application_id);
+          const sortedVersions = [...res.data].sort((a: any, b: any) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+          const matched = sortedVersions.find((v: any) => v.application === initialJobParams.application_id);
           if (matched) {
             const ver = matched as ResumeVersion;
             setCurrentVersion(ver);
             initializeVersionFields(ver);
 
             const letterRes = await api.get('/resume/letters');
-            const matchedLetter = letterRes.data.find((l: any) => l.application === initialJobParams.application_id);
+            const sortedLetters = [...letterRes.data].sort((a: any, b: any) =>
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+            const matchedLetter = sortedLetters.find((l: any) => l.application === initialJobParams.application_id);
             if (matchedLetter) {
               setLetterContent(matchedLetter.content);
               setLetterTone(matchedLetter.tone);
@@ -794,18 +1094,21 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     const profile = ver.tailored_details.original_profile;
     if (profile) {
       if (profile.personal_info) {
+        const tailoredPI = ver.tailored_details.personal_info || {};
         setEditablePersonalInfo({
+          id: profile.personal_info.id,
           full_name: profile.personal_info.full_name || '',
-          title: profile.personal_info.title || '',
+          title: tailoredPI.title || profile.personal_info.title || '',
           email: profile.personal_info.email || '',
           phone: formatPhoneNumber(profile.personal_info.phone || ''),
-          location: profile.personal_info.location || '',
+          location: tailoredPI.location || profile.personal_info.location || '',
           date_of_birth: profile.personal_info.date_of_birth || '',
           nationality: profile.personal_info.nationality || '',
           linkedin: profile.personal_info.linkedin || '',
           github: profile.personal_info.github || '',
           website: profile.personal_info.website || '',
-          image_url: profile.personal_info.image_url || ''
+          image_url: profile.personal_info.image_url || '',
+          signature_image: profile.personal_info.signature_image || liveSignatureRef.current || ''
         });
       }
 
@@ -816,8 +1119,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         return {
           id: exp.id,
           company: exp.company || '',
-          position: exp.position || '',
-          location: exp.location || '',
+          position: tailored?.position || exp.position || '',
+          location: tailored?.location || exp.location || '',
           start_date: exp.start_date || '',
           end_date: exp.end_date || '',
           bullets: tailored ? tailored.bullets : exp.bullets
@@ -846,15 +1149,30 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         return {
           id: p.id || `proj_${Math.random()}`,
           bullets: tailoredP?.bullets || p.bullets || [],
-          title: p.title || '',
-          role: p.role || '',
+          title: tailoredP?.title || p.title || p.title || '',
+          role: tailoredP?.role || p.role || '',
           technologies: p.technologies || p.tech_stack || tailoredP?.technologies || [],
           date: p.date || '',
           link: p.link || tailoredP?.link || ''
         };
       });
       setEditableProjects(mappedProjects);
-      setEditableEducations(profile.educations || []);
+      
+      const rawEdus = ver.tailored_details.educations || [];
+      const profileEdus = profile.educations || [];
+      const educations = profileEdus.map((edu: any) => {
+        const tailored = rawEdus.find((e: any) => e.id === edu.id);
+        return {
+          id: edu.id,
+          institution: edu.institution || '',
+          degree: tailored?.degree || edu.degree || '',
+          field_of_study: tailored?.field_of_study || edu.field_of_study || '',
+          location: tailored?.location || edu.location || '',
+          start_date: edu.start_date || '',
+          end_date: edu.end_date || ''
+        };
+      });
+      setEditableEducations(educations);
     }
 
     // Load styles config
@@ -872,6 +1190,15 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       if (customData.categoryOrder) setCategoryOrder(customData.categoryOrder);
       if (typeof customData.languagesFirst === 'boolean') setLanguagesFirst(customData.languagesFirst);
       if (customData.languagesTitle) setLanguagesTitle(customData.languagesTitle);
+      if (customData.letterStyles) {
+        setLetterStyles(customData.letterStyles);
+      } else {
+        setLetterStyles({
+          fontSize: 13,
+          lineHeight: 1.4,
+          fontFamily: ''
+        });
+      }
     } else {
       setHeaderStyles({});
       const detailsAny = ver.tailored_details as any;
@@ -904,6 +1231,11 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         bulletSpacing: 4,
         dateFormat: 'MM/YYYY',
         pageSize: 'A4'
+      });
+      setLetterStyles({
+        fontSize: 13,
+        lineHeight: 1.4,
+        fontFamily: ''
       });
     }
   };
@@ -1756,7 +2088,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         position,
         template,
         application_id: initialJobParams?.application_id,
-        save_version: saveAutomatically,
+        save_version: true,
         target_language: targetLanguage,
         selected_project_ids: selectedProjectIds,
         aggressive_mode: aggressiveMode
@@ -1824,6 +2156,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         tone: letterTone,
         application_id: initialJobParams?.application_id,
         target_language: targetLanguage,
+        letter_language: letterLanguage,
         selected_project_ids: selectedProjectIds,
         cv_details: activeCvDetails
       });
@@ -1954,81 +2287,103 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     if (!currentVersion) return;
     setIsSaving(true);
     try {
-      if (editorTab === 'resume') {
-        const updatedDetails = {
-          ...currentVersion.tailored_details,
-          skills: editableSkills,
-          experiences: editableExperiences.map(e => ({
+      // Persist personal info (including signature) to master profile
+      try {
+        const infoId = editablePersonalInfo.id || masterProfileInfo?.id;
+        if (infoId) {
+          await api.put(`/master-profile/personal-info/${infoId}`, editablePersonalInfo);
+        } else {
+          const infoRes = await api.post('/master-profile/personal-info', editablePersonalInfo);
+          if (infoRes.data && infoRes.data.id) {
+            setEditablePersonalInfo(prev => ({ ...prev, id: infoRes.data.id }));
+            editablePersonalInfo.id = infoRes.data.id;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to save personal info to master profile:", err);
+      }
+
+      // Always compile and save the updated CV details / customization config (containing signature height)
+      const updatedDetails = {
+        ...currentVersion.tailored_details,
+        skills: editableSkills,
+        experiences: editableExperiences.map(e => ({
+          id: e.id,
+          bullets: e.bullets,
+          company: e.company || '',
+          position: e.position || '',
+          location: e.location || '',
+          start_date: e.start_date || '',
+          end_date: e.end_date || ''
+        })),
+        original_profile: {
+          ...currentVersion.tailored_details.original_profile,
+          personal_info: {
+            ...currentVersion.tailored_details.original_profile?.personal_info,
+            ...editablePersonalInfo
+          },
+          work_experiences: editableExperiences.map(e => ({
             id: e.id,
-            bullets: e.bullets,
             company: e.company || '',
             position: e.position || '',
             location: e.location || '',
             start_date: e.start_date || '',
-            end_date: e.end_date || ''
+            end_date: e.end_date || '',
+            bullets: e.bullets
           })),
-          original_profile: {
-            ...currentVersion.tailored_details.original_profile,
-            personal_info: {
-              ...currentVersion.tailored_details.original_profile?.personal_info,
-              ...editablePersonalInfo
-            },
-            work_experiences: editableExperiences.map(e => ({
-              id: e.id,
-              company: e.company || '',
-              position: e.position || '',
-              location: e.location || '',
-              start_date: e.start_date || '',
-              end_date: e.end_date || '',
-              bullets: e.bullets
-            })),
-            skills: editableSkills,
-            projects: editableProjects,
-            educations: editableEducations
-          },
-          customization: {
-            sections,
-            customStyles,
-            headerStyles,
-            categoryOrder,
-            languagesFirst,
-            languagesTitle
-          }
-        };
-        if (currentVersion.id.startsWith('unsaved_')) {
-          const res = await api.post('/resume/versions', {
-            application: initialJobParams?.application_id || null,
-            title: `Resume for ${currentVersion.target_role} at ${currentVersion.target_company}`,
-            target_company: currentVersion.target_company,
-            target_role: currentVersion.target_role,
-            ats_score: currentVersion.ats_score,
-            tailored_summary: editableSummary,
-            tailored_details: updatedDetails,
-            template: template
-          });
-          if (res.data) {
-            setCurrentVersion(res.data);
-          }
-        } else {
-          const res = await api.patch(`/resume/versions/${currentVersion.id}`, {
-            tailored_summary: editableSummary,
-            tailored_details: updatedDetails,
-            template: template
-          });
-          if (res.data) {
-            setCurrentVersion(res.data);
-          } else {
-            setCurrentVersion(prev => prev ? ({
-              ...prev,
-              tailored_summary: editableSummary,
-              tailored_details: updatedDetails as any,
-              template: template
-            }) : prev);
-          }
+          skills: editableSkills,
+          projects: editableProjects,
+          educations: editableEducations
+        },
+        customization: {
+          sections,
+          customStyles,
+          headerStyles,
+          categoryOrder,
+          languagesFirst,
+          languagesTitle,
+          letterStyles
+        }
+      };
+
+      let savedVersion = currentVersion;
+      if (currentVersion.id.startsWith('unsaved_')) {
+        const res = await api.post('/resume/versions', {
+          application: initialJobParams?.application_id || null,
+          title: `Resume for ${currentVersion.target_role} at ${currentVersion.target_company}`,
+          target_company: currentVersion.target_company,
+          target_role: currentVersion.target_role,
+          ats_score: currentVersion.ats_score,
+          tailored_summary: editableSummary,
+          tailored_details: updatedDetails,
+          template: template
+        });
+        if (res.data) {
+          savedVersion = res.data;
+          setCurrentVersion(res.data);
         }
       } else {
+        const res = await api.patch(`/resume/versions/${currentVersion.id}`, {
+          tailored_summary: editableSummary,
+          tailored_details: updatedDetails,
+          template: template
+        });
+        if (res.data) {
+          savedVersion = res.data;
+          setCurrentVersion(res.data);
+        } else {
+          setCurrentVersion(prev => prev ? ({
+            ...prev,
+            tailored_summary: editableSummary,
+            tailored_details: updatedDetails as any,
+            template: template
+          }) : prev);
+        }
+      }
+
+      if (letterContent) {
         const letterRes = await api.get('/resume/letters');
-        const matchedLetter = letterRes.data.find((l: any) => l.application === initialJobParams?.application_id || l.target_company === currentVersion.target_company);
+        const matchedLetter = letterRes.data.find((l: any) => l.application === initialJobParams?.application_id || l.target_company === savedVersion.target_company);
         if (matchedLetter) {
           await api.patch(`/resume/letters/${matchedLetter.id}`, {
             content: letterContent,
@@ -2037,12 +2392,18 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         } else {
           await api.post('/resume/letters', {
             application: initialJobParams?.application_id,
-            target_company: currentVersion.target_company,
-            target_role: currentVersion.target_role,
+            target_company: savedVersion.target_company,
+            target_role: savedVersion.target_role,
             content: letterContent,
             tone: letterTone
           });
         }
+      }
+
+      if (editorTab === 'letter') {
+        setSaveBannerMessage('Cover Letter Saved Successfully!');
+      } else {
+        setSaveBannerMessage('CV Revision Saved Successfully!');
       }
       setShowSaveBanner(true);
       setTimeout(() => setShowSaveBanner(false), 3000);
@@ -2331,7 +2692,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
       {showSaveBanner && (
         <div className={styles.saveBanner}>
           <Check size={16} />
-          <span>CV Revision Saved Successfully!</span>
+          <span>{saveBannerMessage}</span>
         </div>
       )}
 
@@ -2694,29 +3055,54 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                     required
                   />
 
-                  <div className={styles.selectGroup}>
-                    <label htmlFor="letterTone">Writing Tone</label>
-                    <select
-                      id="letterTone"
-                      value={letterTone}
-                      onChange={(e) => setLetterTone(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        borderRadius: '8px',
-                        border: '1px solid var(--card-border, #cbd5e1)',
-                        background: 'white',
-                        fontSize: '13px',
-                        outline: 'none',
-                        color: 'var(--text-main, #1e293b)'
-                      }}
-                    >
-                      <option value="professional">Professional & Direct (Recommended)</option>
-                      <option value="enthusiastic">Enthusiastic & Passionate</option>
-                      <option value="creative">Creative & Narrative</option>
-                      <option value="executive">Executive & Formal</option>
-                      <option value="direct">Short & Conversational</option>
-                    </select>
+                  <div className={styles.formGrid} style={{ marginBottom: '16px' }}>
+                    <div className={styles.selectGroup}>
+                      <label htmlFor="letterTone">Writing Tone</label>
+                      <select
+                        id="letterTone"
+                        value={letterTone}
+                        onChange={(e) => setLetterTone(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--card-border, #cbd5e1)',
+                          background: 'white',
+                          fontSize: '13px',
+                          outline: 'none',
+                          color: 'var(--text-main, #1e293b)'
+                        }}
+                      >
+                        <option value="professional">Professional & Direct (Recommended)</option>
+                        <option value="enthusiastic">Enthusiastic & Passionate</option>
+                        <option value="creative">Creative & Narrative</option>
+                        <option value="executive">Executive & Formal</option>
+                        <option value="direct">Short & Conversational</option>
+                      </select>
+                    </div>
+
+                    <div className={styles.selectGroup}>
+                      <label htmlFor="letterLanguageSelect">Cover Letter Language</label>
+                      <select
+                        id="letterLanguageSelect"
+                        value={letterLanguage}
+                        onChange={(e) => setLetterLanguage(e.target.value as any)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--card-border, #cbd5e1)',
+                          background: 'white',
+                          fontSize: '13px',
+                          outline: 'none',
+                          color: 'var(--text-main, #1e293b)'
+                        }}
+                      >
+                        <option value="auto">Auto (Match Resume Language)</option>
+                        <option value="en">English</option>
+                        <option value="de">German</option>
+                      </select>
+                    </div>
                   </div>
 
                   <Button type="submit" isLoading={isLetterLoading} className={styles.tailorBtn}>
@@ -2736,6 +3122,83 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                     </p>
                   </div>
                 </div>
+
+                {(() => {
+                  const letter = getParsedLetter(letterContent, editablePersonalInfo);
+                  const notes = letter.verification_notes;
+                  if (!notes || (!notes.requirements_emphasized?.length && !notes.resume_evidence_used?.length && !notes.placeholders?.length && !notes.confirmation_needed?.length)) {
+                    return null;
+                  }
+                  return (
+                    <div className={`${styles.atsCard} glass-card`} style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
+                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e293b', fontSize: '14px', fontWeight: 700, margin: 0 }}>
+                          <Sparkles size={16} style={{ color: '#6366f1' }} />
+                          AI Generation Audit
+                        </h3>
+                        <span style={{ fontSize: '10px', background: '#e0e7ff', color: '#4f46e5', padding: '3px 8px', borderRadius: '12px', fontWeight: 600 }}>Active Audit</span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {notes.requirements_emphasized && notes.requirements_emphasized.length > 0 && (
+                          <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '3.5px solid #6366f1', border: '1px solid #e2e8f0', borderLeftWidth: '3.5px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '14px' }}>🎯</span>
+                              <strong style={{ fontSize: '12px', color: '#1e293b' }}>Emphasized Requirements</strong>
+                            </div>
+                            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              {notes.requirements_emphasized.map((req, idx) => (
+                                <li key={idx} style={{ lineHeight: '1.4' }}>{req}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {notes.resume_evidence_used && notes.resume_evidence_used.length > 0 && (
+                          <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '3.5px solid #10b981', border: '1px solid #e2e8f0', borderLeftWidth: '3.5px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '14px' }}>📄</span>
+                              <strong style={{ fontSize: '12px', color: '#1e293b' }}>Evidence Used from CV</strong>
+                            </div>
+                            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              {notes.resume_evidence_used.map((ev, idx) => (
+                                <li key={idx} style={{ lineHeight: '1.4' }}>{ev}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {notes.placeholders && notes.placeholders.length > 0 && (
+                          <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#fffbeb', borderLeft: '3.5px solid #f59e0b', border: '1px solid #fef3c7', borderLeftWidth: '3.5px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '14px' }}>⚠️</span>
+                              <strong style={{ fontSize: '12px', color: '#b45309' }}>Missing Facts / Placeholders</strong>
+                            </div>
+                            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#78350f', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              {notes.placeholders.map((pl, idx) => (
+                                <li key={idx} style={{ lineHeight: '1.4' }}>{pl}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {notes.confirmation_needed && notes.confirmation_needed.length > 0 && (
+                          <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#fef2f2', borderLeft: '3.5px solid #ef4444', border: '1px solid #fee2e2', borderLeftWidth: '3.5px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '14px' }}>🔍</span>
+                              <strong style={{ fontSize: '12px', color: '#b91c1c' }}>Confirmation Required</strong>
+                            </div>
+                            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#991b1b', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              {notes.confirmation_needed.map((conf, idx) => (
+                                <li key={idx} style={{ lineHeight: '1.4' }}>{conf}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </>
             )
           )}
@@ -3723,30 +4186,30 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                 <div className={styles.slidersTwinGrid}>
                   <div className={styles.sliderGroup}>
-                    <label>Base Font Size: <strong>{customStyles.fontSize}px</strong></label>
+                    <label>Base Font Size: <strong>{letterStyles.fontSize}px</strong></label>
                     <input
                       type="range"
                       min="11"
                       max="18"
-                      value={customStyles.fontSize}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, fontSize: parseInt(e.target.value) }))}
+                      value={letterStyles.fontSize}
+                      onChange={(e) => setLetterStyles(s => ({ ...s, fontSize: parseInt(e.target.value) }))}
                     />
                   </div>
 
                   <div className={styles.sliderGroup}>
-                    <label>Line Height: <strong>{customStyles.lineHeight}</strong></label>
+                    <label>Line Height: <strong>{letterStyles.lineHeight}</strong></label>
                     <input
                       type="range"
                       min="1.2"
                       max="2.2"
                       step="0.1"
-                      value={customStyles.lineHeight}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, lineHeight: parseFloat(e.target.value) }))}
+                      value={letterStyles.lineHeight}
+                      onChange={(e) => setLetterStyles(s => ({ ...s, lineHeight: parseFloat(e.target.value) }))}
                     />
                   </div>
                 </div>
 
-                <div className={styles.slidersTwinGrid}>
+                 <div className={styles.slidersTwinGrid}>
                   <div className={styles.sliderGroup}>
                     <label>Paper Standard: <strong>DIN A4</strong></label>
                     <div
@@ -3767,23 +4230,278 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   </div>
 
                   <div className={styles.sliderGroup}>
-                    <label>Text Color</label>
-                    <input
-                      type="color"
-                      value={customStyles.textColor}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, textColor: e.target.value }))}
+                    <label htmlFor="coverLetterFontFamily">Font Family</label>
+                    <select
+                      id="coverLetterFontFamily"
+                      value={letterStyles.fontFamily || ''}
+                      onChange={(e) => setLetterStyles(s => ({ ...s, fontFamily: e.target.value }))}
                       style={{
                         width: '100%',
-                        height: '36px',
-                        border: '1px solid var(--card-border, #cbd5e1)',
+                        padding: '8px',
                         borderRadius: '6px',
+                        border: '1px solid var(--card-border, #cbd5e1)',
+                        background: '#ffffff',
+                        fontSize: '12.5px',
+                        color: '#1e293b',
+                        outline: 'none',
                         cursor: 'pointer',
-                        padding: '0',
-                        background: 'transparent'
+                        boxSizing: 'border-box',
+                        height: '35px'
                       }}
-                    />
+                    >
+                      <option value="">Template Default</option>
+                      <option value="'Aptos', 'Calibri', sans-serif">Aptos</option>
+                      <option value="'Inter', sans-serif">Inter</option>
+                      <option value="'Calibri', 'Segoe UI', sans-serif">Calibri</option>
+                      <option value="'Helvetica Neue', 'Helvetica', 'Arial', sans-serif">Helvetica</option>
+                      <option value="'Source Sans 3', 'Source Sans Pro', sans-serif">Source Sans 3</option>
+                      <option value="'IBM Plex Sans', sans-serif">IBM Plex Sans</option>
+                      <option value="'Arial', sans-serif">Arial</option>
+                    </select>
                   </div>
                 </div>
+
+                <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '16px', paddingTop: '16px' }}>
+                    <h3 style={{ fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                      ✍️ Signature Settings
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
+                        <input
+                          type="checkbox"
+                          checked={showSignature}
+                          onChange={(e) => setShowSignature(e.target.checked)}
+                        />
+                        Show Signature on Cover Letter
+                      </label>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>Signature Image:</span>
+                        {editablePersonalInfo.signature_image ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div
+                              style={{
+                                position: 'relative',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '16px',
+                                borderRadius: '8px',
+                                border: '1px solid #cbd5e1',
+                                backgroundColor: '#ffffff',
+                                backgroundImage: 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px), radial-gradient(#e2e8f0 1.5px, transparent 1.5px)',
+                                backgroundSize: '12px 12px',
+                                backgroundPosition: '0 0, 6px 6px',
+                                minHeight: '60px',
+                                width: '100%',
+                                boxSizing: 'border-box'
+                              }}
+                            >
+                              <img
+                                src={editablePersonalInfo.signature_image}
+                                alt="Signature Preview"
+                                style={{ maxHeight: '44px', maxWidth: '100%', objectFit: 'contain' }}
+                              />
+                            </div>
+                            
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const updatedInfo = { ...editablePersonalInfo, signature_image: '' };
+                                setEditablePersonalInfo(updatedInfo);
+                                liveSignatureRef.current = '';
+                                try {
+                                  if (updatedInfo.id) {
+                                    await api.put(`/master-profile/personal-info/${updatedInfo.id}`, updatedInfo);
+                                  } else {
+                                    const res = await api.post('/master-profile/personal-info', updatedInfo);
+                                    if (res.data && res.data.id) {
+                                      setEditablePersonalInfo(prev => ({ ...prev, id: res.data.id }));
+                                    }
+                                  }
+                                } catch (e) {
+                                  console.error("Failed to delete signature:", e);
+                                }
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                width: '100%',
+                                padding: '8px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                color: '#ef4444',
+                                backgroundColor: '#fef2f2',
+                                border: '1px solid #fee2e2',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#fee2e2';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#fef2f2';
+                              }}
+                            >
+                              <X size={12} />
+                              Remove Signature
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              id="sigUploadInputSidebar"
+                              style={{ display: 'none' }}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (readerEvent) => {
+                                    const img = new Image();
+                                    img.onload = async () => {
+                                      const canvas = document.createElement('canvas');
+                                      canvas.width = img.naturalWidth;
+                                      canvas.height = img.naturalHeight;
+                                      const ctx = canvas.getContext('2d');
+                                      if (ctx) {
+                                        ctx.drawImage(img, 0, 0);
+                                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                        const data = imgData.data;
+                                        for (let i = 0; i < data.length; i += 4) {
+                                          const r = data[i];
+                                          const g = data[i + 1];
+                                          const b = data[i + 2];
+                                          if (r > 200 && g > 200 && b > 200) {
+                                            data[i + 3] = 0;
+                                          }
+                                        }
+                                        ctx.putImageData(imgData, 0, 0);
+                                        const base64 = canvas.toDataURL('image/png');
+                                        const updatedInfo = { ...editablePersonalInfo, signature_image: base64 };
+                                        setEditablePersonalInfo(updatedInfo);
+                                        liveSignatureRef.current = base64;
+                                        try {
+                                          if (updatedInfo.id) {
+                                            await api.put(`/master-profile/personal-info/${updatedInfo.id}`, updatedInfo);
+                                          } else {
+                                            const res = await api.post('/master-profile/personal-info', updatedInfo);
+                                            if (res.data && res.data.id) {
+                                              setEditablePersonalInfo(prev => ({ ...prev, id: res.data.id }));
+                                            }
+                                          }
+                                        } catch (err) {
+                                          console.error("Failed to save signature:", err);
+                                        }
+                                      }
+                                    };
+                                    img.src = readerEvent.target?.result as string;
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                            <div
+                              onClick={() => document.getElementById('sigUploadInputSidebar')?.click()}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                setIsSigDragOver(true);
+                              }}
+                              onDragLeave={() => {
+                                setIsSigDragOver(false);
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                setIsSigDragOver(false);
+                                const file = e.dataTransfer.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (readerEvent) => {
+                                    const img = new Image();
+                                    img.onload = async () => {
+                                      const canvas = document.createElement('canvas');
+                                      canvas.width = img.naturalWidth;
+                                      canvas.height = img.naturalHeight;
+                                      const ctx = canvas.getContext('2d');
+                                      if (ctx) {
+                                        ctx.drawImage(img, 0, 0);
+                                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                        const data = imgData.data;
+                                        for (let i = 0; i < data.length; i += 4) {
+                                          const r = data[i];
+                                          const g = data[i + 1];
+                                          const b = data[i + 2];
+                                          if (r > 200 && g > 200 && b > 200) {
+                                            data[i + 3] = 0;
+                                          }
+                                        }
+                                        ctx.putImageData(imgData, 0, 0);
+                                        const base64 = canvas.toDataURL('image/png');
+                                        const updatedInfo = { ...editablePersonalInfo, signature_image: base64 };
+                                        setEditablePersonalInfo(updatedInfo);
+                                        liveSignatureRef.current = base64;
+                                        try {
+                                          if (updatedInfo.id) {
+                                            await api.put(`/master-profile/personal-info/${updatedInfo.id}`, updatedInfo);
+                                          } else {
+                                            const res = await api.post('/master-profile/personal-info', updatedInfo);
+                                            if (res.data && res.data.id) {
+                                              setEditablePersonalInfo(prev => ({ ...prev, id: res.data.id }));
+                                            }
+                                          }
+                                        } catch (err) {
+                                          console.error("Failed to save signature:", err);
+                                        }
+                                      }
+                                    };
+                                    img.src = readerEvent.target?.result as string;
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '16px',
+                                borderRadius: '8px',
+                                border: isSigDragOver ? '1.5px dashed #6366f1' : '1.5px dashed #cbd5e1',
+                                backgroundColor: isSigDragOver ? '#e0e7ff33' : '#f8fafc',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                textAlign: 'center'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = '#6366f1';
+                                e.currentTarget.style.backgroundColor = '#e0e7ff33';
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isSigDragOver) {
+                                  e.currentTarget.style.borderColor = '#cbd5e1';
+                                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                                }
+                              }}
+                            >
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '6px' }}>
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="17 8 12 3 7 8" />
+                                <line x1="12" y1="3" x2="12" y2="15" />
+                              </svg>
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: '#4f46e5' }}>Upload Signature</span>
+                              <span style={{ fontSize: '9px', color: '#64748b', marginTop: '2px' }}>Drag image or click here. Transparent output.</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+
               </div>
             )
           )}
@@ -4274,28 +4992,292 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                               <div className={styles.skeletonLineMedium} style={{ height: '12px', width: '120px' }} />
                             </div>
                           </div>
-                        ) : (
-                          <textarea
-                            className={styles.letterTextarea}
-                            value={letterContent}
-                            onChange={(e) => setLetterContent(e.target.value)}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              border: 'none',
-                              outline: 'none',
-                              resize: 'none',
-                              fontFamily: 'inherit',
-                              fontSize: 'inherit',
-                              lineHeight: 'inherit',
-                              color: 'inherit',
-                              padding: 0,
-                              margin: 0,
-                              background: 'transparent',
-                              overflow: 'hidden'
-                            }}
-                          />
-                        )}
+                        ) : (() => {
+                          const letter = getParsedLetter(letterContent, editablePersonalInfo);
+
+                          const updateField = (key: keyof ParsedLetter, value: any) => {
+                            if (letter.is_json) {
+                              try {
+                                const parsed = JSON.parse(letterContent);
+                                const updated = {
+                                  ...parsed,
+                                  [key]: value
+                                };
+                                setLetterContent(JSON.stringify(updated));
+                              } catch (e) {
+                                console.error(e);
+                              }
+                            } else {
+                              // Legacy content updates
+                              if (key === 'body') {
+                                setLetterContent(value + '\n' + letter.closing_salutation + '\n' + letter.candidate_name);
+                              } else if (key === 'closing_salutation') {
+                                setLetterContent(letter.body + '\n' + value + '\n' + letter.candidate_name);
+                              } else if (key === 'candidate_name') {
+                                setLetterContent(letter.body + '\n' + letter.closing_salutation + '\n' + value);
+                              }
+                            }
+                          };
+
+                          if (!letter.is_json) {
+                            // Legacy raw text layout (with signature logic if present)
+                            return (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  height: '100%',
+                                  width: '100%',
+                                  fontFamily: letterStyles.fontFamily || 'inherit',
+                                  fontSize: `${letterStyles.fontSize}px`,
+                                  lineHeight: letterStyles.lineHeight,
+                                  color: '#1e293b'
+                                }}
+                              >
+                                <AutoSizeTextarea
+                                  value={letter.body}
+                                  onChange={(val) => updateField('body', val)}
+                                  style={{
+                                    width: '100%',
+                                    flex: 1,
+                                    border: 'none',
+                                    outline: 'none',
+                                    resize: 'none',
+                                    fontFamily: 'inherit',
+                                    fontSize: 'inherit',
+                                    lineHeight: 'inherit',
+                                    color: 'inherit',
+                                    padding: 0,
+                                    margin: 0,
+                                    background: 'transparent',
+                                    overflow: 'hidden'
+                                  }}
+                                  placeholder="Cover letter body..."
+                                />
+                                
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+                                  <textarea
+                                    value={letter.closing_salutation}
+                                    onChange={(e) => updateField('closing_salutation', e.target.value)}
+                                    rows={1}
+                                    style={{
+                                      width: '100%',
+                                      border: 'none',
+                                      outline: 'none',
+                                      resize: 'none',
+                                      fontFamily: 'inherit',
+                                      fontSize: 'inherit',
+                                      lineHeight: 'inherit',
+                                      color: 'inherit',
+                                      padding: 0,
+                                      margin: 0,
+                                      background: 'transparent',
+                                      overflow: 'hidden',
+                                      fontWeight: 'inherit'
+                                    }}
+                                    placeholder="Closing salutation..."
+                                  />
+                                  
+                                  {showSignature && editablePersonalInfo.signature_image && (
+                                    <ResizableSignature
+                                      src={editablePersonalInfo.signature_image}
+                                      height={signatureHeight}
+                                      onChange={setSignatureHeight}
+                                    />
+                                  )}
+
+                                  <textarea
+                                    value={letter.candidate_name}
+                                    onChange={(e) => updateField('candidate_name', e.target.value)}
+                                    rows={2}
+                                    style={{
+                                      width: '100%',
+                                      border: 'none',
+                                      outline: 'none',
+                                      resize: 'none',
+                                      fontFamily: 'inherit',
+                                      fontSize: 'inherit',
+                                      lineHeight: 'inherit',
+                                      color: 'inherit',
+                                      padding: 0,
+                                      margin: 0,
+                                      background: 'transparent',
+                                      overflow: 'hidden',
+                                      fontWeight: 'inherit'
+                                    }}
+                                    placeholder="Applicant name..."
+                                  />
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // Structured JSON Letter Layout with custom side arrangements!
+                          return (
+                            <div
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                minHeight: '100%',
+                                width: '100%',
+                                fontFamily: letterStyles.fontFamily || 'inherit',
+                                fontSize: `${letterStyles.fontSize}px`,
+                                lineHeight: letterStyles.lineHeight,
+                                color: '#1e293b'
+                              }}
+                            >
+                              {/* 1. Sender Info Header (Applicant details aligned to the top-right) */}
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '32px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', textAlign: 'right', alignItems: 'flex-end', width: '280px' }}>
+                                  <input
+                                    value={letter.sender_name}
+                                    onChange={(e) => updateField('sender_name', e.target.value)}
+                                    style={{ fontWeight: 'bold', fontSize: '15px', border: 'none', outline: 'none', background: 'transparent', width: '100%', textAlign: 'right', padding: 0 }}
+                                    placeholder="Your Name"
+                                  />
+                                  <input
+                                    value={letter.sender_address}
+                                    onChange={(e) => updateField('sender_address', e.target.value)}
+                                    style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', textAlign: 'right', padding: 0, fontSize: '12px', color: '#64748b' }}
+                                    placeholder="Your Address"
+                                  />
+                                  <input
+                                    value={letter.sender_phone}
+                                    onChange={(e) => updateField('sender_phone', e.target.value)}
+                                    style={{ border: 'none', outline: 'none', background: 'transparent', textAlign: 'right', padding: 0, fontSize: '12px', color: '#64748b', width: '100%' }}
+                                    placeholder="Your Phone"
+                                  />
+                                  <input
+                                    value={letter.sender_email}
+                                    onChange={(e) => updateField('sender_email', e.target.value)}
+                                    style={{ border: 'none', outline: 'none', background: 'transparent', textAlign: 'right', padding: 0, fontSize: '12px', color: '#64748b', width: '100%' }}
+                                    placeholder="Your Email"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* 2. Recipient Info (Company name first, then contact person, then address) */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '320px', marginBottom: '20px' }}>
+                                <input
+                                  value={letter.recipient_company}
+                                  onChange={(e) => updateField('recipient_company', e.target.value)}
+                                  style={{ fontWeight: 'bold', border: 'none', outline: 'none', background: 'transparent', width: '100%', padding: 0 }}
+                                  placeholder="Company Name"
+                                />
+                                <input
+                                  value={
+                                    letter.recipient_contact && letter.recipient_contact !== 'NOT PROVIDED'
+                                      ? letter.recipient_contact
+                                      : (letter.salutation.toLowerCase().includes('damen') || letter.salutation.toLowerCase().includes('geehrte')
+                                          ? 'Sehr geehrte Damen und Herren'
+                                          : 'Hiring Manager')
+                                  }
+                                  onChange={(e) => updateField('recipient_contact', e.target.value)}
+                                  style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', padding: 0, color: '#475569' }}
+                                  placeholder="Contact Person / Hiring Manager"
+                                />
+                                <textarea
+                                  value={letter.recipient_address}
+                                  onChange={(e) => updateField('recipient_address', e.target.value)}
+                                  rows={2}
+                                  style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', padding: 0, resize: 'none', overflow: 'hidden', color: '#475569', fontFamily: 'inherit', fontSize: 'inherit', lineHeight: 'inherit' }}
+                                  placeholder="Company Address"
+                                />
+                              </div>
+
+                              {/* 3. Location and Date (to the right side, combined to prevent empty gaps) */}
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '28px' }}>
+                                <input
+                                  value={letter.location && letter.date ? `${letter.location}, ${letter.date}` : (letter.location || letter.date || '')}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    const commaIndex = val.indexOf(',');
+                                    if (commaIndex !== -1) {
+                                      const loc = val.substring(0, commaIndex).trim();
+                                      const dt = val.substring(commaIndex + 1).trim();
+                                      updateField('location', loc);
+                                      updateField('date', dt);
+                                    } else {
+                                      updateField('location', val);
+                                      updateField('date', '');
+                                    }
+                                  }}
+                                  style={{ border: 'none', outline: 'none', background: 'transparent', textAlign: 'right', padding: 0, width: '250px', fontSize: '12.5px', color: '#475569' }}
+                                  placeholder="City, Date"
+                                />
+                              </div>
+
+                              {/* 4. Subject Line (Bold, Clean, No Bold Asterisks!) */}
+                              <div style={{ marginBottom: '20px' }}>
+                                <textarea
+                                  value={letter.subject}
+                                  onChange={(e) => updateField('subject', e.target.value)}
+                                  rows={1}
+                                  style={{ fontWeight: 'bold', fontSize: '14.5px', color: '#0f172a', border: 'none', outline: 'none', background: 'transparent', width: '100%', padding: 0, resize: 'none', overflow: 'hidden', fontFamily: 'inherit', lineHeight: 'inherit' }}
+                                  placeholder="Subject Line"
+                                />
+                              </div>
+
+                              {/* 5. Salutation */}
+                              <div style={{ marginBottom: '16px' }}>
+                                <input
+                                  value={letter.salutation}
+                                  onChange={(e) => updateField('salutation', e.target.value)}
+                                  style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', lineHeight: 'inherit', color: 'inherit' }}
+                                  placeholder="Salutation"
+                                />
+                              </div>
+
+                              {/* 6. Body Paragraphs (using AutoSizeTextarea for dynamic resizable height!) */}
+                              <div style={{ marginBottom: '24px' }}>
+                                <AutoSizeTextarea
+                                  value={letter.body}
+                                  onChange={(val) => updateField('body', val)}
+                                  style={{
+                                    width: '100%',
+                                    border: 'none',
+                                    outline: 'none',
+                                    resize: 'none',
+                                    fontFamily: 'inherit',
+                                    fontSize: 'inherit',
+                                    lineHeight: 'inherit',
+                                    color: 'inherit',
+                                    padding: 0,
+                                    margin: 0,
+                                    background: 'transparent',
+                                    overflow: 'hidden'
+                                  }}
+                                  placeholder="Type your cover letter body here..."
+                                />
+                              </div>
+
+                              {/* 7. Closing, Signature and Name */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <input
+                                  value={letter.closing_salutation}
+                                  onChange={(e) => updateField('closing_salutation', e.target.value)}
+                                  style={{ border: 'none', outline: 'none', background: 'transparent', width: '250px', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', lineHeight: 'inherit', color: 'inherit' }}
+                                  placeholder="Closing Salutation"
+                                />
+
+                                {showSignature && editablePersonalInfo.signature_image && (
+                                  <ResizableSignature
+                                    src={editablePersonalInfo.signature_image}
+                                    height={signatureHeight}
+                                    onChange={setSignatureHeight}
+                                  />
+                                )}
+
+                                <input
+                                  value={letter.candidate_name}
+                                  onChange={(e) => updateField('candidate_name', e.target.value)}
+                                  style={{ fontWeight: 'bold', border: 'none', outline: 'none', background: 'transparent', width: '250px', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', lineHeight: 'inherit', color: 'inherit' }}
+                                  placeholder="Your Name"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
