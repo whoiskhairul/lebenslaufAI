@@ -12,7 +12,6 @@ export interface SectionSettingsPopoverProps {
   setEditableExperiences: React.Dispatch<React.SetStateAction<any[]>>;
   setEditableProjects: React.Dispatch<React.SetStateAction<any[]>>;
   setEditableEducations: React.Dispatch<React.SetStateAction<any[]>>;
-  openSectionAiModal: (sectionId: string) => void;
 }
 
 export const SectionSettingsPopover: React.FC<SectionSettingsPopoverProps> = ({
@@ -23,8 +22,7 @@ export const SectionSettingsPopover: React.FC<SectionSettingsPopoverProps> = ({
   onClose,
   setEditableExperiences,
   setEditableProjects,
-  setEditableEducations,
-  openSectionAiModal
+  setEditableEducations
 }) => {
   const localStyles = sec?.customStyles || {};
 
@@ -36,8 +34,14 @@ export const SectionSettingsPopover: React.FC<SectionSettingsPopoverProps> = ({
     window.dispatchEvent(new Event('cv-style-change'));
   };
 
-  const topPos = popoverPosition ? Math.max(60, Math.min(window.innerHeight - 520, popoverPosition.top - 10)) : 100;
-  const leftPos = popoverPosition ? Math.max(16, popoverPosition.left - 305) : 100;
+  const popoverWidth = 290;
+  const popoverHeight = 440;
+  const leftPos = popoverPosition
+    ? Math.min(Math.max(340, popoverPosition.left + 35), (typeof window !== 'undefined' ? window.innerWidth : 1200) - popoverWidth - 16)
+    : 340;
+  const topPos = popoverPosition
+    ? Math.min(Math.max(60, popoverPosition.top - 10), (typeof window !== 'undefined' ? window.innerHeight : 800) - popoverHeight - 16)
+    : 100;
 
   return createPortal(
     <div
@@ -150,43 +154,6 @@ export const SectionSettingsPopover: React.FC<SectionSettingsPopoverProps> = ({
               onChange={(e) => updateStyle('headingColor', e.target.value)}
             />
           </div>
-        </div>
-
-        <div className={styles.popoverToggles}>
-          <button
-            type="button"
-            className={`${styles.popoverToggleBtn} ${localStyles.fontWeight === 'bold' ? styles.popoverToggleBtnActive : ''}`}
-            onClick={() => updateStyle('fontWeight', localStyles.fontWeight === 'bold' ? 'normal' : 'bold')}
-            title="Toggle Bold Body Text"
-          >
-            <strong>B</strong>
-          </button>
-          <button
-            type="button"
-            className={`${styles.popoverToggleBtn} ${localStyles.fontStyle === 'italic' ? styles.popoverToggleBtnActive : ''}`}
-            onClick={() => updateStyle('fontStyle', localStyles.fontStyle === 'italic' ? 'normal' : 'italic')}
-            title="Toggle Italic Body Text"
-          >
-            <em>I</em>
-          </button>
-
-          <button
-            type="button"
-            className={`${styles.popoverToggleBtn} ${localStyles.headingWeight === 'normal' ? styles.popoverToggleBtnActive : ''}`}
-            onClick={() => updateStyle('headingWeight', localStyles.headingWeight === 'normal' ? 'bold' : 'normal')}
-            title="Toggle Bold Heading"
-          >
-            <strong>H-B</strong>
-          </button>
-
-          <button
-            type="button"
-            className={`${styles.popoverToggleBtn} ${localStyles.headingStyle === 'italic' ? styles.popoverToggleBtnActive : ''}`}
-            onClick={() => updateStyle('headingStyle', localStyles.headingStyle === 'italic' ? 'normal' : 'italic')}
-            title="Toggle Italic Heading"
-          >
-            <em>H-I</em>
-          </button>
         </div>
 
         {sec?.type === 'custom' && (
@@ -343,14 +310,6 @@ export const SectionSettingsPopover: React.FC<SectionSettingsPopoverProps> = ({
               + Append Bullet Point
             </button>
           )}
-
-          <button
-            type="button"
-            onClick={() => openSectionAiModal(sectionId)}
-            className={styles.popoverAiBtn}
-          >
-            ✨ AI Section Polish
-          </button>
         </div>
       </div>
     </div>,

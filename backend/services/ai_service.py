@@ -236,18 +236,21 @@ class AIService:
         
         is_german = target_language in ['de', 'deutsch', 'german']
         lang_instruction = (
-            "CRITICAL GERMAN LANGUAGE REQUIREMENT:\n"
-            "- Translate and write ALL tailored summary, ALL experience bullet points, and ALL project bullet points in GERMAN (Deutsch).\n"
-            "- Translate ALL experience position titles, company locations, education degrees, fields of study, education locations, skill names, skill categories, and personal info titles & locations to GERMAN (Deutsch) (e.g., 'Junior Software Developer' -> 'Junior-Softwareentwickler', 'Computer Science' -> 'Informatik', 'Germany' -> 'Deutschland', 'English' -> 'Englisch', 'fluent' -> 'fließend').\n"
-            "- Provide German section header names in 'tailored_section_names': summary -> 'Zusammenfassung', experience -> 'Berufserfahrung', projects -> 'Projekte', education -> 'Ausbildung', skills -> 'Kenntnisse'.\n\n"
+            "CRITICAL LANGUAGE MANDATE: TARGET LANGUAGE IS GERMAN (Deutsch).\n"
+            "- You MUST translate and write ALL tailored_summary text, ALL experience positions, experience locations, and experience bullet points in GERMAN.\n"
+            "- You MUST translate and write ALL project bullet points in GERMAN.\n"
+            "- You MUST translate education degrees, locations, fields of study, skill names, skill categories, and personal info fields into GERMAN (e.g. 'Computer Science' -> 'Informatik', 'Germany' -> 'Deutschland').\n"
+            "- Never mix English sentences into the output under any circumstances. Everything returned inside tailored_summary, tailored_experiences, tailored_projects, tailored_educations, tailored_skills, and tailored_personal_info MUST be strictly in German.\n"
+            "- The tailored_section_names dictionary keys MUST map to German values: summary -> 'Zusammenfassung', experience -> 'Berufserfahrung', projects -> 'Projekte', education -> 'Ausbildung', skills -> 'Kenntnisse'.\n\n"
             if is_german
             else "Write ALL tailored summary, experience bullets, and project bullets in ENGLISH.\n\n"
         )
 
         aggressive_instruction = (
-            "AGGRESSIVE ATS OPTIMIZATION ENABLED:\n"
-            "- Actively weave key missing technical terms, tools, methodologies, and frameworks from the JOB_DESCRIPTION into experience bullet points, project bullet points, and professional summary where contextually appropriate to maximize ATS score.\n"
-            "- Ensure sentences remain natural, highly impressive, and professional.\n\n"
+            "CRITICAL ATS MANDATE: AGGRESSIVE ATS OPTIMIZATION IS ENABLED.\n"
+            "- You MUST actively and strategically weave key missing technical skills, tools, methodologies, and frameworks from the JOB_DESCRIPTION into the candidate's tailored_summary, work experience bullets, and project bullets to achieve a maximum ATS score.\n"
+            "- Do not fabricate new jobs, dates, or degrees, but you MUST adjust the descriptions of their work history and projects to explicitly call out usage of the required tools/frameworks where contextually appropriate.\n"
+            "- Ensure the tailored sentences remain natural, grammatically correct, and highly professional.\n\n"
             if aggressive_mode
             else "STANDARD PROFILE ALIGNMENT (STRICT):\n"
             "- Do NOT invent/fabricate new unlisted tools, jobs, dates, or degrees.\n"
@@ -269,7 +272,7 @@ class AIService:
             "1. Keyword Match (50%): Ratio of semantically matched keywords to total required job description keywords.\n"
             "2. Experience Depth (30%): Evaluation of whether the critical matched skills are actively demonstrated in the work experience descriptions/bullets rather than just listed in a static skills block.\n"
             "3. Structural & Formatting Quality (20%): Presence of contact details, professional summary, structured work experiences (with bullets), projects, and general compliance with resume length/layout guidelines.\n\n"
-            "CRITICAL: Do NOT invent/fabricate skills, jobs, dates, or degrees.\n"
+            f"CRITICAL: {'Do NOT invent/fabricate entire jobs, dates, or degrees, but you must weave in required keywords contextually in work history as specified by AGGRESSIVE ATS OPTIMIZATION.' if aggressive_mode else 'Do NOT invent/fabricate skills, jobs, dates, or degrees.'}\n"
             "Return ONLY a JSON object matching this schema:\n"
             "{\n"
             "  \"tailored_summary\": \"string\",\n"
@@ -284,6 +287,8 @@ class AIService:
             "  \"tailored_projects\": [\n"
             "     {\n"
             "       \"id\": \"string (UUID matches project.id)\",\n"
+            "       \"title\": \"string (MUST be in target language)\",\n"
+            "       \"role\": \"string (MUST be in target language)\",\n"
             "       \"bullets\": [\"string (MUST be in target language)\"]\n"
             "     }\n"
             "  ],\n"

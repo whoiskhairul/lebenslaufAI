@@ -141,7 +141,8 @@ export const SectionAiPolishModal: React.FC<SectionAiPolishModalProps> = ({
           </button>
           {sectionAiProposal && (
             <button type="button" className={styles.acceptAiBtn} onClick={handleAcceptSectionAiProposal}>
-              Accept & Apply AI Polish
+              <Sparkles size={14} />
+              <span>Accept & Apply AI Polish</span>
             </button>
           )}
         </div>

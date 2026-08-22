@@ -4,8 +4,9 @@ import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
+import { Toast } from '../components/Toast';
 import {
-  Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Brain, Award, Save, RefreshCw, GripVertical, Trash, Plus, Settings, ArrowUp, ArrowDown, Maximize2, Minimize2, LayoutGrid, Layers, Sliders, ChevronUp, ChevronDown
+  Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Brain, Award, Save, RefreshCw, GripVertical, Trash, Plus, Settings, ArrowUp, ArrowDown, Maximize2, Minimize2, LayoutGrid, Layers, Sliders, ChevronUp, ChevronDown, User, Briefcase, Code, GraduationCap, Globe, Eye, EyeOff, RotateCcw
 } from 'lucide-react';
 import styles from './EditorNew.module.css';
 
@@ -31,6 +32,8 @@ import { SectionAiPolishModal } from './editor/components/SectionAiPolishModal';
 import { HeaderSettingsPopover } from './editor/components/HeaderSettingsPopover';
 import { SectionSettingsPopover } from './editor/components/SectionSettingsPopover';
 import { UnitRenderer } from './editor/components/UnitRenderer';
+import { SectionDetailEditor } from './editor/components/sidepanel/SectionDetailEditor';
+import { AddCustomSectionModal, CustomSectionFormat } from './editor/components/AddCustomSectionModal';
 interface ParsedLetter {
   sender_name: string;
   sender_address: string;
@@ -276,6 +279,8 @@ const ResizableSignature: React.FC<{ src: string; height: number; onChange: (h: 
 };
 
 export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
+  const { sidebarCollapsed } = useAuthStore();
+
   // Main CV Parameters
   const [jobDescription, setJobDescription] = useState('');
   const [company, setCompany] = useState('');
@@ -298,10 +303,16 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const [isProjectsCollapsed, setIsProjectsCollapsed] = useState(false);
   const [isAtsChecking, setIsAtsChecking] = useState<boolean>(false);
   const [keywordCategoryPopover, setKeywordCategoryPopover] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [polishModalInfo, setPolishModalInfo] = useState<{ text: string; onAccept: (newText: string) => void } | null>(null);
+  const [polishInstruction, setPolishInstruction] = useState('Improve impact, metrics, and professional polish');
+  const [isPolishing, setIsPolishing] = useState(false);
 
   // Tabs layout controls
   const [editorTab, setEditorTab] = useState<'resume' | 'letter' | 'job'>('resume');
   const [activeControlTab, setActiveControlTab] = useState<'tailor' | 'style' | 'ats'>('tailor');
+  const [activeStyleSubTab, setActiveStyleSubTab] = useState<'theme' | 'sections'>('sections');
+  const [activeDetailSectionId, setActiveDetailSectionId] = useState<string | null>(null);
   const [expandedSectionSettings, setExpandedSectionSettings] = useState<string | null>(null);
   const [headerStyles, setHeaderStyles] = useState<any>({});
   const [activeSectionSettings, setActiveSectionSettings] = useState<string | null>(null);
@@ -324,6 +335,71 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Add Custom Section Modal State
+  const [isAddCustomSectionOpen, setIsAddCustomSectionOpen] = useState(false);
+
+  // Smooth Section Hide / Show Animation State
+  const [animatingHideSectionId, setAnimatingHideSectionId] = useState<string | null>(null);
+  const [animatingShowSectionId, setAnimatingShowSectionId] = useState<string | null>(null);
+
+  const toggleSectionVisibility = (sectionId: string) => {
+    const target = sections.find(s => s.id === sectionId);
+    if (!target) return;
+
+    if (target.visible) {
+      // Begin smooth collapse & glide-up of subsequent sections
+      setAnimatingHideSectionId(sectionId);
+      setTimeout(() => {
+        setSections(prev => prev.map(s => s.id === sectionId ? { ...s, visible: false } : s));
+        setTimeout(() => {
+          setAnimatingHideSectionId(null);
+        }, 50);
+      }, 340);
+    } else {
+      // Begin smooth expand & glide-down of subsequent sections
+      setAnimatingShowSectionId(sectionId);
+      setSections(prev => prev.map(s => s.id === sectionId ? { ...s, visible: true } : s));
+      setTimeout(() => {
+        setAnimatingShowSectionId(null);
+      }, 360);
+    }
+  };
+
+  const handleCreateCustomSection = (title: string, format: CustomSectionFormat) => {
+    const newSecId = `custom_${Date.now()}`;
+    const newSec: any = {
+      id: newSecId,
+      name: title,
+      visible: true,
+      type: 'custom',
+      customFormat: format
+    };
+
+    if (format === 'keyvalue') {
+      newSec.keyValuePairs = [
+        { key: 'Category / Key', value: 'Tools, proficiencies, or relevant details' }
+      ];
+    } else if (format === 'entries') {
+      newSec.entries = [
+        {
+          id: `entry_${Date.now()}`,
+          title: `${title} Contributor / Role`,
+          subtitle: 'Organization or Project',
+          location: 'City, Country',
+          date: '2023 - Present',
+          bullets: ['Spearheaded key project initiative and delivered measurable performance outcomes.']
+        }
+      ];
+    } else if (format === 'paragraph') {
+      newSec.paragraphText = 'Experienced professional committed to delivering high-impact solutions, optimizing system performance, and driving core project objectives.';
+    } else {
+      newSec.bullets = ['Earned credential / accomplishment with distinguished outcome.'];
+    }
+
+    setSections(prev => [...prev, newSec]);
+    handleOpenSectionDetail(newSecId);
+  };
+
   // Resizable Control Panel State
   const [panelWidth, setPanelWidth] = useState<number>(() => {
     const saved = localStorage.getItem('editor_panel_width');
@@ -331,20 +407,30 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   });
   const [isResizingPanel, setIsResizingPanel] = useState<boolean>(false);
   const controlPanelRef = useRef<HTMLDivElement>(null);
+  const startXRef = useRef<number>(0);
+  const startWidthRef = useRef<number>(0);
+
+  // When navbar is collapsed (72px vs 260px), control panel claims the +188px reclaimed space
+  const effectivePanelWidth = sidebarCollapsed ? panelWidth + 188 : panelWidth;
 
   // Mouse drag handler for panel resizing
   useEffect(() => {
     if (!isResizingPanel) return;
 
     const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - startXRef.current;
+      let newBaseWidth = startWidthRef.current + deltaX;
+
+      // Responsive bounds: leave at least adequate space for the CV canvas
+      const minCanvasSpace = window.innerWidth < 1200 ? 360 : 460;
+      const navOffset = sidebarCollapsed ? 72 : 260;
       const MIN_WIDTH = 320;
-      const MAX_WIDTH = Math.min(800, window.innerWidth - 350);
-      let newWidth = e.clientX;
+      const MAX_WIDTH = Math.max(MIN_WIDTH, Math.min(850, window.innerWidth - navOffset - minCanvasSpace));
 
-      if (newWidth < MIN_WIDTH) newWidth = MIN_WIDTH;
-      if (newWidth > MAX_WIDTH) newWidth = MAX_WIDTH;
+      if (newBaseWidth < MIN_WIDTH) newBaseWidth = MIN_WIDTH;
+      if (newBaseWidth > MAX_WIDTH) newBaseWidth = MAX_WIDTH;
 
-      setPanelWidth(newWidth);
+      setPanelWidth(newBaseWidth);
     };
 
     const handleMouseUp = () => {
@@ -365,7 +451,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
     };
-  }, [isResizingPanel]);
+  }, [isResizingPanel, sidebarCollapsed]);
 
   useEffect(() => {
     localStorage.setItem('editor_panel_width', panelWidth.toString());
@@ -465,8 +551,13 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       itemGap?: number;
       bulletSpacing?: number;
     };
-    customFormat?: 'bullets' | 'keyvalue';
+    customFormat?: 'bullets' | 'keyvalue' | 'entries' | 'paragraph';
     keyValuePairs?: Array<{ key: string; value: string }>;
+    entries?: any[];
+    paragraphText?: string;
+    originalSnapshot?: any;
+    aiSnapshot?: any;
+    activeVersion?: 'original' | 'ai';
   }>>([
     { id: 'summary', name: 'Professional Summary', visible: true, type: 'summary' },
     { id: 'experience', name: 'Work Experience', visible: true, type: 'experience' },
@@ -945,6 +1036,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     window.dispatchEvent(new Event('cv-style-change'));
   }, [customStyles, sections, template]);
 
+  const [masterProfileData, setMasterProfileData] = useState<any>(null);
+
   // Load master profile projects and info for tailoring selection & diagnostics
   useEffect(() => {
     const fetchMasterProfile = async () => {
@@ -952,6 +1045,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         const res = await api.get('/master-profile/full');
         const profileObj = (res.data && res.data.success) ? res.data.data : res.data;
         if (profileObj) {
+          setMasterProfileData(profileObj);
           if (profileObj.personal_info) {
             setMasterProfileInfo(profileObj.personal_info);
             const liveSig = profileObj.personal_info.signature_image || '';
@@ -1429,14 +1523,12 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     try {
       const instruction = customInstruction || sectionAiPrompt || 'Enhance impact with strong action verbs, professional tone, and ATS keyword relevance.';
 
-      const res = await api.post('/api/tailor/rewrite', {
+      const res = await api.post('/resume/rephrase', {
         text: contentToRewrite,
-        prompt: instruction,
-        job_description: jobDescription || undefined,
-        target_role: position || undefined
+        instruction: instruction
       });
 
-      const proposed = res.data?.rewritten_text || res.data?.result || res.data?.text || contentToRewrite;
+      const proposed = res.data?.rephrased || res.data?.rewritten_text || res.data?.result || res.data?.text || contentToRewrite;
 
       setSectionAiProposal({
         sectionId,
@@ -1451,10 +1543,98 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     }
   };
 
+  const handleResetSectionToMasterProfile = (sectionId: string) => {
+    if (!masterProfileData) return;
+    if (sectionId === 'header') {
+      if (masterProfileData.personal_info) {
+        setEditablePersonalInfo(JSON.parse(JSON.stringify(masterProfileData.personal_info)));
+      }
+      return;
+    }
+    const sec = sections.find(s => s.id === sectionId);
+    if (!sec) return;
+
+    if (sec.type === 'summary') {
+      if (masterProfileData.personal_info?.summary) {
+        setEditableSummary(masterProfileData.personal_info.summary);
+      }
+    } else if (sec.type === 'experience') {
+      if (masterProfileData.work_experiences) {
+        setEditableExperiences(JSON.parse(JSON.stringify(masterProfileData.work_experiences)));
+      }
+    } else if (sec.type === 'projects') {
+      if (masterProfileData.projects) {
+        setEditableProjects(JSON.parse(JSON.stringify(masterProfileData.projects)));
+      }
+    } else if (sec.type === 'education') {
+      if (masterProfileData.educations) {
+        setEditableEducations(JSON.parse(JSON.stringify(masterProfileData.educations)));
+      }
+    } else if (sec.type === 'skills') {
+      if (masterProfileData.skills) {
+        setEditableSkills(JSON.parse(JSON.stringify(masterProfileData.skills)));
+      }
+    }
+  };
+
+  const handleToggleSectionVersion = (sectionId: string) => {
+    const sec = sections.find(s => s.id === sectionId);
+    if (!sec || !sec.originalSnapshot) return;
+
+    const isCurrentlyAi = sec.activeVersion !== 'original';
+    const nextVersion = isCurrentlyAi ? 'original' : 'ai';
+    const snapshot = isCurrentlyAi ? sec.originalSnapshot : sec.aiSnapshot;
+    if (!snapshot) return;
+
+    if (sec.type === 'summary') {
+      if (snapshot.summary !== undefined) setEditableSummary(snapshot.summary);
+    } else if (sec.type === 'experience') {
+      if (snapshot.experiences) setEditableExperiences(snapshot.experiences);
+    } else if (sec.type === 'projects') {
+      if (snapshot.projects) setEditableProjects(snapshot.projects);
+    } else if (sec.type === 'education') {
+      if (snapshot.educations) setEditableEducations(snapshot.educations);
+    }
+
+    setSections(prev => prev.map(s => {
+      if (s.id !== sectionId) return s;
+      return {
+        ...s,
+        activeVersion: nextVersion,
+        ...(s.type === 'custom' ? snapshot : {})
+      };
+    }));
+  };
+
   const handleApplySectionAiProposal = () => {
     if (!sectionAiProposal) return;
     const { sectionId, type, scope, proposed } = sectionAiProposal.payload;
 
+    // 1. Capture original snapshot before applying AI changes
+    const targetSec = sections.find(s => s.id === sectionId);
+    if (targetSec && !targetSec.originalSnapshot) {
+      let origSnapshot: any = {};
+      if (targetSec.type === 'summary') {
+        origSnapshot = { summary: editableSummary };
+      } else if (targetSec.type === 'experience') {
+        origSnapshot = { experiences: JSON.parse(JSON.stringify(editableExperiences)) };
+      } else if (targetSec.type === 'projects') {
+        origSnapshot = { projects: JSON.parse(JSON.stringify(editableProjects)) };
+      } else if (targetSec.type === 'education') {
+        origSnapshot = { educations: JSON.parse(JSON.stringify(editableEducations)) };
+      } else if (targetSec.type === 'custom') {
+        origSnapshot = {
+          bullets: targetSec.bullets ? [...targetSec.bullets] : undefined,
+          keyValuePairs: targetSec.keyValuePairs ? JSON.parse(JSON.stringify(targetSec.keyValuePairs)) : undefined,
+          entries: targetSec.entries ? JSON.parse(JSON.stringify(targetSec.entries)) : undefined,
+          paragraphText: targetSec.paragraphText
+        };
+      }
+
+      setSections(prev => prev.map(s => s.id === sectionId ? { ...s, originalSnapshot: origSnapshot, activeVersion: 'ai' } : s));
+    }
+
+    // 2. Apply proposed AI content
     if (scope === 'all') {
       if (type === 'summary') {
         setEditableSummary(proposed);
@@ -1536,6 +1716,31 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         }
       }
     }
+
+    // 3. Save AI snapshot for future toggle
+    setTimeout(() => {
+      setSections(prev => prev.map(s => {
+        if (s.id !== sectionId) return s;
+        let aiSnap: any = {};
+        if (s.type === 'summary') {
+          aiSnap = { summary: editableSummary };
+        } else if (s.type === 'experience') {
+          aiSnap = { experiences: JSON.parse(JSON.stringify(editableExperiences)) };
+        } else if (s.type === 'projects') {
+          aiSnap = { projects: JSON.parse(JSON.stringify(editableProjects)) };
+        } else if (s.type === 'education') {
+          aiSnap = { educations: JSON.parse(JSON.stringify(editableEducations)) };
+        } else if (s.type === 'custom') {
+          aiSnap = {
+            bullets: s.bullets ? [...s.bullets] : undefined,
+            keyValuePairs: s.keyValuePairs ? JSON.parse(JSON.stringify(s.keyValuePairs)) : undefined,
+            entries: s.entries ? JSON.parse(JSON.stringify(s.entries)) : undefined,
+            paragraphText: s.paragraphText
+          };
+        }
+        return { ...s, aiSnapshot: aiSnap, activeVersion: 'ai' };
+      }));
+    }, 60);
 
     setSectionAiProposal(null);
     setOpenSectionAiModalId(null);
@@ -1765,6 +1970,20 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     } : e));
   };
 
+  const handleOpenSectionDetail = (secId: string) => {
+    setActiveDetailSectionId(secId);
+    setTimeout(() => {
+      const secEl = document.querySelector(`[data-section-id="${secId}"]`);
+      if (secEl) {
+        secEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+  };
+
+  const handlePolishInlineText = (text: string, onAccept: (newText: string) => void) => {
+    if (!text || !text.trim()) return;
+    setPolishModalInfo({ text, onAccept });
+  };
 
   // Custom Sections Item Operations
   const handleAddCustomBullet = (secId: string, bulletIdx: number = -1) => {
@@ -2135,7 +2354,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   const handleGenerateLetter = async (targetCompany?: string, targetRole?: string) => {
     if (!jobDescription.trim()) {
-      alert('Please provide a job description first.');
+      setToast({ message: 'Please provide a job description first.', type: 'info' });
       return;
     }
     setIsLetterLoading(true);
@@ -2582,7 +2801,6 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
         setEditableExperiences={setEditableExperiences}
         setEditableProjects={setEditableProjects}
         setEditableEducations={setEditableEducations}
-        openSectionAiModal={(id) => setOpenSectionAiModalId(id)}
       />
     );
   };
@@ -2651,6 +2869,8 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
         handleMoveSkillCategory={handleMoveSkillCategory}
         getLocalizedCategoryName={getLocalizedCategoryName}
         getAlertsFor={getAlertsFor}
+        toggleSectionVisibility={toggleSectionVisibility}
+        onResetToMasterProfile={handleResetSectionToMasterProfile}
       />
     );
   };
@@ -2672,6 +2892,13 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
   return (
     <div className={styles.container}>
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
       {/* Dynamic print page styling to force correct browser paper size */}
       <style dangerouslySetInnerHTML={{
         __html: `
@@ -2701,12 +2928,18 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
         <div
           ref={controlPanelRef}
           className={`${styles.controlPanel} no-print`}
-          style={{ width: `${panelWidth}px`, minWidth: `${panelWidth}px` }}
+          style={{
+            width: `${effectivePanelWidth}px`,
+            minWidth: `${effectivePanelWidth}px`,
+            transition: isResizingPanel ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}
         >
           <div
             className={`${styles.resizerHandle} ${isResizingPanel ? styles.resizerHandleActive : ''}`}
             onMouseDown={(e) => {
               e.preventDefault();
+              startXRef.current = e.clientX;
+              startWidthRef.current = panelWidth;
               setIsResizingPanel(true);
             }}
             title="Click and drag to adjust control panel width"
@@ -3216,941 +3449,507 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
           {activeControlTab === 'style' && (
             // Design and Typography Customizers
             editorTab === 'resume' ? (
-              // CV Design Options
+              // CV Design & Layout Options
               <div className={`${styles.styleControlsForm} glass-card`}>
-                <h3>Typography & Layout Presets</h3>
-
-                <div className={styles.presetCard}>
-                  <div className={styles.presetHeader}>
-                    <label className={styles.presetLabel}>
-                      <Sliders size={16} style={{ color: 'var(--primary, #6366f1)' }} />
-                      <span>Quick Spacing & Density Presets</span>
-                    </label>
-                  </div>
-                  <div className={styles.presetGrid}>
-                    {[
-                      {
-                        id: 'standard',
-                        title: 'Standard',
-                        subtitle: 'Default balance',
-                        icon: LayoutGrid,
-                        config: { fontSize: 13, headingSize: 1.4, lineHeight: 1.4, sectionSpacing: 20, bulletSpacing: 4 }
-                      },
-                      {
-                        id: 'tight',
-                        title: 'Tight',
-                        subtitle: 'Fit ~15% more',
-                        icon: Minimize2,
-                        config: { fontSize: 12, headingSize: 1.3, lineHeight: 1.3, sectionSpacing: 14, bulletSpacing: 3 }
-                      },
-                      {
-                        id: 'ultra',
-                        title: 'Ultra Tight',
-                        subtitle: 'Max density',
-                        icon: Layers,
-                        config: { fontSize: 11, headingSize: 1.2, lineHeight: 1.2, sectionSpacing: 10, bulletSpacing: 2 }
-                      }
-                    ].map(preset => {
-                      const IconComponent = preset.icon;
-                      const isActive =
-                        customStyles.fontSize === preset.config.fontSize &&
-                        customStyles.sectionSpacing === preset.config.sectionSpacing;
-
-                      return (
-                        <button
-                          key={preset.id}
-                          type="button"
-                          className={`${styles.presetTile} ${isActive ? styles.presetTileActive : ''}`}
-                          onClick={() => setCustomStyles(s => ({ ...s, ...preset.config }))}
-                        >
-                          <div className={styles.presetTileTop}>
-                            <IconComponent size={14} className={styles.presetIcon} />
-                            {isActive && (
-                              <span className={styles.presetCheck}>
-                                <Check size={10} />
-                              </span>
-                            )}
-                          </div>
-                          <div>
-                            <div className={styles.presetTitle}>{preset.title}</div>
-                            <div className={styles.presetSubtitle}>{preset.subtitle}</div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className={styles.slidersTwinGrid}>
-                  <div className={styles.sliderGroup}>
-                    <label>Base Font Size: <strong>{customStyles.fontSize}px</strong></label>
-                    <input
-                      type="range"
-                      min="10"
-                      max="18"
-                      step="0.1"
-                      value={customStyles.fontSize}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, fontSize: parseFloat(e.target.value) }))}
-                    />
-                  </div>
-
-                  <div className={styles.sliderGroup}>
-                    <label>Heading Multiplier: <strong>x{customStyles.headingSize}</strong></label>
-                    <input
-                      type="range"
-                      min="1.0"
-                      max="2.2"
-                      step="0.05"
-                      value={customStyles.headingSize}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, headingSize: parseFloat(e.target.value) }))}
-                    />
-                  </div>
-                </div>
-
-                <div className={styles.slidersTwinGrid}>
-                  <div className={styles.sliderGroup}>
-                    <label>Line Height: <strong>{customStyles.lineHeight}</strong></label>
-                    <input
-                      type="range"
-                      min="1.0"
-                      max="2.0"
-                      step="0.05"
-                      value={customStyles.lineHeight}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, lineHeight: parseFloat(e.target.value) }))}
-                    />
-                  </div>
-
-                  <div className={styles.sliderGroup}>
-                    <label>Section Spacing: <strong>{customStyles.sectionSpacing}px</strong></label>
-                    <input
-                      type="range"
-                      min="10"
-                      max="45"
-                      step="0.5"
-                      value={customStyles.sectionSpacing}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, sectionSpacing: parseFloat(e.target.value) }))}
-                    />
-                  </div>
-                </div>
-
-                <div className={styles.slidersTwinGrid}>
-                  <div className={styles.sliderGroup}>
-                    <label>Bullet Point Spacing: <strong>{customStyles.bulletSpacing !== undefined ? customStyles.bulletSpacing : 4}px</strong></label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="15"
-                      step="0.5"
-                      value={customStyles.bulletSpacing !== undefined ? customStyles.bulletSpacing : 4}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, bulletSpacing: parseFloat(e.target.value) }))}
-                    />
-                  </div>
-
-                  <div className={styles.sliderGroup}>
-                    <label>Page Margin: <strong>{customStyles.pageMargin || 48}px</strong></label>
-                    <input
-                      type="range"
-                      min="15"
-                      max="90"
-                      step="0.5"
-                      value={customStyles.pageMargin || 48}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, pageMargin: parseFloat(e.target.value) }))}
-                    />
-                  </div>
-                </div>
-
-                <div className={styles.colorPickers}>
-                  <div className={styles.colorPickerGroup}>
-                    <label>Accent Color</label>
-                    <input
-                      type="color"
-                      value={customStyles.accentColor}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, accentColor: e.target.value }))}
-                    />
-                  </div>
-                  <div className={styles.colorPickerGroup}>
-                    <label>Title 2nd Word Color</label>
-                    <input
-                      type="color"
-                      value={customStyles.headingSecondaryColor || '#3d7ee6'}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, headingSecondaryColor: e.target.value }))}
-                    />
-                  </div>
-                  <div className={styles.colorPickerGroup}>
-                    <label>Text Color</label>
-                    <input
-                      type="color"
-                      value={customStyles.textColor}
-                      onChange={(e) => setCustomStyles(s => ({ ...s, textColor: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <div className={styles.selectGroup} style={{ marginTop: '12px' }}>
-                  <label htmlFor="globalFontFamily">Font Family</label>
-                  <select
-                    id="globalFontFamily"
-                    value={customStyles.fontFamily || ''}
-                    onChange={(e) => setCustomStyles(s => ({ ...s, fontFamily: e.target.value }))}
-                    style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--card-border)', background: 'var(--card-bg)', color: 'var(--foreground)' }}
+                {/* Sub-Tab Navigation Bar: Theme vs Sections */}
+                <div className={styles.subTabContainer}>
+                  <button
+                    type="button"
+                    className={`${styles.subTabBtn} ${activeStyleSubTab === 'sections' ? styles.activeSubTab : ''}`}
+                    onClick={() => setActiveStyleSubTab('sections')}
                   >
-                    <option value="">Template Default</option>
-                    <option value="'Aptos', 'Calibri', sans-serif">Aptos</option>
-                    <option value="'Inter', sans-serif">Inter</option>
-                    <option value="'Calibri', 'Segoe UI', sans-serif">Calibri</option>
-                    <option value="'Helvetica Neue', 'Helvetica', 'Arial', sans-serif">Helvetica</option>
-                    <option value="'Source Sans 3', 'Source Sans Pro', sans-serif">Source Sans 3</option>
-                    <option value="'IBM Plex Sans', sans-serif">IBM Plex Sans</option>
-                    <option value="'Arial', sans-serif">Arial</option>
-                  </select>
+                    <Layers size={13} />
+                    <span>Sections & Content</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.subTabBtn} ${activeStyleSubTab === 'theme' ? styles.activeSubTab : ''}`}
+                    onClick={() => setActiveStyleSubTab('theme')}
+                  >
+                    <Sliders size={13} />
+                    <span>Theme & Typography</span>
+                  </button>
                 </div>
 
-                <hr style={{ margin: 'var(--space-2) 0', borderColor: 'var(--card-border)' }} />
+                {/* Sub-Tab 1: Theme & Typography */}
+                {activeStyleSubTab === 'theme' && (
+                  <>
+                    <h3>Typography & Layout Presets</h3>
 
-                <h3>Sections Control Panel</h3>
-                <div className={styles.sectionsList}>
-                  {sections.map((secItem, idx) => (
-                    <div key={secItem.id} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', width: '100%' }}>
-                      <div className={styles.sectionSortRow}>
+                    <div className={styles.presetCard}>
+                      <div className={styles.presetHeader}>
+                        <label className={styles.presetLabel}>
+                          <Sliders size={16} style={{ color: 'var(--primary, #6366f1)' }} />
+                          <span>Quick Spacing & Density Presets</span>
+                        </label>
+                      </div>
+                      <div className={styles.presetGrid}>
+                        {[
+                          {
+                            id: 'standard',
+                            title: 'Standard',
+                            subtitle: 'Default balance',
+                            icon: LayoutGrid,
+                            config: { fontSize: 13, headingSize: 1.4, lineHeight: 1.4, sectionSpacing: 20, bulletSpacing: 4 }
+                          },
+                          {
+                            id: 'tight',
+                            title: 'Tight',
+                            subtitle: 'Fit ~15% more',
+                            icon: Minimize2,
+                            config: { fontSize: 12, headingSize: 1.3, lineHeight: 1.3, sectionSpacing: 14, bulletSpacing: 3 }
+                          },
+                          {
+                            id: 'ultra',
+                            title: 'Ultra Tight',
+                            subtitle: 'Max density',
+                            icon: Layers,
+                            config: { fontSize: 11, headingSize: 1.2, lineHeight: 1.2, sectionSpacing: 10, bulletSpacing: 2 }
+                          }
+                        ].map(preset => {
+                          const IconComponent = preset.icon;
+                          const isActive =
+                            customStyles.fontSize === preset.config.fontSize &&
+                            customStyles.sectionSpacing === preset.config.sectionSpacing;
+
+                          return (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              className={`${styles.presetTile} ${isActive ? styles.presetTileActive : ''}`}
+                              onClick={() => setCustomStyles(s => ({ ...s, ...preset.config }))}
+                            >
+                              <div className={styles.presetTileTop}>
+                                <IconComponent size={14} className={styles.presetIcon} />
+                                {isActive && (
+                                  <span className={styles.presetCheck}>
+                                    <Check size={10} />
+                                  </span>
+                                )}
+                              </div>
+                              <div>
+                                <div className={styles.presetTitle}>{preset.title}</div>
+                                <div className={styles.presetSubtitle}>{preset.subtitle}</div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className={styles.slidersTwinGrid}>
+                      <div className={styles.sliderGroup}>
+                        <label>Base Font Size: <strong>{customStyles.fontSize}px</strong></label>
                         <input
-                          type="checkbox"
-                          checked={secItem.visible}
-                          onChange={(e) => setSections(prev => prev.map((s, i) => i === idx ? { ...s, visible: e.target.checked } : s))}
+                          type="range"
+                          min="10"
+                          max="18"
+                          step="0.1"
+                          value={customStyles.fontSize}
+                          onChange={(e) => setCustomStyles(s => ({ ...s, fontSize: parseFloat(e.target.value) }))}
                         />
-                        <span className={styles.sectionSortName}>{secItem.name}</span>
+                      </div>
 
-                        <button
-                          type="button"
-                          className={styles.settingsToggleBtn}
-                          onClick={() => setExpandedSectionSettings(expandedSectionSettings === secItem.id ? null : secItem.id)}
+                      <div className={styles.sliderGroup}>
+                        <label>Heading Multiplier: <strong>x{customStyles.headingSize}</strong></label>
+                        <input
+                          type="range"
+                          min="1.0"
+                          max="2.2"
+                          step="0.05"
+                          value={customStyles.headingSize}
+                          onChange={(e) => setCustomStyles(s => ({ ...s, headingSize: parseFloat(e.target.value) }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className={styles.slidersTwinGrid}>
+                      <div className={styles.sliderGroup}>
+                        <label>Line Height: <strong>{customStyles.lineHeight}</strong></label>
+                        <input
+                          type="range"
+                          min="1.0"
+                          max="2.0"
+                          step="0.05"
+                          value={customStyles.lineHeight}
+                          onChange={(e) => setCustomStyles(s => ({ ...s, lineHeight: parseFloat(e.target.value) }))}
+                        />
+                      </div>
+
+                      <div className={styles.sliderGroup}>
+                        <label>Section Spacing: <strong>{customStyles.sectionSpacing}px</strong></label>
+                        <input
+                          type="range"
+                          min="10"
+                          max="45"
+                          step="0.5"
+                          value={customStyles.sectionSpacing}
+                          onChange={(e) => setCustomStyles(s => ({ ...s, sectionSpacing: parseFloat(e.target.value) }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className={styles.slidersTwinGrid}>
+                      <div className={styles.sliderGroup}>
+                        <label>Bullet Point Spacing: <strong>{customStyles.bulletSpacing !== undefined ? customStyles.bulletSpacing : 4}px</strong></label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="15"
+                          step="0.5"
+                          value={customStyles.bulletSpacing !== undefined ? customStyles.bulletSpacing : 4}
+                          onChange={(e) => setCustomStyles(s => ({ ...s, bulletSpacing: parseFloat(e.target.value) }))}
+                        />
+                      </div>
+
+                      <div className={styles.sliderGroup}>
+                        <label>Page Margin: <strong>{customStyles.pageMargin || 48}px</strong></label>
+                        <input
+                          type="range"
+                          min="15"
+                          max="90"
+                          step="0.5"
+                          value={customStyles.pageMargin || 48}
+                          onChange={(e) => setCustomStyles(s => ({ ...s, pageMargin: parseFloat(e.target.value) }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className={styles.colorPickers}>
+                      <div className={styles.colorPickerGroup}>
+                        <label>Accent Color</label>
+                        <input
+                          type="color"
+                          value={customStyles.accentColor}
+                          onChange={(e) => setCustomStyles(s => ({ ...s, accentColor: e.target.value }))}
+                        />
+                      </div>
+                      <div className={styles.colorPickerGroup}>
+                        <label>Title 2nd Word Color</label>
+                        <input
+                          type="color"
+                          value={customStyles.headingSecondaryColor || '#3d7ee6'}
+                          onChange={(e) => setCustomStyles(s => ({ ...s, headingSecondaryColor: e.target.value }))}
+                        />
+                      </div>
+                      <div className={styles.colorPickerGroup}>
+                        <label>Text Color</label>
+                        <input
+                          type="color"
+                          value={customStyles.textColor}
+                          onChange={(e) => setCustomStyles(s => ({ ...s, textColor: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className={styles.selectGroup} style={{ marginTop: '12px' }}>
+                      <label htmlFor="globalFontFamily">Font Family</label>
+                      <select
+                        id="globalFontFamily"
+                        value={customStyles.fontFamily || ''}
+                        onChange={(e) => setCustomStyles(s => ({ ...s, fontFamily: e.target.value }))}
+                        style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--card-border)', background: 'var(--card-bg)', color: 'var(--foreground)' }}
+                      >
+                        <option value="">Template Default</option>
+                        <option value="'Aptos', 'Calibri', sans-serif">Aptos</option>
+                        <option value="'Inter', sans-serif">Inter</option>
+                        <option value="'Calibri', 'Segoe UI', sans-serif">Calibri</option>
+                        <option value="'Helvetica Neue', 'Helvetica', 'Arial', sans-serif">Helvetica</option>
+                        <option value="'Source Sans 3', 'Source Sans Pro', sans-serif">Source Sans 3</option>
+                        <option value="'IBM Plex Sans', sans-serif">IBM Plex Sans</option>
+                        <option value="'Arial', sans-serif">Arial</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+
+                {/* Sub-Tab 2: Sections & Content */}
+                {activeStyleSubTab === 'sections' && (
+                  activeDetailSectionId ? (
+                    /* Master-Detail Full Section Editor */
+                    <SectionDetailEditor
+                      sectionId={activeDetailSectionId}
+                      sections={sections}
+                      setSections={setSections}
+                      onBack={() => setActiveDetailSectionId(null)}
+                      onSelectSection={(newSecId) => handleOpenSectionDetail(newSecId)}
+                      personalInfo={editablePersonalInfo}
+                      setPersonalInfo={setEditablePersonalInfo}
+                      summary={editableSummary}
+                      setSummary={setEditableSummary}
+                      experiences={editableExperiences}
+                      setExperiences={setEditableExperiences}
+                      onAddExperience={handleAddExperience}
+                      projects={editableProjects}
+                      setProjects={setEditableProjects}
+                      onAddProject={handleAddProject}
+                      educations={editableEducations}
+                      setEducations={setEditableEducations}
+                      onAddEducation={handleAddEducation}
+                      skills={editableSkills}
+                      setSkills={setEditableSkills}
+                      categoryOrder={categoryOrder}
+                      onMoveSkillCategory={handleMoveSkillCategory}
+                      getLocalizedCategoryName={getLocalizedCategoryName}
+                      languagesTitle={languagesTitle}
+                      setLanguagesTitle={setLanguagesTitle}
+                      targetLanguage={targetLanguage}
+                      onOpenAiPolishModal={(secId) => setOpenSectionAiModalId(secId)}
+                      onPolishBullet={handlePolishInlineText}
+                      toggleSectionVisibility={toggleSectionVisibility}
+                      animatingHideSectionId={animatingHideSectionId}
+                      onToggleSectionVersion={handleToggleSectionVersion}
+                      onResetToMasterProfile={handleResetSectionToMasterProfile}
+                    />
+                  ) : (
+                    /* Section Control Overview Matrix */
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <h3 style={{ margin: 0 }}>Sections Control Panel</h3>
+                        <span style={{ fontSize: '11px', color: 'var(--muted, #64748b)', fontWeight: 600 }}>
+                          {sections.filter(s => s.visible).length} visible / {sections.length + 1} total
+                        </span>
+                      </div>
+
+                      {/* Header / Personal Info Card */}
+                      <div className={`${styles.sectionCardItem} ${styles.sectionCardHeaderItem}`} style={{ marginBottom: '8px' }}>
+                        <div
+                          className={styles.sectionCardLeft}
+                          onClick={() => handleOpenSectionDetail('header')}
                         >
-                          <Settings size={12} />
-                        </button>
+                          <div
+                            className={styles.sectionIconBadge}
+                            style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#4f46e5' }}
+                          >
+                            <User size={16} />
+                          </div>
+                          <div className={styles.sectionCardInfo}>
+                            <div className={styles.sectionCardTitle}>
+                              <span>Personal Info & Header</span>
+                            </div>
+                            <div className={styles.sectionCardSubtitle}>
+                              {editablePersonalInfo.full_name || 'Your name'} • {editablePersonalInfo.title || 'Headline & Contact'}
+                            </div>
+                          </div>
+                        </div>
 
-                        {secItem.id.startsWith('custom_') && (
+                        <div className={styles.sectionCardRight}>
                           <button
                             type="button"
-                            className={styles.settingsToggleBtn}
-                            style={{ color: '#ef4444' }}
-                            onClick={() => setSections(prev => prev.filter(s => s.id !== secItem.id))}
-                          >
-                            <Trash size={12} />
-                          </button>
-                        )}
-
-                        <div className={styles.sortButtons}>
-                          <button
-                            type="button"
-                            disabled={idx === 0}
-                            onClick={() => {
-                              const reordered = [...sections];
-                              const temp = reordered[idx];
-                              reordered[idx] = reordered[idx - 1];
-                              reordered[idx - 1] = temp;
-                              setSections(reordered);
+                            className={styles.sectionAiCardBtn}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleResetSectionToMasterProfile('header');
                             }}
+                            title="Reset Personal Info & Header to Master Profile Original"
+                            style={{ marginRight: '4px' }}
                           >
-                            ↑
+                            <RotateCcw size={13} />
                           </button>
                           <button
                             type="button"
-                            disabled={idx === sections.length - 1}
-                            onClick={() => {
-                              const reordered = [...sections];
-                              const temp = reordered[idx];
-                              reordered[idx] = reordered[idx + 1];
-                              reordered[idx + 1] = temp;
-                              setSections(reordered);
-                            }}
+                            className={styles.sectionEditCardBtn}
+                            onClick={() => handleOpenSectionDetail('header')}
+                            title="Edit Personal Information"
                           >
-                            ↓
+                            <span>Edit</span>
+                            <Settings size={12} />
                           </button>
                         </div>
                       </div>
 
-                      {/* Local individual section styles panel */}
-                      {expandedSectionSettings === secItem.id && (
-                        <div className={styles.sectionSettingsCard}>
-                          <h4>{secItem.name} Manager</h4>
+                      {/* Dynamic CV Sections Cards */}
+                      <div className={styles.sectionsList}>
+                        {sections.map((secItem, idx) => {
+                          const meta = (() => {
+                            if (secItem.type === 'summary' || secItem.id === 'summary') {
+                              const words = editableSummary ? editableSummary.trim().split(/\s+/).filter(Boolean).length : 0;
+                              return {
+                                icon: <FileText size={16} />,
+                                iconBg: 'rgba(168, 85, 247, 0.12)',
+                                iconColor: '#a855f7',
+                                subtitle: words > 0 ? `${words} words pitch` : 'Summary not set'
+                              };
+                            }
+                            if (secItem.type === 'experience' || secItem.id === 'experience') {
+                              return {
+                                icon: <Briefcase size={16} />,
+                                iconBg: 'rgba(59, 130, 246, 0.12)',
+                                iconColor: '#3b82f6',
+                                subtitle: `${editableExperiences.length} position${editableExperiences.length === 1 ? '' : 's'}`
+                              };
+                            }
+                            if (secItem.type === 'projects' || secItem.id === 'projects') {
+                              return {
+                                icon: <Code size={16} />,
+                                iconBg: 'rgba(16, 185, 129, 0.12)',
+                                iconColor: '#10b981',
+                                subtitle: `${editableProjects.length} project${editableProjects.length === 1 ? '' : 's'}`
+                              };
+                            }
+                            if (secItem.type === 'education' || secItem.id === 'education') {
+                              return {
+                                icon: <GraduationCap size={16} />,
+                                iconBg: 'rgba(245, 158, 11, 0.12)',
+                                iconColor: '#f59e0b',
+                                subtitle: `${editableEducations.length} degree${editableEducations.length === 1 ? '' : 's'}`
+                              };
+                            }
+                            if (secItem.type === 'skills' || secItem.id === 'skills') {
+                              const langCount = editableSkills.filter(s => (s.category || '').toLowerCase().trim() === 'languages').length;
+                              const itCount = editableSkills.length - langCount;
+                              return {
+                                icon: <Globe size={16} />,
+                                iconBg: 'rgba(236, 72, 153, 0.12)',
+                                iconColor: '#ec4899',
+                                subtitle: `${itCount} skills • ${langCount} languages`
+                              };
+                            }
+                            const count = secItem.customFormat === 'keyvalue' ? (secItem.keyValuePairs?.length || 0) : (secItem.bullets?.length || 0);
+                            return {
+                              icon: <Layers size={16} />,
+                              iconBg: 'rgba(99, 102, 241, 0.12)',
+                              iconColor: '#6366f1',
+                              subtitle: `${count} custom item${count === 1 ? '' : 's'}`
+                            };
+                          })();
 
-                          {/* Local layout choice for custom sections */}
-                          {secItem.type === 'custom' && (
-                            <div className={styles.sliderGroup}>
-                              <label>Section Format</label>
-                              <select
-                                value={secItem.customFormat || 'bullets'}
-                                onChange={(e) => {
-                                  const val = e.target.value as 'bullets' | 'keyvalue';
-                                  setSections(prev => prev.map(s => s.id === secItem.id ? {
-                                    ...s,
-                                    customFormat: val,
-                                    keyValuePairs: val === 'keyvalue' ? (s.keyValuePairs || [{ key: 'Languages', value: 'German (Native), English (C1)' }]) : undefined
-                                  } : s));
-                                }}
-                                style={{
-                                  padding: '4px',
-                                  fontSize: '11px',
-                                  background: 'var(--card-bg)',
-                                  border: '1px solid var(--card-border)',
-                                  color: 'var(--foreground)'
-                                }}
+                          return (
+                            <div
+                              key={secItem.id}
+                              className={`${styles.sectionCardItem} ${!secItem.visible ? styles.sectionCardDisabled : ''}`}
+                            >
+                              <div
+                                className={styles.sectionCardLeft}
+                                onClick={() => handleOpenSectionDetail(secItem.id)}
                               >
-                                <option value="bullets">Multi-bullet list</option>
-                                <option value="keyvalue">Structured Key-Value grid</option>
-                              </select>
-                            </div>
-                          )}
-
-                          {secItem.type === 'experience' && (
-                            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div>
-                                  <h5 style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--foreground, #0f172a)' }}>
-                                    Work Experience Manager
-                                  </h5>
-                                  <span style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)' }}>
-                                    Manage position, company name, location, and dates
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleAddExperience()}
-                                  style={{
-                                    fontSize: '11px',
-                                    fontWeight: 700,
-                                    color: '#ffffff',
-                                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                                    border: 'none',
-                                    padding: '5px 10px',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 2px 4px rgba(99, 102, 241, 0.25)',
-                                    whiteSpace: 'nowrap'
-                                  }}
+                                <div
+                                  className={styles.sectionIconBadge}
+                                  style={{ background: meta.iconBg, color: meta.iconColor }}
                                 >
-                                  + New Experience
-                                </button>
-                              </div>
-
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
-                                {editableExperiences.map((exp, eIdx) => (
-                                  <div key={exp.id || `exp_${eIdx}`} className={styles.projectCard}>
-                                    <div className={styles.projectInputGroup} style={{ width: '100%' }}>
-                                      <label className={styles.projectInputLabel}>🏢 Company Name & Location</label>
-                                      <input
-                                        type="text"
-                                        className={styles.projectInput}
-                                        style={{ width: '100%' }}
-                                        placeholder="e.g. Acme Corporation, Munich"
-                                        value={`${exp.company || ''}${exp.location ? `, ${exp.location}` : ''}`}
-                                        onChange={(e) => {
-                                          const val = e.target.value;
-                                          const commaIndex = val.indexOf(',');
-                                          let newComp = val;
-                                          let newLoc = '';
-                                          if (commaIndex !== -1) {
-                                            newComp = val.substring(0, commaIndex).trim();
-                                            newLoc = val.substring(commaIndex + 1).trim();
-                                          } else {
-                                            newComp = val;
-                                          }
-                                          setEditableExperiences(prev => prev.map((item, i) => i === eIdx ? { ...item, company: newComp, location: newLoc } : item));
-                                        }}
-                                      />
-                                    </div>
-                                    <div className={styles.projectInputGroup} style={{ width: '100%', marginTop: '6px' }}>
-                                      <label className={styles.projectInputLabel}>💼 Position / Job Title</label>
-                                      <input
-                                        type="text"
-                                        className={styles.projectInput}
-                                        style={{ width: '100%' }}
-                                        placeholder="e.g. Senior Software Engineer"
-                                        value={exp.position || ''}
-                                        onChange={(e) => setEditableExperiences(prev => prev.map((item, i) => i === eIdx ? { ...item, position: e.target.value } : item))}
-                                      />
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {secItem.type === 'projects' && (
-                            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div>
-                                  <h5 style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--foreground, #0f172a)' }}>
-                                    Projects & Subfields Manager
-                                  </h5>
-                                  <span style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)' }}>
-                                    Customize roles, tech stack, dates & links
-                                  </span>
+                                  {meta.icon}
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleAddProject()}
-                                  style={{
-                                    fontSize: '11px',
-                                    fontWeight: 700,
-                                    color: '#ffffff',
-                                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                                    border: 'none',
-                                    padding: '5px 10px',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 2px 4px rgba(99, 102, 241, 0.25)',
-                                    whiteSpace: 'nowrap'
-                                  }}
-                                >
-                                  + New Project
-                                </button>
-                              </div>
-
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
-                                {editableProjects.map((proj, pIdx) => {
-                                  const cardKey = proj.id || `proj_${pIdx}`;
-                                  const isExpanded = !!expandedProjectCards[cardKey];
-                                  const projTechStr = Array.isArray(proj.technologies)
-                                    ? proj.technologies.join(', ')
-                                    : (proj.technologies || '');
-                                  const projLinkVal = proj.link || proj.github_url || proj.demo_url || '';
-
-                                  return (
-                                    <div key={cardKey} className={styles.projectCard}>
-                                      {/* Header Bar (Click to toggle expand/collapse) */}
-                                      <div
-                                        className={styles.projectHeaderRow}
-                                        style={{ cursor: 'pointer', userSelect: 'none', borderBottom: isExpanded ? '1px solid var(--card-border, #f1f5f9)' : 'none', paddingBottom: isExpanded ? '6px' : '0' }}
-                                        onClick={() => setExpandedProjectCards(prev => ({ ...prev, [cardKey]: !prev[cardKey] }))}
-                                      >
-                                        <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--foreground)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                          <span style={{ fontSize: '10px', color: 'var(--primary, #6366f1)' }}>{isExpanded ? '▼' : '▶'}</span>
-                                          📌 {proj.title ? proj.title : `Project #${pIdx + 1}`}
-                                        </span>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                          <span style={{ fontSize: '10.5px', color: 'var(--primary, #6366f1)', fontWeight: 600 }}>
-                                            {isExpanded ? 'Collapse' : 'Edit Details'}
-                                          </span>
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setEditableProjects(prev => prev.filter((_, i) => i !== pIdx));
-                                            }}
-                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '11px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}
-                                          >
-                                            <Trash size={12} />
-                                          </button>
-                                        </div>
-                                      </div>
-
-                                      {/* Collapsible Body (Only rendered when expanded) */}
-                                      {isExpanded && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', boxSizing: 'border-box', paddingTop: '4px' }}>
-                                          {/* Title */}
-                                          <div className={styles.projectInputGroup}>
-                                            <label className={styles.projectInputLabel}>
-                                              PROJECT TITLE
-                                            </label>
-                                            <input
-                                              type="text"
-                                              className={styles.projectInput}
-                                              placeholder="e.g. E-Commerce Microservices Platform"
-                                              value={proj.title || ''}
-                                              onChange={(e) => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, title: e.target.value } : p))}
-                                            />
-                                          </div>
-
-                                          {/* Subfields (Stacked single-column layout for narrow sidebar) */}
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
-                                            {/* Role */}
-                                            <div className={styles.projectInputGroup}>
-                                              <label className={styles.projectInputLabel}>
-                                                🏢 Role
-                                              </label>
-                                              <input
-                                                type="text"
-                                                className={styles.projectInput}
-                                                placeholder="e.g. Lead Engineer"
-                                                value={proj.role || ''}
-                                                onChange={(e) => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, role: e.target.value } : p))}
-                                              />
-                                            </div>
-
-                                            {/* Tech Stack */}
-                                            <div className={styles.projectInputGroup}>
-                                              <label className={styles.projectInputLabel}>
-                                                ⚡ Tech Stack
-                                              </label>
-                                              <input
-                                                type="text"
-                                                className={styles.projectInput}
-                                                placeholder="e.g. React, Node.js, Python"
-                                                value={projTechStr}
-                                                onChange={(e) => {
-                                                  const val = e.target.value;
-                                                  setEditableProjects(prev => prev.map((p, i) => i === pIdx ? {
-                                                    ...p,
-                                                    technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
-                                                  } : p));
-                                                }}
-                                              />
-                                            </div>
-
-                                            {/* Link */}
-                                            <div className={styles.projectInputGroup}>
-                                              <label className={styles.projectInputLabel}>
-                                                🔗 Link URL
-                                              </label>
-                                              <input
-                                                type="text"
-                                                className={styles.projectInput}
-                                                placeholder="e.g. https://github.com/username/project"
-                                                value={projLinkVal}
-                                                onChange={(e) => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, link: e.target.value } : p))}
-                                              />
-                                            </div>
-
-                                            {/* Date */}
-                                            <div className={styles.projectInputGroup}>
-                                              <label className={styles.projectInputLabel}>
-                                                📅 Date / Period
-                                              </label>
-                                              <input
-                                                type="text"
-                                                className={styles.projectInput}
-                                                placeholder="e.g. 2026"
-                                                value={proj.date || ''}
-                                                onChange={(e) => setEditableProjects(prev => prev.map((p, i) => i === pIdx ? { ...p, date: e.target.value } : p))}
-                                              />
-                                            </div>
-                                          </div>
-
-                                          {/* Footer Button */}
-                                          <div style={{ display: 'flex', justifyContent: 'flex-start', paddingTop: '4px' }}>
-                                            <button
-                                              type="button"
-                                              onClick={() => handleAddProjectBullet(pIdx)}
-                                              style={{
-                                                fontSize: '11px',
-                                                fontWeight: 600,
-                                                color: 'var(--primary, #4f46e5)',
-                                                background: 'rgba(99, 102, 241, 0.08)',
-                                                border: '1px solid rgba(99, 102, 241, 0.2)',
-                                                padding: '4px 10px',
-                                                borderRadius: '6px',
-                                                cursor: 'pointer',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '4px'
-                                              }}
-                                            >
-                                              + Add Bullet Point
-                                            </button>
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-
-                          {secItem.type === 'skills' && (
-                            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                              {/* 1. IT Skills Categories */}
-                              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                IT Skills Categories
-                              </div>
-                              {(() => {
-                                const itSkills = editableSkills.filter(s => (s.category || '').toLowerCase().trim() !== 'languages');
-                                const uniqueCats = Array.from(new Set(itSkills.map(s => (s.category || 'technical').toLowerCase().trim())));
-                                const normalizedOrder = categoryOrder.map(c => c.toLowerCase().trim());
-                                const orderedCats = normalizedOrder.filter(c => uniqueCats.includes(c));
-                                const remainingCats = uniqueCats.filter(c => !orderedCats.includes(c));
-                                const finalSideCats = [...orderedCats, ...remainingCats];
-
-                                if (categoryOrder.length === 0) {
-                                  const defaultOrder = ['programming languages', 'frameworks & libraries', 'databases', 'cloud & devops', 'development tools', 'testing'];
-                                  finalSideCats.sort((a, b) => {
-                                    const idxA = defaultOrder.indexOf(a);
-                                    const idxB = defaultOrder.indexOf(b);
-                                    return (idxA !== -1 ? idxA : 100) - (idxB !== -1 ? idxB : 100);
-                                  });
-                                }
-
-                                return finalSideCats.map((catName, catIdx) => {
-                                  const categorySkills = editableSkills.filter(s => (s.category || 'technical').toLowerCase().trim() === catName);
-                                  const originalCategory = categorySkills[0]?.category || catName;
-                                  const displayHeader = getLocalizedCategoryName(originalCategory);
-                                  const isExpanded = !!expandedSkillCats[catName];
-
-                                  return (
-                                    <div
-                                      key={`skill_cat_panel_${catIdx}`}
-                                      style={{
-                                        background: 'var(--card-bg, rgba(255, 255, 255, 0.8))',
-                                        border: '1px solid var(--card-border, rgba(226, 232, 240, 0.8))',
-                                        borderRadius: 'var(--radius-md, 10px)',
-                                        overflow: 'hidden',
-                                        backdropFilter: 'blur(8px)',
-                                        boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
-                                        transition: 'all 0.2s ease'
-                                      }}
-                                    >
-                                      {/* Accordion Header Bar */}
-                                      <div
-                                        onClick={() => setExpandedSkillCats(prev => ({ ...prev, [catName]: !prev[catName] }))}
-                                        style={{
-                                          display: 'flex',
-                                          justifyContent: 'space-between',
-                                          alignItems: 'center',
-                                          padding: '10px 12px',
-                                          cursor: 'pointer',
-                                          background: isExpanded ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
-                                          userSelect: 'none',
-                                          borderBottom: isExpanded ? '1px solid var(--card-border, #e2e8f0)' : 'none'
-                                        }}
-                                      >
-                                        <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--foreground, #0f172a)' }}>
-                                          {displayHeader} <span style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)', fontWeight: 500 }}>({categorySkills.length})</span>
-                                        </span>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                          <button
-                                            type="button"
-                                            disabled={catIdx === 0}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleMoveSkillCategory(catName, 'up');
-                                            }}
-                                            style={{ opacity: catIdx === 0 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--foreground, #0f172a)', cursor: 'pointer', padding: '2px' }}
-                                            title="Move Category Up"
-                                          >
-                                            <ArrowUp size={13} />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            disabled={catIdx === finalSideCats.length - 1}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleMoveSkillCategory(catName, 'down');
-                                            }}
-                                            style={{ opacity: catIdx === finalSideCats.length - 1 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--foreground, #0f172a)', cursor: 'pointer', padding: '2px' }}
-                                            title="Move Category Down"
-                                          >
-                                            <ArrowDown size={13} />
-                                          </button>
-                                          <span style={{ fontSize: '11px', color: 'var(--primary, #6366f1)', fontWeight: 600, marginLeft: '4px' }}>
-                                            {isExpanded ? 'Collapse ▲' : 'Expand ▼'}
-                                          </span>
-                                        </div>
-                                      </div>
-
-                                      {/* Collapsible Content Body */}
-                                      {isExpanded && (
-                                        <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                          {/* Category Title Rename */}
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                                            <label style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)', whiteSpace: 'nowrap', fontWeight: 600 }}>Title:</label>
-                                            <input
-                                              type="text"
-                                              value={displayHeader}
-                                              onChange={(e) => {
-                                                const newCatName = e.target.value;
-                                                if (!newCatName.trim()) return;
-                                                setEditableSkills(prev => prev.map(s => (s.category || 'technical').toLowerCase().trim() === catName ? { ...s, category: newCatName.trim() } : s));
-                                              }}
-                                              style={{
-                                                flex: 1,
-                                                fontSize: '11.5px',
-                                                fontWeight: 700,
-                                                padding: '4px 8px',
-                                                borderRadius: 'var(--radius-sm, 6px)',
-                                                border: '1px solid var(--card-border, #cbd5e1)',
-                                                color: 'var(--primary, #6366f1)',
-                                                background: 'var(--background, #f8fafc)'
-                                              }}
-                                            />
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (window.confirm(`Delete category "${displayHeader}" and all its skills?`)) {
-                                                  setEditableSkills(prev => prev.filter(s => (s.category || 'technical').toLowerCase().trim() !== catName));
-                                                }
-                                              }}
-                                              style={{ background: 'transparent', border: 'none', color: 'var(--danger, #ef4444)', cursor: 'pointer', padding: '4px' }}
-                                              title="Delete Category"
-                                            >
-                                              <Trash size={13} />
-                                            </button>
-                                          </div>
-
-                                          {/* List of Skills with Reorder & Delete */}
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                            {categorySkills.map((sk, idx) => (
-                                              <div key={sk.id || idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <input
-                                                  type="text"
-                                                  value={sk.name}
-                                                  onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setEditableSkills(prev => prev.map(item => item.id === sk.id ? { ...item, name: val } : item));
-                                                  }}
-                                                  style={{
-                                                    flex: 1,
-                                                    fontSize: '11.5px',
-                                                    padding: '4px 8px',
-                                                    borderRadius: 'var(--radius-sm, 6px)',
-                                                    border: '1px solid var(--card-border, #cbd5e1)',
-                                                    background: 'var(--background, #ffffff)',
-                                                    color: 'var(--foreground, #1e293b)'
-                                                  }}
-                                                />
-                                                <button
-                                                  type="button"
-                                                  disabled={idx === 0}
-                                                  onClick={() => handleMoveSkillInCategory(sk.id, 'up')}
-                                                  style={{ opacity: idx === 0 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--muted, #64748b)', cursor: 'pointer', padding: '2px' }}
-                                                  title="Move Up"
-                                                >
-                                                  <ArrowUp size={12} />
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  disabled={idx === categorySkills.length - 1}
-                                                  onClick={() => handleMoveSkillInCategory(sk.id, 'down')}
-                                                  style={{ opacity: idx === categorySkills.length - 1 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--muted, #64748b)', cursor: 'pointer', padding: '2px' }}
-                                                  title="Move Down"
-                                                >
-                                                  <ArrowDown size={12} />
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  onClick={() => setEditableSkills(prev => prev.filter(item => item.id !== sk.id))}
-                                                  style={{ background: 'transparent', border: 'none', color: 'var(--danger, #ef4444)', cursor: 'pointer', padding: '2px' }}
-                                                  title="Remove Skill"
-                                                >
-                                                  <X size={12} />
-                                                </button>
-                                              </div>
-                                            ))}
-                                          </div>
-
-                                          {/* Add Skill to this Category */}
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const skillName = window.prompt(`Add new skill to ${displayHeader}:`, 'New Skill');
-                                              if (skillName && skillName.trim()) {
-                                                const targetCat = categorySkills[0]?.category || catName;
-                                                setEditableSkills(prev => [...prev, { id: `sk_${Date.now()}`, name: skillName.trim(), category: targetCat }]);
-                                              }
-                                            }}
-                                            style={{
-                                              marginTop: '4px',
-                                              fontSize: '11px',
-                                              background: 'transparent',
-                                              border: 'none',
-                                              color: 'var(--primary, #6366f1)',
-                                              cursor: 'pointer',
-                                              padding: '4px 0',
-                                              fontWeight: 600,
-                                              textAlign: 'left',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              gap: '4px'
-                                            }}
-                                          >
-                                            + Add skill to {displayHeader}
-                                          </button>
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                });
-                              })()}
-
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                style={{ fontSize: '11px', padding: '8px', color: 'var(--primary, #6366f1)' }}
-                                onClick={() => {
-                                  const newCat = window.prompt('Enter new category name (e.g. Tools, Soft Skills):');
-                                  if (newCat && newCat.trim()) {
-                                    setEditableSkills(prev => [...prev, { id: `sk_${Date.now()}`, name: 'New Skill', category: newCat.trim() }]);
-                                    setExpandedSkillCats(prev => ({ ...prev, [newCat.trim().toLowerCase()]: true }));
-                                  }
-                                }}
-                              >
-                                + Add New Category
-                              </Button>
-
-                              {/* 2. Separate Languages Subsection Card */}
-                              {(() => {
-                                const languageSkills = editableSkills.filter(s => (s.category || '').toLowerCase().trim() === 'languages');
-                                const isExpanded = !!expandedSkillCats.languages;
-                                const displayLangTitle = languagesTitle || (targetLanguage === 'de' ? 'Sprachen' : 'Languages');
-
-                                return (
-                                  <div
-                                    style={{
-                                      marginTop: '8px',
-                                      background: 'var(--card-bg, rgba(255, 255, 255, 0.8))',
-                                      border: '1px solid var(--card-border, rgba(226, 232, 240, 0.8))',
-                                      borderRadius: 'var(--radius-md, 10px)',
-                                      overflow: 'hidden',
-                                      backdropFilter: 'blur(8px)',
-                                      boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
-                                      transition: 'all 0.2s ease'
-                                    }}
-                                  >
-                                    <div
-                                      onClick={() => setExpandedSkillCats(prev => ({ ...prev, languages: !prev.languages }))}
-                                      style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        padding: '10px 12px',
-                                        cursor: 'pointer',
-                                        background: isExpanded ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.04)',
-                                        userSelect: 'none',
-                                        borderBottom: isExpanded ? '1px solid var(--card-border, #e2e8f0)' : 'none'
-                                      }}
-                                    >
-                                      <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--primary, #4f46e5)' }}>
-                                        🌐 {displayLangTitle} <span style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)', fontWeight: 500 }}>({languageSkills.length})</span>
-                                      </span>
-                                      <span style={{ fontSize: '11px', color: 'var(--primary, #6366f1)', fontWeight: 600 }}>
-                                        {isExpanded ? 'Collapse ▲' : 'Expand ▼'}
-                                      </span>
-                                    </div>
-
-                                    {isExpanded && (
-                                      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                                          <label style={{ fontSize: '10.5px', color: 'var(--muted, #64748b)', whiteSpace: 'nowrap', fontWeight: 600 }}>Title:</label>
-                                          <input
-                                            type="text"
-                                            value={displayLangTitle}
-                                            onChange={(e) => setLanguagesTitle(e.target.value)}
-                                            style={{
-                                              flex: 1,
-                                              fontSize: '11.5px',
-                                              fontWeight: 700,
-                                              padding: '4px 8px',
-                                              borderRadius: 'var(--radius-sm, 6px)',
-                                              border: '1px solid var(--card-border, #cbd5e1)',
-                                              color: 'var(--primary, #4f46e5)',
-                                              background: 'var(--background, #f8fafc)'
-                                            }}
-                                          />
-                                        </div>
-
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                          {languageSkills.map((sk, idx) => (
-                                            <div key={sk.id || idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                              <input
-                                                type="text"
-                                                value={sk.name}
-                                                onChange={(e) => {
-                                                  const val = e.target.value;
-                                                  setEditableSkills(prev => prev.map(item => item.id === sk.id ? { ...item, name: val } : item));
-                                                }}
-                                                style={{
-                                                  flex: 1,
-                                                  fontSize: '11.5px',
-                                                  padding: '4px 8px',
-                                                  borderRadius: 'var(--radius-sm, 6px)',
-                                                  border: '1px solid var(--card-border, #cbd5e1)',
-                                                  background: 'var(--background, #ffffff)',
-                                                  color: 'var(--foreground, #1e293b)'
-                                                }}
-                                              />
-                                              <button
-                                                type="button"
-                                                disabled={idx === 0}
-                                                onClick={() => handleMoveSkillInCategory(sk.id, 'up')}
-                                                style={{ opacity: idx === 0 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--muted, #64748b)', cursor: 'pointer', padding: '2px' }}
-                                                title="Move Up"
-                                              >
-                                                <ArrowUp size={12} />
-                                              </button>
-                                              <button
-                                                type="button"
-                                                disabled={idx === languageSkills.length - 1}
-                                                onClick={() => handleMoveSkillInCategory(sk.id, 'down')}
-                                                style={{ opacity: idx === languageSkills.length - 1 ? 0.3 : 1, background: 'transparent', border: 'none', color: 'var(--muted, #64748b)', cursor: 'pointer', padding: '2px' }}
-                                                title="Move Down"
-                                              >
-                                                <ArrowDown size={12} />
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => setEditableSkills(prev => prev.filter(item => item.id !== sk.id))}
-                                                style={{ background: 'transparent', border: 'none', color: 'var(--danger, #ef4444)', cursor: 'pointer', padding: '2px' }}
-                                                title="Remove Language"
-                                              >
-                                                <X size={12} />
-                                              </button>
-                                            </div>
-                                          ))}
-                                        </div>
-
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const langName = window.prompt('Add new language (e.g. German (Native)):', 'French (B2)');
-                                            if (langName && langName.trim()) {
-                                              setEditableSkills(prev => [...prev, { id: `lang_${Date.now()}`, name: langName.trim(), category: 'languages' }]);
-                                            }
-                                          }}
-                                          style={{
-                                            marginTop: '4px',
-                                            fontSize: '11px',
-                                            background: 'transparent',
-                                            border: 'none',
-                                            color: 'var(--primary, #4f46e5)',
-                                            cursor: 'pointer',
-                                            padding: '4px 0',
-                                            fontWeight: 600,
-                                            textAlign: 'left'
-                                          }}
-                                        >
-                                          + Add Language
-                                        </button>
-                                      </div>
+                                <div className={styles.sectionCardInfo}>
+                                  <div className={styles.sectionCardTitle}>
+                                    <span>{secItem.name}</span>
+                                    {!secItem.visible && (
+                                      <span className={styles.sectionHiddenBadge}>Hidden</span>
                                     )}
                                   </div>
-                                );
-                              })()}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                                  <div className={styles.sectionCardSubtitle}>
+                                    {meta.subtitle}
+                                  </div>
+                                </div>
+                              </div>
 
-                <button
-                  type="button"
-                  className={styles.addCustomSecBtn}
-                  onClick={() => {
-                    const secName = window.prompt("Enter Section Title:", "Certifications");
-                    if (secName) {
-                      setSections(prev => [...prev, {
-                        id: `custom_${Date.now()}`,
-                        name: secName,
-                        visible: true,
-                        type: 'custom',
-                        bullets: ['Add certification credential detail...']
-                      }]);
-                    }
-                  }}
-                >
-                  <Plus size={14} /> Add Custom Section
-                </button>
+                              <div className={styles.sectionCardRight}>
+                                <button
+                                  type="button"
+                                  className={`${styles.sectionVisibilityBtn} ${secItem.visible && animatingHideSectionId !== secItem.id ? styles.sectionVisibilityBtnActive : ''}`}
+                                  onClick={() => toggleSectionVisibility(secItem.id)}
+                                  title={secItem.visible && animatingHideSectionId !== secItem.id ? 'Hide section from CV' : 'Show section on CV'}
+                                >
+                                  {secItem.visible && animatingHideSectionId !== secItem.id ? <Eye size={13} /> : <EyeOff size={13} />}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  className={styles.sectionAiCardBtn}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenSectionAiModalId(secItem.id);
+                                  }}
+                                  title={`AI Polish & Tailor ${secItem.name}`}
+                                >
+                                  <Sparkles size={13} />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  className={styles.sectionAiCardBtn}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleResetSectionToMasterProfile(secItem.id);
+                                  }}
+                                  title={`Reset ${secItem.name} to Master Profile Original`}
+                                >
+                                  <RotateCcw size={13} />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  className={styles.sectionEditCardBtn}
+                                  onClick={() => handleOpenSectionDetail(secItem.id)}
+                                  title={`Edit ${secItem.name}`}
+                                >
+                                  <span>Edit</span>
+                                  <Settings size={11} />
+                                </button>
+
+                                {secItem.id.startsWith('custom_') && (
+                                  <button
+                                    type="button"
+                                    className={styles.sectionDeleteBtn}
+                                    onClick={() => {
+                                      if (window.confirm(`Delete section "${secItem.name}"?`)) {
+                                        setSections(prev => prev.filter(s => s.id !== secItem.id));
+                                      }
+                                    }}
+                                    title="Delete Custom Section"
+                                  >
+                                    <Trash size={12} />
+                                  </button>
+                                )}
+
+                                <div className={styles.sectionSortGroup}>
+                                  <button
+                                    type="button"
+                                    className={styles.sectionSortBtn}
+                                    disabled={idx === 0}
+                                    onClick={() => {
+                                      const reordered = [...sections];
+                                      const temp = reordered[idx];
+                                      reordered[idx] = reordered[idx - 1];
+                                      reordered[idx - 1] = temp;
+                                      setSections(reordered);
+                                    }}
+                                    title="Move Up"
+                                  >
+                                    ▲
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={styles.sectionSortBtn}
+                                    disabled={idx === sections.length - 1}
+                                    onClick={() => {
+                                      const reordered = [...sections];
+                                      const temp = reordered[idx];
+                                      reordered[idx] = reordered[idx + 1];
+                                      reordered[idx + 1] = temp;
+                                      setSections(reordered);
+                                    }}
+                                    title="Move Down"
+                                  >
+                                    ▼
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <button
+                        type="button"
+                        className={styles.addCustomSectionCard}
+                        onClick={() => setIsAddCustomSectionOpen(true)}
+                      >
+                        <Plus size={15} />
+                        <span>Add Custom Section (Certifications, Awards, etc.)</span>
+                      </button>
+                    </>
+                  )
+                )}
               </div>
             ) : (
               // Cover Letter Design Options
@@ -4856,19 +4655,62 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                               {/* Standard single column or split grid column templates */}
                               {isCreative ? (
                                 <>
-                                  {headerUnit && renderUnit(headerUnit)}
+                                  {headerUnit && (
+                                    <div className={styles.unitTransitionWrapper}>
+                                      {renderUnit(headerUnit)}
+                                    </div>
+                                  )}
                                   <div className={styles.gridContainer}>
                                     <div className={styles.sidebarColumn}>
-                                      {sidebarUnits.map(unit => renderUnit(unit))}
+                                      {sidebarUnits.map(unit => {
+                                        const sec = sections.find(s => s.id === unit.sectionId);
+                                        if (sec && !sec.visible) return null;
+                                        const isHiding = Boolean(animatingHideSectionId && unit.sectionId === animatingHideSectionId);
+                                        const isEntering = Boolean(animatingShowSectionId && unit.sectionId === animatingShowSectionId);
+                                        return (
+                                          <div
+                                            key={unit.id}
+                                            className={`${styles.unitTransitionWrapper} ${isHiding ? styles.unitTransitionHiding : ''} ${isEntering ? styles.unitTransitionEntering : ''}`}
+                                          >
+                                            {renderUnit(unit)}
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                     <div className={styles.mainColumn}>
-                                      {mainUnits.map(unit => renderUnit(unit))}
+                                      {mainUnits.map(unit => {
+                                        const sec = sections.find(s => s.id === unit.sectionId);
+                                        if (sec && !sec.visible) return null;
+                                        const isHiding = Boolean(animatingHideSectionId && unit.sectionId === animatingHideSectionId);
+                                        const isEntering = Boolean(animatingShowSectionId && unit.sectionId === animatingShowSectionId);
+                                        return (
+                                          <div
+                                            key={unit.id}
+                                            className={`${styles.unitTransitionWrapper} ${isHiding ? styles.unitTransitionHiding : ''} ${isEntering ? styles.unitTransitionEntering : ''}`}
+                                          >
+                                            {renderUnit(unit)}
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 </>
                               ) : (
                                 <div className='allowedPageContentHeight' style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
-                                  {pageUnits.map(unit => renderUnit(unit))}
+                                  {pageUnits.map(unit => {
+                                    const sec = sections.find(s => s.id === unit.sectionId);
+                                    if (sec && !sec.visible) return null;
+                                    const isHiding = Boolean(animatingHideSectionId && unit.sectionId === animatingHideSectionId);
+                                    const isEntering = Boolean(animatingShowSectionId && unit.sectionId === animatingShowSectionId);
+                                    return (
+                                      <div
+                                        key={unit.id}
+                                        className={`${styles.unitTransitionWrapper} ${isHiding ? styles.unitTransitionHiding : ''} ${isEntering ? styles.unitTransitionEntering : ''}`}
+                                      >
+                                        {renderUnit(unit)}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               )}
 
@@ -5310,6 +5152,92 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
           handleGenerateSectionAi={handleGenerateSectionAi}
           handleAcceptSectionAiProposal={handleApplySectionAiProposal}
         />
+      )}
+
+      {/* Add Custom Section Modal */}
+      <AddCustomSectionModal
+        isOpen={isAddCustomSectionOpen}
+        onClose={() => setIsAddCustomSectionOpen(false)}
+        onCreateSection={handleCreateCustomSection}
+      />
+
+      {/* Inline AI Polish Modal */}
+      {polishModalInfo && (
+        <div className={styles.sectionAiModalOverlay}>
+          <div className={styles.sectionAiModalCard} style={{ maxWidth: '480px', padding: '24px', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sparkles size={16} style={{ color: 'var(--primary, #6366f1)' }} />
+                AI Polish Bullet Point
+              </h3>
+              <button
+                type="button"
+                onClick={() => setPolishModalInfo(null)}
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Original Text:</span>
+              <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)', fontSize: '13px', color: '#cbd5e1', fontStyle: 'italic', lineHeight: '1.4' }}>
+                "{polishModalInfo.text}"
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Polish Instructions:</span>
+              <textarea
+                value={polishInstruction}
+                onChange={(e) => setPolishInstruction(e.target.value)}
+                placeholder="Improve impact, metrics, and professional polish..."
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  background: 'rgba(15, 23, 42, 0.6)',
+                  color: '#f8fafc',
+                  fontSize: '13px',
+                  outline: 'none',
+                  resize: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
+              <Button variant="secondary" onClick={() => setPolishModalInfo(null)}>
+                Cancel
+              </Button>
+              <Button
+                isLoading={isPolishing}
+                onClick={async () => {
+                  setIsPolishing(true);
+                  try {
+                    const res = await api.post('/resume/rephrase', {
+                      text: polishModalInfo.text,
+                      instruction: polishInstruction || "Improve impact, metrics, and professional polish"
+                    });
+                    if (res.data && res.data.success && res.data.rephrased_text) {
+                      polishModalInfo.onAccept(res.data.rephrased_text);
+                    }
+                  } catch (err) {
+                    console.error('Failed to polish text:', err);
+                  } finally {
+                    setIsPolishing(false);
+                    setPolishModalInfo(null);
+                  }
+                }}
+                style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: '#ffffff', fontWeight: 600 }}
+              >
+                Apply Polish
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

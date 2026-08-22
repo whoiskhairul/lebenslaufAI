@@ -324,6 +324,105 @@
   font-size: var(--text-xs);
 }
 
+.addSkillTriggerBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: transparent;
+  border: 1px dashed var(--card-border);
+  color: var(--primary);
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.addSkillTriggerBtn:hover {
+  background: var(--muted-light);
+  border-color: var(--primary);
+}
+
+.inlineSkillInputContainer {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--card-bg);
+  border: 1px solid var(--primary);
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-md);
+}
+
+.inlineSkillInput {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: var(--text-sm);
+  color: var(--foreground);
+  width: 130px;
+}
+
+.inlineSkillActionBtn {
+  background: transparent;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: color var(--transition-fast);
+}
+
+.inlineSkillActionBtn:hover {
+  color: var(--primary);
+}
+
+.inlineSkillActionBtn[title="Cancel"]:hover {
+  color: var(--danger);
+}
+
+.iconOrderBtn {
+  background: transparent;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: color var(--transition-fast);
+}
+
+.iconOrderBtn:hover {
+  color: var(--primary);
+}
+
+.categoryActionBtn {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: color var(--transition-fast);
+  opacity: 0.6;
+}
+
+.categoryActionBtn:hover {
+  color: var(--primary);
+  opacity: 1;
+}
+
+.animateFadeOut {
+  opacity: 0.15;
+  transform: scale(0.95);
+  transition: opacity 0.12s ease-in-out, transform 0.12s ease-in-out !important;
+}
+
 @media (max-width: 768px) {
   .layout {
     flex-direction: column;

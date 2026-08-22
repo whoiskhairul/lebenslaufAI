@@ -12,25 +12,14 @@ interface AppShellProps {
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavigate }) => {
-  const { user, logout, theme, setTheme } = useAuthStore();
+  const { user, logout, theme, setTheme, sidebarCollapsed, toggleSidebarCollapsed } = useAuthStore();
   const fullName = user?.full_name || user?.email?.split('@')[0] || 'User';
   const email = user?.email || '';
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    return localStorage.getItem('sidebar_collapsed') === 'true';
-  });
 
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
-  };
-
-  const toggleCollapse = () => {
-    setIsCollapsed(prev => {
-      const next = !prev;
-      localStorage.setItem('sidebar_collapsed', String(next));
-      return next;
-    });
   };
 
   const navItems = [
@@ -62,16 +51,16 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
 
       <div className={styles.workspace}>
         {/* Navigation Sidebar */}
-        <aside className={`${styles.sidebar} ${isSidebarOpen ? styles.sidebarOpen : ''} ${isCollapsed ? styles.collapsed : ''} no-print`}>
+        <aside className={`${styles.sidebar} ${isSidebarOpen ? styles.sidebarOpen : ''} ${sidebarCollapsed ? styles.collapsed : ''} no-print`}>
           {/* Desktop Collapse Toggle Button */}
           <button
             type="button"
             className={styles.collapseBtn}
-            onClick={toggleCollapse}
-            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            onClick={toggleSidebarCollapsed}
+            title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
             aria-label="Toggle sidebar collapse"
           >
-            {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+            {sidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
           </button>
 
           <div className={styles.sidebarLogo}>
