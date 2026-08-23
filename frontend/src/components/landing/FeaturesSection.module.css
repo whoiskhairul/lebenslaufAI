@@ -1,4 +1,4 @@
-.featuresSection {
+﻿.featuresSection {
   padding: 7rem 2rem;
   background: #0f0f12;
   position: relative;
@@ -50,17 +50,17 @@
 
 .card:hover {
   transform: translateY(-6px);
-  border-color: rgba(124, 58, 237, 0.4);
-  box-shadow: 0 20px 40px -15px rgba(124, 58, 237, 0.25);
+  border-color: rgba(79, 70, 229, 0.4);
+  box-shadow: 0 20px 40px -15px rgba(79, 70, 229, 0.25);
 }
 
 .iconWrapper {
   width: 48px;
   height: 48px;
   border-radius: 0.85rem;
-  background: rgba(124, 58, 237, 0.12);
-  border: 1px solid rgba(124, 58, 237, 0.25);
-  color: #a78bfa;
+  background: rgba(79, 70, 229, 0.12);
+  border: 1px solid rgba(79, 70, 229, 0.25);
+  color: #818cf8;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -50,6 +50,7 @@ interface AuthState {
   pendingEmail: string | null;
   theme: 'light' | 'dark';
   sidebarCollapsed: boolean;
+  mobileActivePane: 'preview' | 'editor';
   
   // Actions
   setAuth: (accessToken: string, refreshToken: string, user: User, sessionKey?: string) => void;
@@ -60,6 +61,7 @@ interface AuthState {
   setTheme: (theme: 'light' | 'dark') => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebarCollapsed: () => void;
+  setMobileActivePane: (pane: 'preview' | 'editor') => void;
   initAuth: () => void;
 }
 
@@ -97,7 +99,8 @@ const getInitialState = () => {
     twoFactorRequired: false,
     pendingEmail: null,
     theme,
-    sidebarCollapsed: storedSidebarCollapsed
+    sidebarCollapsed: storedSidebarCollapsed,
+    mobileActivePane: 'preview' as 'preview' | 'editor'
   };
 };
 
@@ -195,6 +198,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
       return { sidebarCollapsed: next };
     });
+  },
+
+  setMobileActivePane: (pane: 'preview' | 'editor') => {
+    set({ mobileActivePane: pane });
   },
 
   initAuth: () => {

@@ -1,4 +1,4 @@
-.testiSection {
+﻿.testiSection {
   padding: 7rem 2rem;
   background: radial-gradient(circle at 50% 50%, #151224 0%, #0f0f12 80%);
   position: relative;
@@ -58,7 +58,7 @@
 
 .card:hover {
   transform: translateY(-4px);
-  border-color: rgba(124, 58, 237, 0.35);
+  border-color: rgba(79, 70, 229, 0.35);
 }
 
 .quote {
@@ -79,7 +79,7 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  background: var(--primary, #4f46e5);
   color: #ffffff;
   font-family: var(--font-display);
   font-weight: 700;
@@ -87,7 +87,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
 }
 
 .authorName {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
@@ -75,7 +75,7 @@ const getParsedLetter = (content: string, editablePersonalInfo: any): ParsedLett
       subject: '',
       salutation: '',
       body: '',
-      closing_salutation: 'Mit freundlichen Grüßen',
+      closing_salutation: 'Mit freundlichen GrÃ¼ÃŸen',
       candidate_name: editablePersonalInfo.full_name || '',
       is_json: false
     };
@@ -116,12 +116,12 @@ const getParsedLetter = (content: string, editablePersonalInfo: any): ParsedLett
     'sincerely',
     'best regards',
     'kind regards',
-    'viele grüße',
-    'freundliche grüße',
+    'viele grÃ¼ÃŸe',
+    'freundliche grÃ¼ÃŸe',
     'hochachtungsvoll',
     'yours truly',
     'mit besten',
-    'grüße'
+    'grÃ¼ÃŸe'
   ];
   for (let i = lines.length - 1; i >= 0; i--) {
     const lineLower = lines[i].toLowerCase().trim();
@@ -161,7 +161,7 @@ const getParsedLetter = (content: string, editablePersonalInfo: any): ParsedLett
     subject: '',
     salutation: '',
     body: bodyText,
-    closing_salutation: closingText || 'Mit freundlichen Grüßen',
+    closing_salutation: closingText || 'Mit freundlichen GrÃ¼ÃŸen',
     candidate_name: nameText || editablePersonalInfo.full_name || '',
     is_json: false
   };
@@ -279,7 +279,7 @@ const ResizableSignature: React.FC<{ src: string; height: number; onChange: (h: 
 };
 
 export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
-  const { sidebarCollapsed } = useAuthStore();
+  const { sidebarCollapsed, mobileActivePane, setMobileActivePane } = useAuthStore();
 
   // Main CV Parameters
   const [jobDescription, setJobDescription] = useState('');
@@ -987,6 +987,19 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
 
+  const MOBILE_BREAKPOINT = 1024;
+  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT);
+
+  useEffect(() => {
+    const handleViewportChange = () => setIsMobileViewport(window.innerWidth <= MOBILE_BREAKPOINT);
+    window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('orientationchange', handleViewportChange);
+    return () => {
+      window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('orientationchange', handleViewportChange);
+    };
+  }, []);
+
   // Multi-Page Virtual Matrix state
   const hiddenCanvasRef = useRef<HTMLDivElement>(null);
   const [pages, setPages] = useState<RenderableUnit[][]>([[]]);
@@ -1018,6 +1031,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     const handleResize = () => {
       if (viewportRef.current) {
         const viewportWidth = viewportRef.current.clientWidth - 40;
+        if (viewportWidth <= 0) return;
         const pageWidth = 794;
         setScale(Math.min(1, viewportWidth / pageWidth));
       }
@@ -1029,7 +1043,29 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       window.removeEventListener('resize', handleResize);
       clearTimeout(timer);
     };
-  }, [currentVersion, editorTab, customStyles.pageSize]);
+  }, [currentVersion, editorTab, customStyles.pageSize, mobileActivePane]);
+
+  // Compensate the layout height of the scaled page stack (transform does not affect flow size)
+  const scaledWrapperRef = useRef<HTMLDivElement>(null);
+  const [wrapperHeightCompensation, setWrapperHeightCompensation] = useState(0);
+
+  useEffect(() => {
+    const el = scaledWrapperRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = el.offsetHeight;
+      setWrapperHeightCompensation(h > 0 ? h * (1 - scale) : 0);
+    };
+    measure();
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(measure);
+      observer.observe(el);
+    }
+    return () => {
+      if (observer) observer.disconnect();
+    };
+  }, [scale, editorTab, pages, customStyles]);
 
   // Trigger DOM layout engine re-calculation when styling changes
   useEffect(() => {
@@ -1395,12 +1431,12 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         const entryId = `entry_${exp.id}`;
         options.push({
           id: entryId,
-          label: `🏢 Job #${expIdx + 1}: ${exp.position || 'Position'} @ ${exp.company || 'Company'}`
+          label: `ðŸ¢ Job #${expIdx + 1}: ${exp.position || 'Position'} @ ${exp.company || 'Company'}`
         });
         (exp.bullets || []).forEach((bullet, bIdx) => {
           options.push({
             id: `bullet_${exp.id}_${bIdx}`,
-            label: `  ↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+            label: `  â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
           });
         });
       });
@@ -1409,12 +1445,12 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         const entryId = `entry_${proj.id}`;
         options.push({
           id: entryId,
-          label: `🚀 Project #${projIdx + 1}: ${proj.title || 'Project'}`
+          label: `ðŸš€ Project #${projIdx + 1}: ${proj.title || 'Project'}`
         });
         (proj.bullets || []).forEach((bullet, bIdx) => {
           options.push({
             id: `bullet_${proj.id}_${bIdx}`,
-            label: `  ↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+            label: `  â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
           });
         });
       });
@@ -1423,12 +1459,12 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         const entryId = `entry_${edu.id}`;
         options.push({
           id: entryId,
-          label: `🎓 Education #${eduIdx + 1}: ${edu.degree || 'Degree'} - ${edu.institution || 'Institution'}`
+          label: `ðŸŽ“ Education #${eduIdx + 1}: ${edu.degree || 'Degree'} - ${edu.institution || 'Institution'}`
         });
         (edu.bullets || []).forEach((bullet, bIdx) => {
           options.push({
             id: `bullet_${edu.id}_${bIdx}`,
-            label: `  ↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+            label: `  â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
           });
         });
       });
@@ -1436,7 +1472,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       (targetSec.bullets || []).forEach((bullet, bIdx) => {
         options.push({
           id: `bullet_${targetSec.id}_${bIdx}`,
-          label: `↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+          label: `â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
         });
       });
     }
@@ -1639,14 +1675,14 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       if (type === 'summary') {
         setEditableSummary(proposed);
       } else if (type === 'custom') {
-        const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+        const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter(Boolean);
         setSections(prev => prev.map(s => s.id === sectionId ? { ...s, bullets } : s));
       } else if (type === 'experience') {
         const blocks = proposed.split('\n\n');
         setEditableExperiences(prev => prev.map((exp, idx) => {
           const block = blocks[idx] || blocks[0];
           if (!block) return exp;
-          const bullets = block.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter((b: string) => b && !b.toLowerCase().includes(' at '));
+          const bullets = block.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter((b: string) => b && !b.toLowerCase().includes(' at '));
           return bullets.length > 0 ? { ...exp, bullets } : exp;
         }));
       } else if (type === 'projects') {
@@ -1654,7 +1690,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         setEditableProjects(prev => prev.map((proj, idx) => {
           const block = blocks[idx] || blocks[0];
           if (!block) return proj;
-          const bullets = block.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter((b: string) => b && !b.includes('('));
+          const bullets = block.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter((b: string) => b && !b.includes('('));
           return bullets.length > 0 ? { ...proj, bullets } : proj;
         }));
       } else if (type === 'education') {
@@ -1662,13 +1698,13 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         setEditableEducations(prev => prev.map((edu, idx) => {
           const block = blocks[idx] || blocks[0];
           if (!block) return edu;
-          const bullets = block.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter((b: string) => b && !b.includes('-'));
+          const bullets = block.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter((b: string) => b && !b.includes('-'));
           return bullets.length > 0 ? { ...edu, bullets } : edu;
         }));
       }
     } else if (scope.startsWith('entry_')) {
       const itemId = scope.replace('entry_', '');
-      const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+      const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter(Boolean);
       if (bullets.length > 0) {
         if (type === 'experience') {
           setEditableExperiences(prev => prev.map(e => e.id === itemId ? { ...e, bullets } : e));
@@ -1682,7 +1718,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       const parts = scope.replace('bullet_', '').split('_');
       const itemId = parts[0];
       const bulletIdx = parseInt(parts[1], 10);
-      const cleanBullet = proposed.trim().replace(/^[-•*]\s*/, '');
+      const cleanBullet = proposed.trim().replace(/^[-â€¢*]\s*/, '');
 
       if (cleanBullet) {
         if (type === 'experience') {
@@ -2051,6 +2087,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   useEffect(() => {
     const measureAndLayout = () => {
       if (!hiddenCanvasRef.current) return;
+      // Defer measurement while the canvas pane is hidden (mobile Editor mode) â€” zero-height reads would corrupt pagination
+      if (hiddenCanvasRef.current.getBoundingClientRect().width === 0) return;
 
       // Create flat elements stream based on sections order and visible elements
       const unitsList: RenderableUnit[] = [];
@@ -2284,7 +2322,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   }, [
     editableSummary, editablePersonalInfo, editableExperiences, editableSkills,
     editableProjects, editableEducations, template, sections, customStyles, headerStyles,
-    languagesFirst, categoryOrder
+    languagesFirst, categoryOrder, mobileActivePane
   ]);
 
   // ----------------------------------------------------
@@ -2923,27 +2961,29 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
         </div>
       )}
 
-      <div className={styles.workspace}>
+      <div className={`${styles.workspace} ${isMobileViewport ? styles.workspaceMobile : ''}`}>
         {/* Sidebar Controls Area */}
         <div
           ref={controlPanelRef}
-          className={`${styles.controlPanel} no-print`}
+          className={`${styles.controlPanel} no-print ${isMobileViewport && mobileActivePane !== 'editor' ? styles.paneHiddenMobile : ''}`}
           style={{
-            width: `${effectivePanelWidth}px`,
-            minWidth: `${effectivePanelWidth}px`,
+            width: isMobileViewport ? '100%' : `${effectivePanelWidth}px`,
+            minWidth: isMobileViewport ? '0' : `${effectivePanelWidth}px`,
             transition: isResizingPanel ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
         >
-          <div
-            className={`${styles.resizerHandle} ${isResizingPanel ? styles.resizerHandleActive : ''}`}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              startXRef.current = e.clientX;
-              startWidthRef.current = panelWidth;
-              setIsResizingPanel(true);
-            }}
-            title="Click and drag to adjust control panel width"
-          />
+          {!isMobileViewport && (
+            <div
+              className={`${styles.resizerHandle} ${isResizingPanel ? styles.resizerHandleActive : ''}`}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                startXRef.current = e.clientX;
+                startWidthRef.current = panelWidth;
+                setIsResizingPanel(true);
+              }}
+              title="Click and drag to adjust control panel width"
+            />
+          )}
           <div className={styles.controlPanelTabs}>
             <button
               type="button"
@@ -3092,8 +3132,8 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                             gap: '2px',
                             padding: '8px 10px',
                             borderRadius: '8px',
-                            border: aggressiveMode ? '2px solid #8b5cf6' : '1px solid #cbd5e1',
-                            background: aggressiveMode ? 'rgba(139, 92, 246, 0.12)' : '#ffffff',
+                            border: aggressiveMode ? '2px solid #6366f1' : '1px solid #cbd5e1',
+                            background: aggressiveMode ? 'rgba(99, 102, 241, 0.12)' : '#ffffff',
                             color: aggressiveMode ? '#6d28d9' : '#475569',
                             cursor: 'pointer',
                             textAlign: 'center'
@@ -3172,11 +3212,11 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   {(() => {
                     const infoToCheck = currentVersion ? editablePersonalInfo : (masterProfileInfo || {});
                     const missing: { field: string; label: string; icon: string }[] = [];
-                    if (!infoToCheck.linkedin) missing.push({ field: 'linkedin', label: 'LinkedIn Profile URL', icon: '🔗' });
-                    if (!infoToCheck.github) missing.push({ field: 'github', label: 'GitHub Profile URL', icon: '💻' });
-                    if (!infoToCheck.phone) missing.push({ field: 'phone', label: 'Phone Number', icon: '📞' });
-                    if (!infoToCheck.location) missing.push({ field: 'location', label: 'Location / City', icon: '📍' });
-                    if (!infoToCheck.email) missing.push({ field: 'email', label: 'Email Address', icon: '✉️' });
+                    if (!infoToCheck.linkedin) missing.push({ field: 'linkedin', label: 'LinkedIn Profile URL', icon: 'ðŸ”—' });
+                    if (!infoToCheck.github) missing.push({ field: 'github', label: 'GitHub Profile URL', icon: 'ðŸ’»' });
+                    if (!infoToCheck.phone) missing.push({ field: 'phone', label: 'Phone Number', icon: 'ðŸ“ž' });
+                    if (!infoToCheck.location) missing.push({ field: 'location', label: 'Location / City', icon: 'ðŸ“' });
+                    if (!infoToCheck.email) missing.push({ field: 'email', label: 'Email Address', icon: 'âœ‰ï¸' });
 
                     if (missing.length === 0) return null;
 
@@ -3236,7 +3276,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   <div className={styles.trackingSection} style={{ marginTop: '16px', padding: '12px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.2)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main, #1e293b)' }}>
-                        {applicationTracked ? '✓ Tracking this Application' : 'Track this job application?'}
+                        {applicationTracked ? 'âœ“ Tracking this Application' : 'Track this job application?'}
                       </div>
                     </div>
                     {!applicationTracked ? (
@@ -3376,7 +3416,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                         {notes.requirements_emphasized && notes.requirements_emphasized.length > 0 && (
                           <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '3.5px solid #6366f1', border: '1px solid #e2e8f0', borderLeftWidth: '3.5px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>🎯</span>
+                              <span style={{ fontSize: '14px' }}>ðŸŽ¯</span>
                               <strong style={{ fontSize: '12px', color: '#1e293b' }}>Emphasized Requirements</strong>
                             </div>
                             <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -3390,7 +3430,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                         {notes.resume_evidence_used && notes.resume_evidence_used.length > 0 && (
                           <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '3.5px solid #10b981', border: '1px solid #e2e8f0', borderLeftWidth: '3.5px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>📄</span>
+                              <span style={{ fontSize: '14px' }}>ðŸ“„</span>
                               <strong style={{ fontSize: '12px', color: '#1e293b' }}>Evidence Used from CV</strong>
                             </div>
                             <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -3404,7 +3444,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                         {notes.placeholders && notes.placeholders.length > 0 && (
                           <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#fffbeb', borderLeft: '3.5px solid #f59e0b', border: '1px solid #fef3c7', borderLeftWidth: '3.5px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>⚠️</span>
+                              <span style={{ fontSize: '14px' }}>âš ï¸</span>
                               <strong style={{ fontSize: '12px', color: '#b45309' }}>Missing Facts / Placeholders</strong>
                             </div>
                             <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#78350f', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -3418,7 +3458,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                         {notes.confirmation_needed && notes.confirmation_needed.length > 0 && (
                           <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#fef2f2', borderLeft: '3.5px solid #ef4444', border: '1px solid #fee2e2', borderLeftWidth: '3.5px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>🔍</span>
+                              <span style={{ fontSize: '14px' }}>ðŸ”</span>
                               <strong style={{ fontSize: '12px', color: '#b91c1c' }}>Confirmation Required</strong>
                             </div>
                             <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#991b1b', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -3728,7 +3768,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                               <span>Personal Info & Header</span>
                             </div>
                             <div className={styles.sectionCardSubtitle}>
-                              {editablePersonalInfo.full_name || 'Your name'} • {editablePersonalInfo.title || 'Headline & Contact'}
+                              {editablePersonalInfo.full_name || 'Your name'} â€¢ {editablePersonalInfo.title || 'Headline & Contact'}
                             </div>
                           </div>
                         </div>
@@ -3766,8 +3806,8 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                               const words = editableSummary ? editableSummary.trim().split(/\s+/).filter(Boolean).length : 0;
                               return {
                                 icon: <FileText size={16} />,
-                                iconBg: 'rgba(168, 85, 247, 0.12)',
-                                iconColor: '#a855f7',
+                                iconBg: 'rgba(99, 102, 241, 0.12)',
+                                iconColor: '#6366f1',
                                 subtitle: words > 0 ? `${words} words pitch` : 'Summary not set'
                               };
                             }
@@ -3802,7 +3842,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                 icon: <Globe size={16} />,
                                 iconBg: 'rgba(236, 72, 153, 0.12)',
                                 iconColor: '#ec4899',
-                                subtitle: `${itCount} skills • ${langCount} languages`
+                                subtitle: `${itCount} skills â€¢ ${langCount} languages`
                               };
                             }
                             const count = secItem.customFormat === 'keyvalue' ? (secItem.keyValuePairs?.length || 0) : (secItem.bullets?.length || 0);
@@ -3915,7 +3955,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                     }}
                                     title="Move Up"
                                   >
-                                    ▲
+                                    â–²
                                   </button>
                                   <button
                                     type="button"
@@ -3930,7 +3970,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                     }}
                                     title="Move Down"
                                   >
-                                    ▼
+                                    â–¼
                                   </button>
                                 </div>
                               </div>
@@ -3966,7 +4006,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   style={{
                     width: '100%',
                     marginBottom: '16px',
-                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                    background: 'var(--primary, #4f46e5)',
                     color: '#ffffff',
                     fontWeight: 700,
                     padding: '10px 14px',
@@ -4024,7 +4064,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                         boxSizing: 'border-box'
                       }}
                     >
-                      A4 (210mm × 297mm)
+                      A4 (210mm Ã— 297mm)
                     </div>
                   </div>
 
@@ -4062,7 +4102,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                 <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '16px', paddingTop: '16px' }}>
                   <h3 style={{ fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                    ✍️ Signature Settings
+                    âœï¸ Signature Settings
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
@@ -4447,7 +4487,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               </div>
             </div>
           ) : currentVersion ? (
-            <div className={styles.previewContainer}>
+            <div className={`${styles.previewContainer} ${isMobileViewport && mobileActivePane !== 'preview' ? styles.paneHiddenMobile : ''}`}>
               <div className={`${styles.tabHeader} no-print`}>
                 <div className={styles.canvasTabs}>
                   <button
@@ -4608,13 +4648,15 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   <div ref={viewportRef} className={styles.canvasViewport}>
                     <div
                       className={styles.pagesScaledWrapper}
+                      ref={scaledWrapperRef}
                       style={{
                         transform: `scale(${scale})`,
                         transformOrigin: 'top center',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '24px',
-                        width: '210mm'
+                        width: '210mm',
+                        marginBottom: `-${wrapperHeightCompensation}px`
                       }}
                     >
                       {pages.map((pageUnits, pageIdx) => {
@@ -4742,13 +4784,15 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   <div ref={viewportRef} className={styles.canvasViewport}>
                     <div
                       className={styles.pagesScaledWrapper}
+                      ref={scaledWrapperRef}
                       style={{
                         transform: `scale(${scale})`,
                         transformOrigin: 'top center',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '24px',
-                        width: '210mm'
+                        width: '210mm',
+                        marginBottom: `-${wrapperHeightCompensation}px`
                       }}
                     >
                       <div
@@ -5231,7 +5275,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                     setPolishModalInfo(null);
                   }
                 }}
-                style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: '#ffffff', fontWeight: 600 }}
+                style={{ background: 'var(--primary, #4f46e5)', color: '#ffffff', fontWeight: 600 }}
               >
                 Apply Polish
               </Button>

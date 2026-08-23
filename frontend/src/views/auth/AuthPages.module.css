@@ -1,4 +1,4 @@
-.authContainer {
+﻿.authContainer {
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -29,7 +29,7 @@
 .authHeader h1 {
   font-size: 1.75rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #60a5fa, #a855f7);
+  background: var(--primary, #6366f1);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 0.5rem;
@@ -129,8 +129,8 @@
 }
 
 .socialBtn:hover {
-  background: rgba(124, 58, 237, 0.25);
-  border-color: rgba(124, 58, 237, 0.5);
+  background: rgba(79, 70, 229, 0.25);
+  border-color: rgba(79, 70, 229, 0.5);
   color: #ffffff !important;
   transform: translateY(-1px);
 }
@@ -157,7 +157,7 @@
 .primaryBtn {
   width: 100%;
   padding: 0.85rem;
-  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  background: var(--primary, #4f46e5);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 0.75rem;
   color: #ffffff !important;
@@ -165,13 +165,13 @@
   font-size: 0.95rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
 }
 
 .primaryBtn:hover:not(:disabled) {
   opacity: 0.95;
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.5);
+  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.5);
   color: #ffffff !important;
 }
 
@@ -221,4 +221,39 @@
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Small Screen Polish ===== */
+@media (max-width: 480px) {
+  .authCard {
+    padding: 1.75rem 1.25rem;
+    border-radius: 1rem;
+  }
+
+  .authHeader h1 {
+    font-size: 1.5rem;
+  }
+
+  .authHeader p {
+    font-size: 0.85rem;
+  }
+
+  .socialGrid {
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+  }
+
+  .socialBtn {
+    padding: 0.65rem 0.35rem;
+    font-size: 0.8rem;
+  }
+
+  .divider {
+    margin: 1.25rem 0;
+  }
+
+  /* Keep autofill/zoom-friendly input sizing on iOS */
+  .authInput {
+    font-size: 16px;
+  }
 }

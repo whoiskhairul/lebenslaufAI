@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { ArrowRight, Github, Linkedin, Twitter, Sparkles } from 'lucide-react';
 import { navigateTo } from '../../utils/navigation';
 import styles from './Footer.module.css';
@@ -23,7 +23,7 @@ export const Footer: React.FC = () => {
         <div className={styles.footerGrid}>
           <div className={styles.brandCol}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
-              <div style={{ width: '28px', height: '28px', background: '#7c3aed', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+              <div style={{ width: '28px', height: '28px', background: '#4f46e5', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
                 <Sparkles style={{ width: '16px', height: '16px' }} />
               </div>
               <h3 style={{ margin: 0 }}>Lebenslauf AI</h3>
@@ -76,7 +76,7 @@ export const Footer: React.FC = () => {
         </div>
 
         <div className={styles.bottomBar}>
-          <div>© {new Date().getFullYear()} Lebenslauf AI Inc. All rights reserved.</div>
+          <div>Â© {new Date().getFullYear()} Lebenslauf AI Inc. All rights reserved.</div>
           <div>Crafted with precision for modern job seekers.</div>
         </div>
       </div>

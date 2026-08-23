@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from './store/authStore';
 import { AppShell } from './components/AppShell';
 import { Landing } from './views/Landing';
@@ -26,8 +26,10 @@ const parseRoute = () => {
 };
 
 export const App: React.FC = () => {
-  const { isAuthenticated, initAuth } = useAuthStore();
-  
+  // Subscribe only to the auth flag: store changes like theme, sidebar or the
+  // mobile pane switcher must NOT re-render App (and remount child fetch effects)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
   // Synchronously parse route on initial mount to avoid 1st frame flash
   const initialRoute = parseRoute();
   const [currentPath, setCurrentPath] = useState(initialRoute.path);
@@ -35,8 +37,8 @@ export const App: React.FC = () => {
 
 
   useEffect(() => {
-    initAuth();
-  }, [initAuth]);
+    useAuthStore.getState().initAuth();
+  }, []);
 
   useEffect(() => {
     const handleLocationChange = () => {
@@ -74,6 +76,13 @@ export const App: React.FC = () => {
   const validAuthenticatedViews = ['dashboard', 'master-profile', 'editor', 'security', 'settings'];
   const activeView = validAuthenticatedViews.includes(currentPath) ? currentPath : 'dashboard';
 
+  // Stable identity: Editor refetches everything when this object changes,
+  // so it must only change when the actual route params change
+  const initialJobParams = useMemo(
+    () => ({ application_id: routeParams.appId, tab: routeParams.tab }),
+    [routeParams.appId, routeParams.tab]
+  );
+
   return (
     <AppShell activeView={activeView} onNavigate={(view) => navigateTo(view)}>
       {activeView === 'dashboard' && (
@@ -81,10 +90,7 @@ export const App: React.FC = () => {
       )}
       {activeView === 'master-profile' && <MasterProfile />}
       {activeView === 'editor' && (
-        <Editor initialJobParams={{
-          application_id: routeParams.appId,
-          tab: routeParams.tab
-        }} />
+        <Editor initialJobParams={initialJobParams} />
       )}
       {activeView === 'security' && <AccountSecurityPage />}
       {activeView === 'settings' && <Settings />}

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap');
 
 .container {
   display: flex;
@@ -392,7 +392,7 @@
 }
 
 .sectionCardHeaderItem {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(139, 92, 246, 0.04) 100%);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(99, 102, 241, 0.04) 100%);
   border-color: rgba(99, 102, 241, 0.25);
 }
 
@@ -501,9 +501,9 @@
 }
 
 .sectionAiCardBtn {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(168, 85, 247, 0.12));
-  border: 1px solid rgba(168, 85, 247, 0.3);
-  color: #8b5cf6;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(99, 102, 241, 0.12));
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #6366f1;
   width: 28px;
   height: 28px;
   border-radius: 6px;
@@ -516,10 +516,10 @@
 }
 
 .sectionAiCardBtn:hover {
-  background: linear-gradient(135deg, #6366f1, #a855f7);
+  background: var(--primary, #6366f1);
   color: #ffffff;
   border-color: transparent;
-  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.4);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
   transform: translateY(-1px);
 }
 
@@ -870,7 +870,7 @@
 }
 
 .presetTileActive {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.06) 100%);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(99, 102, 241, 0.06) 100%);
   border-color: var(--primary, #6366f1);
   box-shadow: 0 0 0 1px var(--primary, #6366f1), 0 4px 14px rgba(99, 102, 241, 0.18);
 }
@@ -1391,11 +1391,11 @@
 }
 
 .aiSectionBtn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #a855f7, #6366f1);
+  background: var(--primary, #6366f1);
   color: #ffffff;
-  border-color: #c084fc;
+  border-color: #818cf8;
   transform: scale(1.16);
-  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.45);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.45);
 }
 
 .itemSortBtn:hover:not(:disabled) {
@@ -1477,8 +1477,8 @@
 }
 
 .sparkleIconGlow {
-  color: #a855f7;
-  filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.6));
+  color: #6366f1;
+  filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.6));
 }
 
 .sectionAiModalBody {
@@ -1508,7 +1508,7 @@
 
 .sectionAiScopeSelect {
   background: rgba(15, 23, 42, 0.9);
-  border: 1px solid rgba(168, 85, 247, 0.4);
+  border: 1px solid rgba(99, 102, 241, 0.4);
   border-radius: 8px;
   padding: 8px 12px;
   color: #f8fafc;
@@ -1520,8 +1520,8 @@
 }
 
 .sectionAiScopeSelect:focus {
-  border-color: #a855f7;
-  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.3);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
 }
 
 .sectionAiScopeSelect option {
@@ -1554,8 +1554,8 @@
 }
 
 .sectionAiPresetChips button:hover {
-  background: rgba(168, 85, 247, 0.2);
-  border-color: rgba(168, 85, 247, 0.5);
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.5);
   color: #ffffff;
 }
 
@@ -1577,15 +1577,15 @@
 }
 
 .sectionAiInputRow input:focus {
-  border-color: #a855f7;
-  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.25);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
 }
 
 .sectionAiSubmitBtn {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: linear-gradient(135deg, #a855f7, #6366f1);
+  background: var(--primary, #6366f1);
   border: none;
   color: #ffffff;
   font-size: 13px;
@@ -1598,7 +1598,7 @@
 
 .sectionAiSubmitBtn:hover:not(:disabled) {
   opacity: 0.92;
-  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.4);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
 }
 
 .sectionAiSubmitBtn:disabled {
@@ -1631,7 +1631,7 @@
 .diffProposedBadge {
   font-size: 12px;
   font-weight: 600;
-  color: #c084fc;
+  color: #818cf8;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -1659,8 +1659,8 @@
 }
 
 .diffBoxProposed {
-  border: 1px solid rgba(168, 85, 247, 0.35);
-  background: rgba(168, 85, 247, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: rgba(99, 102, 241, 0.06);
   color: #f8fafc;
 }
 
@@ -3273,7 +3273,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--primary, #6366f1);
   color: #ffffff;
   border: none;
   font-size: 10px;
@@ -3286,7 +3286,7 @@
 }
 
 .hoverAiBtn:hover {
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  background: var(--primary, #4f46e5);
   transform: translateY(-1px);
 }
 
@@ -3398,7 +3398,7 @@
 }
 
 .popoverInputRow button {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--primary, #6366f1);
   color: #ffffff;
   border: none;
   font-weight: 600;
@@ -3409,7 +3409,7 @@
 }
 
 .popoverInputRow button:hover {
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  background: var(--primary, #4f46e5);
 }
 
 .canvasSkeletonBlock {
@@ -3423,7 +3423,7 @@
 .skeletonLine {
   height: 10px;
   border-radius: 3px;
-  background: linear-gradient(90deg, rgba(99, 102, 241, 0.15) 25%, rgba(168, 85, 247, 0.35) 50%, rgba(99, 102, 241, 0.15) 75%);
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.15) 25%, rgba(99, 102, 241, 0.35) 50%, rgba(99, 102, 241, 0.15) 75%);
   background-size: 200% 100%;
   animation: skeletonShimmer 1.5s infinite linear;
 }
@@ -3488,9 +3488,9 @@
 }
 
 .presetBtnUltra {
-  border-color: rgba(139, 92, 246, 0.5) !important;
-  background: rgba(139, 92, 246, 0.16) !important;
-  color: #8b5cf6 !important;
+  border-color: rgba(99, 102, 241, 0.5) !important;
+  background: rgba(99, 102, 241, 0.16) !important;
+  color: #6366f1 !important;
 }
 
 /* Projects Manager Theme-Adaptive Card & Inputs */
@@ -3698,7 +3698,7 @@
   align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(139, 92, 246, 0.04) 100%);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(99, 102, 241, 0.04) 100%);
   border: 1px solid rgba(99, 102, 241, 0.15);
   border-radius: var(--radius-md, 8px);
 }
@@ -3845,7 +3845,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  background: var(--primary, #4f46e5);
   color: #ffffff;
   border: none;
   font-size: 11.5px;
@@ -3923,7 +3923,7 @@
 }
 
 .sideInlineAiBtn:hover {
-  background: linear-gradient(135deg, #6366f1 0%, #d946ef 100%);
+  background: var(--primary, #6366f1);
   color: #ffffff;
 }
 
@@ -3977,18 +3977,18 @@
 }
 
 .sideAiPolishBtn {
-  color: #8b5cf6 !important;
-  background: rgba(168, 85, 247, 0.1) !important;
-  border: 1px solid rgba(168, 85, 247, 0.25) !important;
+  color: #6366f1 !important;
+  background: rgba(99, 102, 241, 0.1) !important;
+  border: 1px solid rgba(99, 102, 241, 0.25) !important;
   border-radius: 6px !important;
   padding: 5px !important;
 }
 
 .sideAiPolishBtn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #6366f1, #a855f7) !important;
+  background: var(--primary, #6366f1) !important;
   color: #ffffff !important;
   border-color: transparent !important;
-  box-shadow: 0 2px 6px rgba(168, 85, 247, 0.35) !important;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.35) !important;
   transform: translateY(-1px);
 }
 
@@ -4945,7 +4945,7 @@
   font-size: 13px;
   font-weight: 700;
   color: #ffffff;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%);
+  background: var(--primary, #4f46e5);
   border: 1px solid rgba(255, 255, 255, 0.25);
   box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35), 0 1px 3px rgba(0, 0, 0, 0.1);
   cursor: pointer;
@@ -4991,7 +4991,7 @@
   font-size: 13px;
   font-weight: 700;
   color: #ffffff;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%);
+  background: var(--primary, #4f46e5);
   border: 1px solid rgba(255, 255, 255, 0.25);
   box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35), 0 1px 3px rgba(0, 0, 0, 0.1);
   cursor: pointer;
@@ -5024,13 +5024,221 @@
   }
 }
 
+/* ===== Mobile Responsive Workspace ===== */
+/* Note: the mobile pane switcher now lives inside the AppShell bottom navigation bar */
+
+.workspaceMobile {
+  gap: 0;
+}
+
+.paneHiddenMobile {
+  display: none !important;
+}
+
+@media (max-width: 1024px) {
+  .workspaceMobile .resizerHandle {
+    display: none !important;
+  }
+
+  .workspaceMobile .controlPanel {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    padding-bottom: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .headerRow .subtitle {
+    display: none;
+  }
+
+  .tabHeader {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .canvasTabs {
+    width: 100%;
+  }
+
+  .canvasTabBtn {
+    flex: 1;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  /* Compact, symmetric Save / Download action row */
+  .exportActions {
+    width: 100%;
+    gap: 8px;
+  }
+
+  .exportActions > button,
+  .exportActions > div {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .exportActions > div {
+    display: flex;
+  }
+
+  .exportActions > div > button {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .exportActions button {
+    padding: 9px 12px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .exportActions .downloadDropdown {
+    left: 0;
+    right: 0;
+  }
+
+  .canvasViewport {
+    padding: 12px;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pageWarningBanner {
+    font-size: 12px;
+  }
+}
+
+/* ===== Mobile: Design & Layout Tab Controls ===== */
+
+@media (max-width: 768px) {
+  .styleControlsForm {
+    padding: 18px 14px;
+    gap: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Stack twin-column grids inside the control panel */
+  .formGrid,
+  .keywordsTwinGrid,
+  .slidersTwinGrid,
+  .sideTwinGrid {
+    grid-template-columns: 1fr;
+  }
+
+  /* 4-way format toggle becomes 2x2 */
+  .sideFormatToggleGrid4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* All three color pickers share one compact row */
+  .colorPickers {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .colorPickerGroup label {
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Sub-tab labels fit narrow screens */
+  .subTabBtn {
+    padding: 7px 4px;
+    font-size: 10.5px;
+    gap: 4px;
+  }
+
+  /* Bigger slider thumbs for touch */
+  .sliderGroup input[type="range"] {
+    height: 6px;
+  }
+
+  .sliderGroup input[type="range"]::-webkit-slider-thumb {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Section cards: info row on top, action cluster aligned underneath */
+  .sectionCardItem {
+    flex-wrap: wrap;
+    padding: 10px 11px;
+    gap: 8px;
+  }
+
+  .sectionCardLeft {
+    flex: 1 1 100%;
+  }
+
+  .sectionIconBadge {
+    width: 30px;
+    height: 30px;
+  }
+
+  .sectionCardRight {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+    margin-left: 40px;
+  }
+
+  .sectionVisibilityBtn,
+  .sectionAiCardBtn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .sectionEditCardBtn {
+    padding: 6px 9px;
+    font-size: 11px;
+    height: 30px;
+  }
+
+  .sectionSortGroup {
+    gap: 1px;
+  }
+
+  .sectionSortBtn {
+    width: 26px;
+    height: 16px;
+    font-size: 9px;
+  }
+
+  /* Preset tiles breathe better */
+  .presetCard {
+    padding: 12px;
+  }
+
+  .presetTile {
+    min-height: 64px;
+    padding: 8px 10px;
+  }
+
+  .glass-card {
+    max-width: 100%;
+  }
+}
+
+@media print {
+  /* Never hide the printable canvas when printing from a phone in Editor pane mode */
+  .previewContainer.paneHiddenMobile {
+    display: block !important;
+  }
+}
+
 /* Section Version Switcher Banner (Original vs AI) */
 .sectionVersionBanner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.06) 100%);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0.06) 100%);
   border: 1px solid rgba(99, 102, 241, 0.2);
   border-radius: var(--radius-md, 10px);
   padding: 10px 14px;
@@ -5104,7 +5312,7 @@
   font-size: 13px;
   font-weight: 700;
   color: #ffffff;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%);
+  background: var(--primary, #4f46e5);
   border: none;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);

@@ -1,4 +1,4 @@
-.container {
+﻿.container {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -26,7 +26,9 @@
   gap: var(--space-6);
   flex: 1;
   overflow: hidden;
-  align-items: flex-start;
+  /* Allow the viewport to shrink below its content height so overflow-y can engage */
+  min-height: 0;
+  align-items: stretch;
 }
 
 .tabs {
@@ -424,21 +426,92 @@
 }
 
 @media (max-width: 768px) {
+  .container {
+    /* Let content flow naturally; AppShell .content handles page scrolling */
+    height: auto;
+    min-height: 100%;
+  }
+
   .layout {
     flex-direction: column;
+    overflow: visible;
+    min-height: 0;
   }
   .tabs {
     width: 100%;
     flex-direction: row;
     overflow-x: auto;
     padding: var(--space-2);
+    -webkit-overflow-scrolling: touch;
   }
   .tabBtn {
     padding: 0.5rem 1rem;
     white-space: nowrap;
   }
+  .tabBtn.activeTab {
+    border-left: none;
+    border-bottom: 3px solid var(--primary);
+    border-top-left-radius: var(--radius-md);
+    border-bottom-left-radius: var(--radius-md);
+  }
   .formGrid {
     grid-template-columns: 1fr;
+  }
+
+  /* Lighter paddings on phones */
+  .headerRow {
+    margin-bottom: var(--space-4);
+  }
+
+  .viewport {
+    padding: var(--space-4);
+    height: auto;
+    overflow-y: visible;
+  }
+
+  .inlineForm {
+    padding: var(--space-4);
+  }
+
+  .listItem {
+    padding: var(--space-4);
+  }
+
+  .reviewFields {
+    padding-left: var(--space-4);
+  }
+
+  .sectionHeader {
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .formActions {
+    flex-wrap: wrap;
+  }
+
+  .formActions > button {
+    flex: 1 1 auto;
+  }
+
+  .itemHeader h4,
+  .itemSub {
+    word-break: break-word;
+  }
+
+  /* Import wizard modal fits the screen */
+  .modal {
+    margin: 0 var(--space-3);
+    max-height: 85vh;
+    padding: var(--space-4);
+  }
+
+  .modalFooter {
+    flex-direction: column-reverse;
+  }
+
+  .modalFooter > button {
+    width: 100%;
   }
 }
 
@@ -460,7 +533,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 150;
+  z-index: 800;
 }
 
 .modal {
@@ -679,7 +752,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(168, 85, 247, 0.08));
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.08));
   border: 1px solid rgba(99, 102, 241, 0.25);
   border-radius: var(--radius-md);
   padding: 0.6rem 0.85rem;
@@ -723,7 +796,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  background: var(--primary, #6366f1) !important;
   color: #ffffff !important;
   border: none !important;
   font-weight: 600;
@@ -848,7 +921,7 @@
 .skeletonShimmerLine {
   height: 12px;
   border-radius: 4px;
-  background: linear-gradient(90deg, rgba(99, 102, 241, 0.15) 25%, rgba(168, 85, 247, 0.35) 50%, rgba(99, 102, 241, 0.15) 75%);
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.15) 25%, rgba(99, 102, 241, 0.35) 50%, rgba(99, 102, 241, 0.15) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite linear;
 }
