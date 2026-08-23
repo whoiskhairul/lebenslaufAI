@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, Menu, X, ArrowRight } from 'lucide-react';
 import { navigateTo } from '../../utils/navigation';
 import styles from './Navbar.module.css';
@@ -6,6 +6,8 @@ import styles from './Navbar.module.css';
 export const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileToggleRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -18,6 +20,26 @@ export const Navbar: React.FC = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (mobileToggleRef.current?.contains(target) || mobileMenuRef.current?.contains(target)) {
+        return;
+      }
+      setMobileMenuOpen(false);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [mobileMenuOpen]);
 
   const handleNav = (url: string, e: React.MouseEvent) => {
     setMobileMenuOpen(false);
@@ -48,6 +70,7 @@ export const Navbar: React.FC = () => {
             <ArrowRight style={{ width: '15px', height: '15px' }} />
           </a>
           <button
+            ref={mobileToggleRef}
             className={styles.mobileToggle}
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle menu"
@@ -58,7 +81,7 @@ export const Navbar: React.FC = () => {
       </div>
 
       {mobileMenuOpen && (
-        <div className={styles.mobileMenu}>
+        <div ref={mobileMenuRef} className={styles.mobileMenu}>
           <a href="#features" onClick={(e) => handleNav('#features', e)}>Features</a>
           <a href="#how-it-works" onClick={(e) => handleNav('#how-it-works', e)}>How It Works</a>
           <a href="#demo" onClick={(e) => handleNav('#demo', e)}>Live Demo</a>

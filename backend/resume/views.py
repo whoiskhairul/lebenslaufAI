@@ -311,21 +311,19 @@ class ResumeRephraseView(APIView):
                 "error": {"message": "Text and instruction are required."}
             }, status=status.HTTP_400_BAD_REQUEST)
             
-        # Gather profile
-        personal_info = PersonalInfo.objects.filter(user=user).first()
-        profile_data = {
-            'personal_info': personal_info or PersonalInfo(user=user, full_name=user.full_name or "", email=user.email),
-            'work_experiences': WorkExperience.objects.filter(user=user),
-            'projects': Project.objects.filter(user=user),
-            'skills': Skill.objects.filter(user=user),
-            'educations': Education.objects.filter(user=user),
-            'certifications': Certification.objects.filter(user=user),
+        # Gather lightweight candidate context to optimize tokens & latency
+        personal_info = PersonalInfo.objects.filter(user=user).only('full_name', 'title').first()
+        skills = Skill.objects.filter(user=user).values_list('name', flat=True)[:12]
+        
+        lightweight_context = {
+            'candidate_name': personal_info.full_name if personal_info else user.full_name,
+            'title': personal_info.title if personal_info else '',
+            'top_skills': list(skills)
         }
-        profile_serialized = FullProfileSerializer(profile_data).data
         
         api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
         try:
-            rephrased = AIService.rephrase_block(text, instruction, profile_serialized, api_key=api_key)
+            rephrased = AIService.rephrase_block(text, instruction, lightweight_context, api_key=api_key)
             return Response({
                 "success": True,
                 "rephrased": rephrased

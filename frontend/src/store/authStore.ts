@@ -49,6 +49,8 @@ interface AuthState {
   twoFactorRequired: boolean;
   pendingEmail: string | null;
   theme: 'light' | 'dark';
+  sidebarCollapsed: boolean;
+  mobileActivePane: 'preview' | 'editor';
   
   // Actions
   setAuth: (accessToken: string, refreshToken: string, user: User, sessionKey?: string) => void;
@@ -57,6 +59,9 @@ interface AuthState {
   setTwoFactorRequired: (required: boolean, email?: string) => void;
   logout: () => void;
   setTheme: (theme: 'light' | 'dark') => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  toggleSidebarCollapsed: () => void;
+  setMobileActivePane: (pane: 'preview' | 'editor') => void;
   initAuth: () => void;
 }
 
@@ -66,6 +71,7 @@ const getInitialState = () => {
   const sessionKey = typeof window !== 'undefined' ? localStorage.getItem('session_key') : null;
   const rawUserData = typeof window !== 'undefined' ? localStorage.getItem('user_data') : null;
   const storedTheme = (typeof window !== 'undefined' ? localStorage.getItem('app_theme') : null) as 'light' | 'dark' | null;
+  const storedSidebarCollapsed = typeof window !== 'undefined' ? localStorage.getItem('sidebar_collapsed') === 'true' : false;
   
   const theme = storedTheme || 'dark';
   if (typeof document !== 'undefined') {
@@ -92,7 +98,9 @@ const getInitialState = () => {
     isAuthenticated,
     twoFactorRequired: false,
     pendingEmail: null,
-    theme
+    theme,
+    sidebarCollapsed: storedSidebarCollapsed,
+    mobileActivePane: 'preview' as 'preview' | 'editor'
   };
 };
 
@@ -105,8 +113,10 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     // Purge any stale user state from previous logins
     const currentTheme = localStorage.getItem('app_theme') || 'dark';
+    const currentSidebarCollapsed = localStorage.getItem('sidebar_collapsed');
     localStorage.clear();
     localStorage.setItem('app_theme', currentTheme);
+    if (currentSidebarCollapsed !== null) localStorage.setItem('sidebar_collapsed', currentSidebarCollapsed);
 
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem('auth_token', accessToken);
@@ -147,8 +157,10 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     const currentTheme = localStorage.getItem('app_theme') || 'dark';
+    const currentSidebarCollapsed = localStorage.getItem('sidebar_collapsed');
     localStorage.clear();
     localStorage.setItem('app_theme', currentTheme);
+    if (currentSidebarCollapsed !== null) localStorage.setItem('sidebar_collapsed', currentSidebarCollapsed);
 
     set({
       accessToken: null,
@@ -171,12 +183,34 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ theme });
   },
 
+  setSidebarCollapsed: (collapsed: boolean) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebar_collapsed', String(collapsed));
+    }
+    set({ sidebarCollapsed: collapsed });
+  },
+
+  toggleSidebarCollapsed: () => {
+    set((state) => {
+      const next = !state.sidebarCollapsed;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('sidebar_collapsed', String(next));
+      }
+      return { sidebarCollapsed: next };
+    });
+  },
+
+  setMobileActivePane: (pane: 'preview' | 'editor') => {
+    set({ mobileActivePane: pane });
+  },
+
   initAuth: () => {
     const accessToken = localStorage.getItem('access_token');
     const refreshToken = localStorage.getItem('refresh_token');
     const sessionKey = localStorage.getItem('session_key');
     const rawUserData = localStorage.getItem('user_data');
     const storedTheme = localStorage.getItem('app_theme') as 'light' | 'dark' | null;
+    const storedSidebarCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
     
     const theme = storedTheme || 'dark';
     document.documentElement.setAttribute('data-theme', theme);
@@ -190,14 +224,15 @@ export const useAuthStore = create<AuthState>((set) => ({
           sessionKey,
           user,
           isAuthenticated: true,
-          theme
+          theme,
+          sidebarCollapsed: storedSidebarCollapsed
         });
       } catch (e) {
         localStorage.removeItem('user_data');
-        set({ theme });
+        set({ theme, sidebarCollapsed: storedSidebarCollapsed });
       }
     } else {
-      set({ theme });
+      set({ theme, sidebarCollapsed: storedSidebarCollapsed });
     }
   }
 }));

@@ -1,4 +1,4 @@
-.container {
+﻿.container {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -26,7 +26,9 @@
   gap: var(--space-6);
   flex: 1;
   overflow: hidden;
-  align-items: flex-start;
+  /* Allow the viewport to shrink below its content height so overflow-y can engage */
+  min-height: 0;
+  align-items: stretch;
 }
 
 .tabs {
@@ -324,22 +326,192 @@
   font-size: var(--text-xs);
 }
 
+.addSkillTriggerBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: transparent;
+  border: 1px dashed var(--card-border);
+  color: var(--primary);
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.addSkillTriggerBtn:hover {
+  background: var(--muted-light);
+  border-color: var(--primary);
+}
+
+.inlineSkillInputContainer {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--card-bg);
+  border: 1px solid var(--primary);
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-md);
+}
+
+.inlineSkillInput {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: var(--text-sm);
+  color: var(--foreground);
+  width: 130px;
+}
+
+.inlineSkillActionBtn {
+  background: transparent;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: color var(--transition-fast);
+}
+
+.inlineSkillActionBtn:hover {
+  color: var(--primary);
+}
+
+.inlineSkillActionBtn[title="Cancel"]:hover {
+  color: var(--danger);
+}
+
+.iconOrderBtn {
+  background: transparent;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: color var(--transition-fast);
+}
+
+.iconOrderBtn:hover {
+  color: var(--primary);
+}
+
+.categoryActionBtn {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: color var(--transition-fast);
+  opacity: 0.6;
+}
+
+.categoryActionBtn:hover {
+  color: var(--primary);
+  opacity: 1;
+}
+
+.animateFadeOut {
+  opacity: 0.15;
+  transform: scale(0.95);
+  transition: opacity 0.12s ease-in-out, transform 0.12s ease-in-out !important;
+}
+
 @media (max-width: 768px) {
+  .container {
+    /* Let content flow naturally; AppShell .content handles page scrolling */
+    height: auto;
+    min-height: 100%;
+  }
+
   .layout {
     flex-direction: column;
+    overflow: visible;
+    min-height: 0;
   }
   .tabs {
     width: 100%;
     flex-direction: row;
     overflow-x: auto;
     padding: var(--space-2);
+    -webkit-overflow-scrolling: touch;
   }
   .tabBtn {
     padding: 0.5rem 1rem;
     white-space: nowrap;
   }
+  .tabBtn.activeTab {
+    border-left: none;
+    border-bottom: 3px solid var(--primary);
+    border-top-left-radius: var(--radius-md);
+    border-bottom-left-radius: var(--radius-md);
+  }
   .formGrid {
     grid-template-columns: 1fr;
+  }
+
+  /* Lighter paddings on phones */
+  .headerRow {
+    margin-bottom: var(--space-4);
+  }
+
+  .viewport {
+    padding: var(--space-4);
+    height: auto;
+    overflow-y: visible;
+  }
+
+  .inlineForm {
+    padding: var(--space-4);
+  }
+
+  .listItem {
+    padding: var(--space-4);
+  }
+
+  .reviewFields {
+    padding-left: var(--space-4);
+  }
+
+  .sectionHeader {
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .formActions {
+    flex-wrap: wrap;
+  }
+
+  .formActions > button {
+    flex: 1 1 auto;
+  }
+
+  .itemHeader h4,
+  .itemSub {
+    word-break: break-word;
+  }
+
+  /* Import wizard modal fits the screen */
+  .modal {
+    margin: 0 var(--space-3);
+    max-height: 85vh;
+    padding: var(--space-4);
+  }
+
+  .modalFooter {
+    flex-direction: column-reverse;
+  }
+
+  .modalFooter > button {
+    width: 100%;
   }
 }
 
@@ -361,7 +533,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 150;
+  z-index: 800;
 }
 
 .modal {
@@ -580,7 +752,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(168, 85, 247, 0.08));
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.08));
   border: 1px solid rgba(99, 102, 241, 0.25);
   border-radius: var(--radius-md);
   padding: 0.6rem 0.85rem;
@@ -624,7 +796,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  background: var(--primary, #6366f1) !important;
   color: #ffffff !important;
   border: none !important;
   font-weight: 600;
@@ -749,7 +921,7 @@
 .skeletonShimmerLine {
   height: 12px;
   border-radius: 4px;
-  background: linear-gradient(90deg, rgba(99, 102, 241, 0.15) 25%, rgba(168, 85, 247, 0.35) 50%, rgba(99, 102, 241, 0.15) 75%);
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.15) 25%, rgba(99, 102, 241, 0.35) 50%, rgba(99, 102, 241, 0.15) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite linear;
 }

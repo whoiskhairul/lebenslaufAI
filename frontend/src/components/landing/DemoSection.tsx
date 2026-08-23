@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { ArrowRight, CheckCircle2, Sparkles, AlertCircle } from 'lucide-react';
 import { navigateTo } from '../../utils/navigation';
 import styles from './DemoSection.module.css';
@@ -21,7 +21,7 @@ export const DemoSection: React.FC = () => {
               <span className={`${styles.dot} ${styles.dotYellow}`} />
               <span className={`${styles.dot} ${styles.dotGreen}`} />
             </div>
-            <div className={styles.windowTitle}>Lebenslauf AI — Editor & ATS Studio</div>
+            <div className={styles.windowTitle}>Lebenslauf AI â€” Editor & ATS Studio</div>
             <div style={{ width: '40px' }} />
           </div>
 
@@ -34,12 +34,12 @@ export const DemoSection: React.FC = () => {
 
                 <div className={styles.docSectionHeader}>Professional Experience</div>
                 <div style={{ fontWeight: 600, fontSize: '0.9rem', marginTop: '0.5rem' }}>
-                  Lead Software Architect — CloudTech (2022 – Present)
+                  Lead Software Architect â€” CloudTech (2022 â€“ Present)
                 </div>
                 <ul className={styles.bulletList}>
                   <li>Architected high-throughput microservices handling 4M+ daily active sessions.</li>
                   <li className={styles.highlightedBullet}>
-                    ✨ <strong>Tailored:</strong> Integrated Django & React state pipelines resulting in 35% improvement in API response latency.
+                    âœ¨ <strong>Tailored:</strong> Integrated Django & React state pipelines resulting in 35% improvement in API response latency.
                   </li>
                   <li>Spearheaded CI/CD migration reducing deployment window from 45 min to 8 min.</li>
                 </ul>
@@ -59,7 +59,7 @@ export const DemoSection: React.FC = () => {
               </div>
 
               <div className={styles.atsCard}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#818cf8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <CheckCircle2 style={{ width: '16px', height: '16px' }} /> Matched Keywords (12/14)
                 </div>
                 <div className={styles.tagGroup}>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Sparkles, ArrowRight, Play, CheckCircle2, ShieldCheck, Zap } from 'lucide-react';
 import { navigateTo } from '../../utils/navigation';
 import styles from './HeroSection.module.css';
@@ -65,7 +65,7 @@ export const HeroSection: React.FC = () => {
             <svg className={styles.circleSvg} viewBox="0 0 180 180">
               <defs>
                 <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#7c3aed" />
+                  <stop offset="0%" stopColor="#4f46e5" />
                   <stop offset="100%" stopColor="#34d399" />
                 </linearGradient>
               </defs>

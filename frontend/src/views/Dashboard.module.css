@@ -1,4 +1,4 @@
-.container {
+﻿.container {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -293,7 +293,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 120;
+  z-index: 800;
 }
 
 .modal {
@@ -394,6 +394,77 @@
   .formRow {
     grid-template-columns: 1fr;
   }
+
+  /* Stack page header and make the CTA full-width */
+  .headerRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+
+  .newBtn {
+    justify-content: center;
+  }
+
+  .title {
+    font-size: var(--text-xl);
+  }
+
+  .subtitle {
+    font-size: var(--text-xs);
+  }
+
+  /* Two metric cards per row on phones */
+  .metricsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+  }
+
+  .metricCard {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .metricVal {
+    font-size: var(--text-lg);
+  }
+
+  /* Smooth touch scrolling for the kanban board */
+  .boardScroll {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .column {
+    padding: var(--space-3);
+  }
+
+  /* Modal fills the screen with margins and stacks its footer buttons */
+  .modal {
+    margin: 0 var(--space-3);
+    padding: var(--space-4);
+    max-height: 85vh;
+    border-radius: var(--radius-lg);
+  }
+
+  .modalHeader h3 {
+    font-size: var(--text-base);
+  }
+
+  .modalFooter {
+    flex-direction: column-reverse;
+  }
+
+  .modalFooter > button {
+    width: 100%;
+  }
+
+  /* Keep the slide-out panel's actions clear of the bottom nav bar */
+  .detailsSidebar {
+    height: auto;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 /* Slide-out Application details side panel */
@@ -410,7 +481,7 @@
   display: flex;
   flex-direction: column;
   animation: slideIn 0.3s ease forwards;
-  z-index: 130;
+  z-index: 800;
   text-align: left;
 }
 

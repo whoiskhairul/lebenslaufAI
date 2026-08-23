@@ -5,9 +5,10 @@ import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { MasterProfileSkeleton } from '../components/skeleton/MasterProfileSkeleton';
 import {
-  User, Briefcase, FolderGit2, Dumbbell, GraduationCap, Award, Trash2, Plus, Edit3, Check, X, Upload, Brain, Wand2, Sparkles, Lock, AlertCircle
+  User, Briefcase, FolderGit2, Dumbbell, GraduationCap, Award, Trash2, Plus, Edit3, Check, X, Upload, Brain, Wand2, Sparkles, Lock, AlertCircle, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import styles from './MasterProfile.module.css';
+import { Toast } from '../components/Toast';
 
 
 interface PersonalInfo {
@@ -54,6 +55,7 @@ interface Skill {
   name: string;
   category: string;
   level?: string;
+  order?: number;
 }
 
 interface Education {
@@ -350,10 +352,10 @@ export const MasterProfile: React.FC = () => {
       setImportStep(1);
       setCvText('');
       setParsedData(null);
-      alert('CV details imported successfully!');
+      setToast({ message: 'CV details imported successfully!', type: 'success' });
     } catch (err) {
       console.error(err);
-      alert('An error occurred while importing CV data.');
+      setToast({ message: 'An error occurred while importing CV data.', type: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -386,6 +388,21 @@ export const MasterProfile: React.FC = () => {
   const [skillCategory, setSkillCategory] = useState('');
   const [skillLevel, setSkillLevel] = useState('intermediate');
   const [sessionCustomCats, setSessionCustomCats] = useState<string[]>([]);
+  const [inlineCategoryInput, setInlineCategoryInput] = useState<string | null>(null);
+  const [inlineSkillName, setInlineSkillName] = useState('');
+  const [localSkills, setLocalSkills] = useState<Skill[]>([]);
+  const [deletedSkillIds, setDeletedSkillIds] = useState<string[]>([]);
+  const [animatingSkillId, setAnimatingSkillId] = useState<string | null>(null);
+  const [animatingPartnerSkillId, setAnimatingPartnerSkillId] = useState<string | null>(null);
+  const [animationDirection, setAnimationDirection] = useState<'left' | 'right' | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [promptModal, setPromptModal] = useState<{
+    title: string;
+    description: string;
+    defaultValue: string;
+    onConfirm: (val: string) => void;
+  } | null>(null);
+  const [promptValue, setPromptValue] = useState('');
 
   // Project temp state
   const [projTitle, setProjTitle] = useState('');
@@ -405,6 +422,8 @@ export const MasterProfile: React.FC = () => {
           loadedProfile.personal_info.image_url = user.avatar;
         }
         setProfile(loadedProfile);
+        setLocalSkills(loadedProfile.skills || []);
+        setDeletedSkillIds([]);
       }
     } catch (err) {
       console.error('Failed to load profile:', err);
@@ -561,48 +580,170 @@ export const MasterProfile: React.FC = () => {
   };
 
   // CRUD handlers for Skills
-  const handleAddSkill = async (e: React.FormEvent) => {
+  const handleMoveSkill = (skillId: string, direction: 'left' | 'right') => {
+    const skillToMove = localSkills.find(s => s.id === skillId);
+    if (!skillToMove) return;
+
+    const catSkills = localSkills
+      .filter(s => s.category === skillToMove.category)
+      .sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
+
+    const idx = catSkills.findIndex(s => s.id === skillId);
+    if (idx === -1) return;
+
+    const targetIdx = direction === 'left' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= catSkills.length) return;
+
+    const targetSkill = catSkills[targetIdx];
+
+    // Trigger the fade animation
+    setAnimatingSkillId(skillId);
+    setAnimatingPartnerSkillId(targetSkill.id!);
+
+    // Wait for the fade-out to complete before updating state
+    setTimeout(() => {
+      setLocalSkills(prev => {
+        const updated = prev.map(s => {
+          if (s.id === skillId) {
+            return { ...s, order: targetIdx };
+          } else if (s.id === targetSkill.id) {
+            return { ...s, order: idx };
+          }
+          if (s.category === skillToMove.category) {
+            const indexInCat = catSkills.findIndex(cs => cs.id === s.id);
+            if (indexInCat !== idx && indexInCat !== targetIdx) {
+              return { ...s, order: indexInCat };
+            }
+          }
+          return s;
+        });
+
+        return updated;
+      });
+
+      // Clear animation states (fades back in)
+      setAnimatingSkillId(null);
+      setAnimatingPartnerSkillId(null);
+    }, 120);
+  };
+
+  const handleSaveInlineSkill = (categoryName: string) => {
+    if (!inlineSkillName.trim()) return;
+    const catSkills = localSkills.filter(s => s.category === categoryName);
+    const newSkill: Skill = {
+      id: `temp_${Date.now()}_${Math.random()}`,
+      name: inlineSkillName.trim(),
+      category: categoryName,
+      level: '',
+      order: catSkills.length
+    };
+    setLocalSkills(prev => [...prev, newSkill]);
+    setInlineSkillName('');
+    setInlineCategoryInput(null);
+  };
+
+  const handleAddSkill = (e: React.FormEvent) => {
     e.preventDefault();
     if (!skillName || !skillCategory) return;
-    setIsSaving(true);
-    try {
-      const payload = {
-        name: skillName,
+
+    if (editingId) {
+      setLocalSkills(prev => prev.map(s => {
+        if (s.id === editingId) {
+          return { ...s, name: skillName.trim(), category: skillCategory };
+        }
+        return s;
+      }));
+    } else {
+      const catSkills = localSkills.filter(s => s.category === skillCategory);
+      const newSkill: Skill = {
+        id: `temp_${Date.now()}_${Math.random()}`,
+        name: skillName.trim(),
         category: skillCategory,
-        level: skillLevel
+        level: '',
+        order: catSkills.length
       };
-
-      if (editingId) {
-        await api.put(`/master-profile/skills/${editingId}`, payload);
-      } else {
-        await api.post('/master-profile/skills', payload);
-      }
-
-      setIsAdding(false);
-      setEditingId(null);
-      setSkillName(''); setSkillCategory('');
-      fetchProfile();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSaving(false);
+      setLocalSkills(prev => [...prev, newSkill]);
     }
+
+    setIsAdding(false);
+    setEditingId(null);
+    setSkillName('');
+    setSkillCategory('');
   };
 
   const handleStartEditSkill = (skill: Skill) => {
     setSkillName(skill.name);
     setSkillCategory(skill.category);
-    setSkillLevel(skill.level || (skill.category === 'Languages' ? 'B2' : 'intermediate'));
     setEditingId(skill.id!);
     setIsAdding(true);
   };
 
-  const handleDeleteSkill = async (id: string) => {
+  const handleDeleteSkill = (id: string) => {
+    if (id && !id.startsWith('temp_')) {
+      setDeletedSkillIds(prev => [...prev, id]);
+    }
+    setLocalSkills(prev => prev.filter(s => s.id !== id));
+  };
+
+  const handleRenameCategory = (oldCategoryName: string) => {
+    setPromptValue(oldCategoryName);
+    setPromptModal({
+      title: 'Rename Category',
+      description: `Enter a new name for the category "${oldCategoryName}":`,
+      defaultValue: oldCategoryName,
+      onConfirm: (newName) => {
+        if (!newName.trim() || newName.trim() === oldCategoryName) return;
+        setLocalSkills(prev => prev.map(s => {
+          if (s.category === oldCategoryName) {
+            return { ...s, category: newName.trim() };
+          }
+          return s;
+        }));
+      }
+    });
+  };
+
+  const handleSaveSkills = async () => {
+    setIsSaving(true);
+    setMsg({ type: '', text: '' });
     try {
-      await api.delete(`/master-profile/skills/${id}`);
-      fetchProfile();
+      // 1. Delete removed skills
+      for (const id of deletedSkillIds) {
+        try {
+          await api.delete(`/master-profile/skills/${id}`);
+        } catch (err) {
+          console.error(`Failed to delete skill ${id}:`, err);
+        }
+      }
+
+      // 2. Add or Update skills
+      for (const skill of localSkills) {
+        if (skill.id && skill.id.startsWith('temp_')) {
+          const payload = {
+            name: skill.name,
+            category: skill.category,
+            level: skill.level || '',
+            order: skill.order || 0
+          };
+          await api.post('/master-profile/skills', payload);
+        } else {
+          const payload = {
+            name: skill.name,
+            category: skill.category,
+            order: skill.order || 0
+          };
+          await api.patch(`/master-profile/skills/${skill.id}`, payload);
+        }
+      }
+
+      setDeletedSkillIds([]);
+      setMsg({ type: 'success', text: 'Skills saved successfully!' });
+      await fetchProfile();
     } catch (err) {
-      console.error(err);
+      console.error('Failed to save skills:', err);
+      setMsg({ type: 'error', text: 'Failed to save skills registry.' });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -671,6 +812,70 @@ export const MasterProfile: React.FC = () => {
 
   return (
     <div className={styles.container}>
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+      {promptModal && (
+        <div className={styles.modalOverlay}>
+          <div className={`${styles.modalContent} glass-card`} style={{ maxWidth: '400px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 10000 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--card-border)', paddingBottom: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>{promptModal.title}</h3>
+              <button
+                type="button"
+                onClick={() => setPromptModal(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '13px', color: 'var(--foreground)' }}>{promptModal.description}</label>
+              <input
+                type="text"
+                value={promptValue}
+                onChange={(e) => setPromptValue(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--card-border)',
+                  background: 'var(--card-bg)',
+                  color: 'var(--foreground)',
+                  fontSize: '13px',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    promptModal.onConfirm(promptValue);
+                    setPromptModal(null);
+                  } else if (e.key === 'Escape') {
+                    setPromptModal(null);
+                  }
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
+              <Button variant="secondary" onClick={() => setPromptModal(null)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  promptModal.onConfirm(promptValue);
+                  setPromptModal(null);
+                }}
+              >
+                Confirm
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className={styles.headerRow}>
         <div>
           <h2 className={styles.title}>Master Profile Registry</h2>
@@ -1271,17 +1476,24 @@ export const MasterProfile: React.FC = () => {
                               ...Array.from(new Set([...customCatsInProfile, ...sessionCustomCats]))
                             ];
                             if (val === '__add_custom__') {
-                              const customCatName = window.prompt('Enter custom category name:');
-                              if (customCatName && customCatName.trim()) {
-                                const trimmed = customCatName.trim();
-                                if (!allCats.includes(trimmed)) {
-                                  setSessionCustomCats(prev => [...prev, trimmed]);
+                              setPromptValue('');
+                              setPromptModal({
+                                title: 'Add Custom Category',
+                                description: 'Enter custom category name:',
+                                defaultValue: '',
+                                onConfirm: (customCatName) => {
+                                  if (customCatName && customCatName.trim()) {
+                                    const trimmed = customCatName.trim();
+                                    if (!allCats.includes(trimmed)) {
+                                      setSessionCustomCats(prev => [...prev, trimmed]);
+                                    }
+                                    setSkillCategory(trimmed);
+                                    setSkillLevel('intermediate');
+                                  } else {
+                                    setSkillCategory('');
+                                  }
                                 }
-                                setSkillCategory(trimmed);
-                                setSkillLevel('intermediate');
-                              } else {
-                                setSkillCategory('');
-                              }
+                              });
                             } else {
                               setSkillCategory(val);
                               if (val === 'Languages') {
@@ -1320,29 +1532,6 @@ export const MasterProfile: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className={styles.selectGroup} style={{ marginTop: '16px' }}>
-                        <label htmlFor="addSkillLevel">Proficiency Level</label>
-                        <select id="addSkillLevel" value={skillLevel} onChange={e => setSkillLevel(e.target.value)}>
-                          {skillCategory === 'Languages' ? (
-                            <>
-                              <option value="A1">A1 (Beginner)</option>
-                              <option value="A2">A2 (Elementary)</option>
-                              <option value="B1">B1 (Intermediate)</option>
-                              <option value="B2">B2 (Upper Intermediate)</option>
-                              <option value="C1">C1 (Advanced)</option>
-                              <option value="C2">C2 (Proficiency)</option>
-                              <option value="Native">Native Speaker</option>
-                            </>
-                          ) : (
-                            <>
-                              <option value="beginner">Beginner</option>
-                              <option value="intermediate">Intermediate</option>
-                              <option value="expert">Expert</option>
-                            </>
-                          )}
-                        </select>
-                      </div>
-
                       <div className={styles.formActions}>
                         <Button variant="ghost" type="button" onClick={() => {
                           setIsAdding(false);
@@ -1357,7 +1546,7 @@ export const MasterProfile: React.FC = () => {
                   <div className={styles.skillsRegistry}>
                     {/* Render grouped skills */}
                     {Object.entries(
-                      profile.skills.reduce((acc, curr) => {
+                      localSkills.reduce((acc, curr) => {
                         const cat = curr.category || 'Other';
                         if (!acc[cat]) acc[cat] = [];
                         acc[cat].push(curr);
@@ -1381,24 +1570,109 @@ export const MasterProfile: React.FC = () => {
                         };
                         return getCategoryOrderScore(catA) - getCategoryOrderScore(catB);
                       })
-                      .map(([category, skills]) => (
-                        <div key={category} className={styles.skillCategoryBlock}>
-                          <h4 className={styles.categoryTitle}>{category}</h4>
-                          <div className={styles.skillsGrid}>
-                            {skills.map((s) => (
-                              <div key={s.id} className={styles.skillTagCard} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                                <span>{s.name} <span className={styles.skillLevel}>({s.level})</span></span>
-                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                  <button type="button" onClick={() => handleStartEditSkill(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', color: 'var(--primary-color, #4f46e5)' }} title="Edit skill">
-                                    <Edit3 size={12} />
-                                  </button>
-                                  <button onClick={() => handleDeleteSkill(s.id!)} className={styles.skillDeleteBtn}>X</button>
+                      .map(([category, skills]) => {
+                        const sortedSkills = [...skills].sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
+                        return (
+                          <div key={category} className={styles.skillCategoryBlock}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                              <h4 className={styles.categoryTitle} style={{ marginBottom: 0 }}>{category}</h4>
+                              <button
+                                type="button"
+                                className={styles.categoryActionBtn}
+                                onClick={() => handleRenameCategory(category)}
+                                title="Rename Category"
+                              >
+                                <Edit3 size={14} />
+                              </button>
+                            </div>
+                            <div className={styles.skillsGrid}>
+                              {sortedSkills.map((s, idx) => {
+                                const isAnimating = s.id === animatingSkillId || s.id === animatingPartnerSkillId;
+                                const animationClass = isAnimating ? styles.animateFadeOut : '';
+
+                                return (
+                                  <div key={s.id} className={`${styles.skillTagCard} ${animationClass}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                    <span>{s.name}</span>
+                                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                    {idx > 0 && (
+                                      <button type="button" onClick={() => handleMoveSkill(s.id!, 'left')} className={styles.iconOrderBtn} title="Move left">
+                                        <ChevronLeft size={12} />
+                                      </button>
+                                    )}
+                                    {idx < sortedSkills.length - 1 && (
+                                      <button type="button" onClick={() => handleMoveSkill(s.id!, 'right')} className={styles.iconOrderBtn} title="Move right">
+                                        <ChevronRight size={12} />
+                                      </button>
+                                    )}
+                                    <button type="button" onClick={() => handleStartEditSkill(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', color: 'var(--primary-color, #4f46e5)' }} title="Edit skill">
+                                      <Edit3 size={12} />
+                                    </button>
+                                    <button onClick={() => handleDeleteSkill(s.id!)} className={styles.skillDeleteBtn}>X</button>
+                                  </div>
                                 </div>
+                              );
+                              })}
+
+                            {inlineCategoryInput === category ? (
+                              <div className={styles.inlineSkillInputContainer}>
+                                <input
+                                  type="text"
+                                  className={styles.inlineSkillInput}
+                                  placeholder="Type skill name..."
+                                  value={inlineSkillName}
+                                  onChange={(e) => setInlineSkillName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleSaveInlineSkill(category);
+                                    } else if (e.key === 'Escape') {
+                                      setInlineCategoryInput(null);
+                                      setInlineSkillName('');
+                                    }
+                                  }}
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  className={styles.inlineSkillActionBtn}
+                                  onClick={() => handleSaveInlineSkill(category)}
+                                  title="Save"
+                                >
+                                  <Check size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className={styles.inlineSkillActionBtn}
+                                  onClick={() => {
+                                    setInlineCategoryInput(null);
+                                    setInlineSkillName('');
+                                  }}
+                                  title="Cancel"
+                                >
+                                  <X size={14} />
+                                </button>
                               </div>
-                            ))}
+                            ) : (
+                              <button
+                                type="button"
+                                className={styles.addSkillTriggerBtn}
+                                onClick={() => {
+                                  setInlineCategoryInput(category);
+                                  setInlineSkillName('');
+                                }}
+                              >
+                                <Plus size={14} /> Add Skill
+                              </button>
+                            )}
                           </div>
                         </div>
-                      ))}
+                      );
+                      })}
+                  </div>
+                  
+                  <div style={{ marginTop: '24px' }}>
+                    <Button onClick={handleSaveSkills} isLoading={isSaving} className={styles.saveBtn}>
+                      Save Skills
+                    </Button>
                   </div>
                 </div>
               )}

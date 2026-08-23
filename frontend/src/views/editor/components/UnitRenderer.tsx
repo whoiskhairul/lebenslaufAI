@@ -7,7 +7,7 @@ import { AutoSizeTextarea } from './AutoSizeTextarea';
 import { HeaderSettingsPopover } from './HeaderSettingsPopover';
 import { SectionSettingsPopover } from './SectionSettingsPopover';
 import {
-  Settings, ChevronUp, ChevronDown, Plus, Sparkles, X, ArrowUp, ArrowDown, Trash, EyeOff
+  Settings, ChevronUp, ChevronDown, Plus, Sparkles, X, ArrowUp, ArrowDown, Trash, EyeOff, RotateCcw
 } from 'lucide-react';
 import styles from '../../EditorNew.module.css';
 
@@ -108,6 +108,8 @@ export interface UnitRendererProps {
   handleMoveSkillCategory?: (catName: string, dir: 'up' | 'down') => void;
   getLocalizedCategoryName: (cat: string) => string;
   getAlertsFor: (section: string) => any[];
+  toggleSectionVisibility?: (sectionId: string) => void;
+  onResetToMasterProfile?: (sectionId: string) => void;
 }
 
 export const UnitRenderer: React.FC<UnitRendererProps> = ({
@@ -149,6 +151,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
   reviewedActions,
   renderHoverAiControls,
   isRephrasing,
+  onResetToMasterProfile,
   handleMoveExperience,
   handleAddExperienceBullet,
   handleRemoveExperienceBullet,
@@ -167,12 +170,14 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
   categoryOrder,
   handleMoveSkillCategory,
   getLocalizedCategoryName,
-  getAlertsFor
+  getAlertsFor,
+  toggleSectionVisibility
 }) => {
   const isPP = template === 'pixel_perfect_pdf';
   const isGerman = template === 'german_style_cv';
 
   const sec = sections.find(s => s.id === unit.sectionId);
+  if (!isMeasuring && sec && !sec.visible) return null;
   const localStyles = sec?.customStyles || {};
 
   let spacingStyle: React.CSSProperties = {};
@@ -264,7 +269,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
     const isHeaderSettingsOpen = activeSectionSettings === 'header';
 
     const headerControls = !isMeasuring && (
-      <div className={`${styles.sectionControls} no-print`} style={{ top: '4px', left: '-36px', right: 'auto' }}>
+      <div className={`${styles.sectionControls} no-print`} style={{ top: '-28px', left: '0', right: 'auto' }}>
         <button
           type="button"
           className={styles.itemSortBtn}
@@ -310,7 +315,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
 
     if (isPP) {
       return (
-        <div className={styles.ppHeader} style={headerContainerStyle}>
+        <div className={styles.ppHeader} style={headerContainerStyle} data-section-id="header">
           {headerControls}
           {!isMeasuring && isHeaderSettingsOpen && (
             <HeaderSettingsPopover
@@ -428,7 +433,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
 
     if (isGerman) {
       return (
-        <div className={styles.germanHeader} style={headerContainerStyle}>
+        <div className={styles.germanHeader} style={headerContainerStyle} data-section-id="header">
           {headerControls}
           {!isMeasuring && isHeaderSettingsOpen && (
             <HeaderSettingsPopover
@@ -545,7 +550,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
     }
 
     return (
-      <div className={styles.resumeHeader} style={headerContainerStyle}>
+      <div className={styles.resumeHeader} style={headerContainerStyle} data-section-id="header">
         {headerControls}
         {!isMeasuring && isHeaderSettingsOpen && (
           <HeaderSettingsPopover
@@ -664,6 +669,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
       <div
         className={`${styles.sectionHeaderWrapper} ${isSectionHovered ? styles.sectionHoverActive : ''}`}
         style={mergedStyles}
+        data-section-id={unit.sectionId}
         onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
         onMouseLeave={() => setHoveredSectionId(null)}
       >
@@ -710,7 +716,9 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
               title="Hide Section"
               onClick={(e) => {
                 e.stopPropagation();
-                if (window.confirm(`Hide section "${unit.titleText}"? You can re-enable it in the sidebar.`)) {
+                if (toggleSectionVisibility) {
+                  toggleSectionVisibility(unit.sectionId!);
+                } else {
                   setSections(prev => prev.map(s => s.id === unit.sectionId ? { ...s, visible: false } : s));
                 }
               }}
@@ -728,6 +736,19 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
             >
               <Sparkles size={12} />
             </button>
+            {onResetToMasterProfile && (
+              <button
+                type="button"
+                className={styles.deleteBlockBtn}
+                title="Revert Section to Master Profile Original"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onResetToMasterProfile(unit.sectionId!);
+                }}
+              >
+                <RotateCcw size={12} />
+              </button>
+            )}
             <button
               type="button"
               className={styles.itemSortBtn}
@@ -784,7 +805,6 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
             setEditableExperiences={setEditableExperiences}
             setEditableProjects={setEditableProjects}
             setEditableEducations={setEditableEducations}
-            openSectionAiModal={(id) => setOpenSectionAiModalId(id)}
           />
         )}
       </div>
@@ -838,45 +858,6 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
         onMouseEnter={() => { handleMouseEnterSuggestion(exp.id); setHoveredSectionId(unit.sectionId || null); }}
         onMouseLeave={() => { handleMouseLeaveSuggestion(); setHoveredSectionId(null); }}
       >
-        {!isMeasuring && (
-          <div className={`${styles.itemControls} no-print`}>
-            <button
-              type="button"
-              disabled={expIdx === 0}
-              onClick={() => handleMoveExperience(expIdx, 'up')}
-              className={styles.itemSortBtn}
-              title="Move Up"
-            >
-              <ArrowUp size={12} />
-            </button>
-            <button
-              type="button"
-              disabled={expIdx === editableExperiences.length - 1}
-              onClick={() => handleMoveExperience(expIdx, 'down')}
-              className={styles.itemSortBtn}
-              title="Move Down"
-            >
-              <ArrowDown size={12} />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleAddExperienceBullet(expIdx)}
-              className={styles.itemSortBtn}
-              title="Add Bullet Point"
-            >
-              <Plus size={10} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditableExperiences(prev => prev.filter(e => e.id !== exp.id))}
-              className={styles.deleteBlockBtn}
-              title="Exclude item"
-            >
-              <Trash size={12} />
-            </button>
-          </div>
-        )}
-
         {isPP || isGerman ? (
           <>
             <div className={isPP ? styles.ppLeftCol : styles.germanLeftCol}>
@@ -1087,41 +1068,6 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
         onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
         onMouseLeave={() => setHoveredSectionId(null)}
       >
-        {!isMeasuring && (
-          <div className={`${styles.itemControls} no-print`}>
-            <button
-              type="button"
-              disabled={projIdx === 0}
-              onClick={() => handleMoveProject(projIdx, 'up')}
-              className={styles.itemSortBtn}
-            >
-              <ArrowUp size={12} />
-            </button>
-            <button
-              type="button"
-              disabled={projIdx === editableProjects.length - 1}
-              onClick={() => handleMoveProject(projIdx, 'down')}
-              className={styles.itemSortBtn}
-            >
-              <ArrowDown size={12} />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleAddProjectBullet(projIdx)}
-              className={styles.itemSortBtn}
-            >
-              <Plus size={10} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditableProjects(prev => prev.filter(p => p.id !== proj.id))}
-              className={styles.deleteBlockBtn}
-            >
-              <Trash size={12} />
-            </button>
-          </div>
-        )}
-
         {isPP || isGerman ? (
           <>
             <div className={isPP ? styles.ppLeftCol : styles.germanLeftCol}>
@@ -1416,42 +1362,6 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
         onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
         onMouseLeave={() => setHoveredSectionId(null)}
       >
-        {!isMeasuring && (
-          <div className={`${styles.itemControls} no-print`}>
-            <button
-              type="button"
-              disabled={eduIdx === 0}
-              onClick={() => handleMoveEducation(eduIdx, 'up')}
-              className={styles.itemSortBtn}
-            >
-              <ArrowUp size={12} />
-            </button>
-            <button
-              type="button"
-              disabled={eduIdx === editableEducations.length - 1}
-              onClick={() => handleMoveEducation(eduIdx, 'down')}
-              className={styles.itemSortBtn}
-            >
-              <ArrowDown size={12} />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleAddEducationBullet(eduIdx)}
-              className={styles.itemSortBtn}
-              title="Add Bullet Point"
-            >
-              <Plus size={10} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditableEducations(prev => prev.filter(e => e.id !== edu.id))}
-              className={styles.deleteBlockBtn}
-            >
-              <Trash size={12} />
-            </button>
-          </div>
-        )}
-
         {isPP || isGerman ? (
           <>
             <div className={isPP ? styles.ppLeftCol : styles.germanLeftCol}>
@@ -1649,25 +1559,6 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
         onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
         onMouseLeave={() => setHoveredSectionId(null)}
       >
-        {!isMeasuring && (
-          <div className={`${styles.itemControls} no-print`} style={{ left: '-48px' }}>
-            <button type="button" disabled={languagesFirst} onClick={() => setLanguagesFirst(true)} className={styles.itemSortBtn} title="Move Up"><ArrowUp size={12} /></button>
-            <button type="button" disabled={!languagesFirst} onClick={() => setLanguagesFirst(false)} className={styles.itemSortBtn} title="Move Down"><ArrowDown size={12} /></button>
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm("Delete languages?")) {
-                  setEditableSkills(prev => prev.filter(s => (s.category || '').toLowerCase().trim() !== 'languages'));
-                }
-              }}
-              className={styles.deleteBlockBtn}
-              title="Delete languages"
-            >
-              <Trash size={12} />
-            </button>
-          </div>
-        )}
-
         <div style={{ fontWeight: 700, fontSize: '1.05em', color: 'var(--accent-color, #0f172a)', marginBottom: '4px' }}>
           <AutoSizeTextarea
             value={languagesTitle || (targetLanguage === 'de' ? 'Sprachen' : 'Languages')}
@@ -1724,43 +1615,6 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
         onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
         onMouseLeave={() => setHoveredSectionId(null)}
       >
-        {!isMeasuring && (
-          <div className={`${styles.itemControls} no-print`} style={{ left: '-82px' }}>
-            {handleMoveSkillCategory && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => handleMoveSkillCategory(cat, 'up')}
-                  className={styles.moveItemBtn}
-                  title="Move Category Up"
-                >
-                  <ArrowUp size={12} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleMoveSkillCategory(cat, 'down')}
-                  className={styles.moveItemBtn}
-                  title="Move Category Down"
-                >
-                  <ArrowDown size={12} />
-                </button>
-              </>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm(`Delete skills category "${catLabel}"?`)) {
-                  setEditableSkills(prev => prev.filter(s => (s.category || 'technical').toLowerCase().trim() !== cat.toLowerCase().trim()));
-                }
-              }}
-              className={styles.deleteBlockBtn}
-              title={`Delete ${catLabel}`}
-            >
-              <Trash size={12} />
-            </button>
-          </div>
-        )}
-
         <div style={{ display: 'flex', alignItems: 'flex-start', paddingLeft: '24px', width: '100%' }}>
           <span className={styles.bulletDot}>•</span>
           <strong style={{ fontWeight: 700, marginRight: '5px', color: 'var(--text-color, #1e293b)' }}>
@@ -1792,9 +1646,11 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
   // 9. Custom Section Items
   if (unit.type === 'custom-content') {
     const isSectionHovered = hoveredSectionId === unit.sectionId;
+    const format = sec?.customFormat || 'bullets';
 
-    if (sec?.customFormat === 'keyvalue') {
-      const pairs = sec.keyValuePairs || [{ key: 'Label', value: 'Detail Description' }];
+    // 9A. Key-Value Layout
+    if (format === 'keyvalue') {
+      const pairs = sec?.keyValuePairs || [{ key: 'Label', value: 'Detail Description' }];
       return (
         <div
           className={isSectionHovered ? styles.sectionHoverActive : ''}
@@ -1808,43 +1664,6 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
               className={`${isPP ? styles.ppSectionRow : (isGerman ? styles.germanRow : styles.resumeItem)}`}
               style={{ position: 'relative', display: isPP || isGerman ? undefined : 'flex', marginBottom: '6px' }}
             >
-              {!isMeasuring && (
-                <div className={`${styles.bulletControls} no-print`} style={{ left: '-40px' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSections(prev => prev.map(s => {
-                        if (s.id === unit.sectionId) {
-                          const newPairs = [...(s.keyValuePairs || [])];
-                          newPairs.splice(pIdx, 1);
-                          return { ...s, keyValuePairs: newPairs };
-                        }
-                        return s;
-                      }));
-                    }}
-                    className={styles.deleteBulletBtn}
-                  >
-                    <Trash size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    style={{ color: 'var(--primary)' }}
-                    onClick={() => {
-                      setSections(prev => prev.map(s => {
-                        if (s.id === unit.sectionId) {
-                          const newPairs = [...(s.keyValuePairs || [])];
-                          newPairs.splice(pIdx + 1, 0, { key: 'Key Label', value: 'Text Value' });
-                          return { ...s, keyValuePairs: newPairs };
-                        }
-                        return s;
-                      }));
-                    }}
-                    className={styles.deleteBulletBtn}
-                  >
-                    <Plus size={12} />
-                  </button>
-                </div>
-              )}
               <div className={isPP ? styles.ppLeftCol : styles.germanLeftCol}>
                 <strong style={{ color: 'var(--accent-color, #0f172a)' }}>
                   <AutoSizeTextarea
@@ -1882,6 +1701,269 @@ export const UnitRenderer: React.FC<UnitRendererProps> = ({
         </div>
       );
     }
+
+    // 9B. Structured Entries Layout
+    if (format === 'entries') {
+      const entries = sec?.entries || [
+        { id: 'entry_1', title: 'Position or Project', subtitle: 'Organization', date: '2024', location: 'Location', bullets: ['Accomplishment detail...'] }
+      ];
+      return (
+        <div
+          className={isSectionHovered ? styles.sectionHoverActive : ''}
+          style={mergedStyles}
+          onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
+          onMouseLeave={() => setHoveredSectionId(null)}
+        >
+          {entries.map((entry: any, eIdx: number) => (
+            <div
+              key={entry.id || eIdx}
+              className={`${isPP ? styles.ppSectionRow : (isGerman ? styles.germanRow : styles.resumeItem)}`}
+              style={{ position: 'relative', marginBottom: '10px' }}
+            >
+              {isPP || isGerman ? (
+                <>
+                  <div className={isPP ? styles.ppLeftCol : styles.germanLeftCol}>
+                    <h4 className={isPP ? styles.ppRoleTitle : styles.germanRole}>
+                      <AutoSizeTextarea
+                        value={entry.title || ''}
+                        onChange={(val) => {
+                          setSections(prev => prev.map(s => {
+                            if (s.id === unit.sectionId) {
+                              const nextEntries = (s.entries || []).map((ent: any, i: number) => i === eIdx ? { ...ent, title: val } : ent);
+                              return { ...s, entries: nextEntries };
+                            }
+                            return s;
+                          }));
+                        }}
+                      />
+                    </h4>
+                    <span className={isPP ? styles.ppDateRange : styles.germanDateRange}>
+                      <AutoSizeTextarea
+                        value={entry.date || ''}
+                        onChange={(val) => {
+                          setSections(prev => prev.map(s => {
+                            if (s.id === unit.sectionId) {
+                              const nextEntries = (s.entries || []).map((ent: any, i: number) => i === eIdx ? { ...ent, date: val } : ent);
+                              return { ...s, entries: nextEntries };
+                            }
+                            return s;
+                          }));
+                        }}
+                      />
+                    </span>
+                  </div>
+                  <div className={isPP ? styles.ppRightCol : styles.germanRightCol}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                      <div className={isPP ? styles.ppCompany : styles.germanCompany}>
+                        <AutoSizeTextarea
+                          value={entry.subtitle || ''}
+                          onChange={(val) => {
+                            setSections(prev => prev.map(s => {
+                              if (s.id === unit.sectionId) {
+                                const nextEntries = (s.entries || []).map((ent: any, i: number) => i === eIdx ? { ...ent, subtitle: val } : ent);
+                                return { ...s, entries: nextEntries };
+                              }
+                              return s;
+                            }));
+                          }}
+                        />
+                      </div>
+                      {entry.subtitle && entry.location && <span style={{ color: '#475569', fontSize: '0.9em' }}>, </span>}
+                      <div style={{ fontSize: '0.85em', color: '#64748b', opacity: 0.85 }}>
+                        <AutoSizeTextarea
+                          value={entry.location || ''}
+                          onChange={(val) => {
+                            setSections(prev => prev.map(s => {
+                              if (s.id === unit.sectionId) {
+                                const nextEntries = (s.entries || []).map((ent: any, i: number) => i === eIdx ? { ...ent, location: val } : ent);
+                                return { ...s, entries: nextEntries };
+                              }
+                              return s;
+                            }));
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <ul className={styles.bulletsList}>
+                      {(entry.bullets || []).map((bullet: string, bIdx: number) => (
+                        <li key={bIdx} className={styles.bulletItem}>
+                          <span className={styles.bulletDot}>•</span>
+                          <div className={styles.bulletContent}>
+                            <AutoSizeTextarea
+                              value={bullet}
+                              onChange={(val) => {
+                                setSections(prev => prev.map(s => {
+                                  if (s.id === unit.sectionId) {
+                                    const nextEntries = (s.entries || []).map((ent: any, i: number) => {
+                                      if (i !== eIdx) return ent;
+                                      const nextBullets = (ent.bullets || []).map((b: string, bi: number) => bi === bIdx ? val : b);
+                                      return { ...ent, bullets: nextBullets };
+                                    });
+                                    return { ...s, entries: nextEntries };
+                                  }
+                                  return s;
+                                }));
+                              }}
+                            />
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <h4 style={{ margin: 0, fontWeight: 700, fontSize: '1em', color: 'var(--accent-color, #0f172a)' }}>
+                      <AutoSizeTextarea
+                        value={entry.title || ''}
+                        onChange={(val) => {
+                          setSections(prev => prev.map(s => {
+                            if (s.id === unit.sectionId) {
+                              const nextEntries = (s.entries || []).map((ent: any, i: number) => i === eIdx ? { ...ent, title: val } : ent);
+                              return { ...s, entries: nextEntries };
+                            }
+                            return s;
+                          }));
+                        }}
+                      />
+                    </h4>
+                    <span style={{ fontSize: '0.85em', color: '#64748b' }}>
+                      <AutoSizeTextarea
+                        value={entry.date || ''}
+                        onChange={(val) => {
+                          setSections(prev => prev.map(s => {
+                            if (s.id === unit.sectionId) {
+                              const nextEntries = (s.entries || []).map((ent: any, i: number) => i === eIdx ? { ...ent, date: val } : ent);
+                              return { ...s, entries: nextEntries };
+                            }
+                            return s;
+                          }));
+                        }}
+                      />
+                    </span>
+                  </div>
+                  {(entry.subtitle || entry.location) && (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontStyle: 'italic', fontSize: '0.9em', color: '#475569', marginBottom: '4px' }}>
+                      {entry.subtitle && (
+                        <AutoSizeTextarea
+                          value={entry.subtitle || ''}
+                          onChange={(val) => {
+                            setSections(prev => prev.map(s => {
+                              if (s.id === unit.sectionId) {
+                                const nextEntries = (s.entries || []).map((ent: any, i: number) => i === eIdx ? { ...ent, subtitle: val } : ent);
+                                return { ...s, entries: nextEntries };
+                              }
+                              return s;
+                            }));
+                          }}
+                        />
+                      )}
+                      {entry.subtitle && entry.location && <span>, </span>}
+                      {entry.location && (
+                        <div style={{ fontSize: '0.95em', color: '#64748b' }}>
+                          <AutoSizeTextarea
+                            value={entry.location || ''}
+                            onChange={(val) => {
+                              setSections(prev => prev.map(s => {
+                                if (s.id === unit.sectionId) {
+                                  const nextEntries = (s.entries || []).map((ent: any, i: number) => i === eIdx ? { ...ent, location: val } : ent);
+                                  return { ...s, entries: nextEntries };
+                                }
+                                return s;
+                              }));
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <ul className={styles.bulletsList}>
+                    {(entry.bullets || []).map((bullet: string, bIdx: number) => (
+                      <li key={bIdx} className={styles.bulletItem}>
+                        <span className={styles.bulletDot}>•</span>
+                        <div className={styles.bulletContent}>
+                          <AutoSizeTextarea
+                            value={bullet}
+                            onChange={(val) => {
+                              setSections(prev => prev.map(s => {
+                                if (s.id === unit.sectionId) {
+                                  const nextEntries = (s.entries || []).map((ent: any, i: number) => {
+                                    if (i !== eIdx) return ent;
+                                    const nextBullets = (ent.bullets || []).map((b: string, bi: number) => bi === bIdx ? val : b);
+                                    return { ...ent, bullets: nextBullets };
+                                  });
+                                  return { ...s, entries: nextEntries };
+                                }
+                                return s;
+                              }));
+                            }}
+                          />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // 9C. Paragraph Narrative Layout
+    if (format === 'paragraph') {
+      const pText = sec?.paragraphText ?? ((sec?.bullets || []).join(' ') || 'Add continuous narrative statement...');
+      return (
+        <div
+          className={isSectionHovered ? styles.sectionHoverActive : ''}
+          style={{ ...mergedStyles, width: '100%', paddingLeft: isPP || isGerman ? '0' : '8px' }}
+          onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
+          onMouseLeave={() => setHoveredSectionId(null)}
+        >
+          <AutoSizeTextarea
+            value={pText}
+            onChange={(val) => {
+              setSections(prev => prev.map(s => s.id === unit.sectionId ? { ...s, paragraphText: val } : s));
+            }}
+          />
+        </div>
+      );
+    }
+
+    // 9D. Default Bullet Points List
+    const bullets = sec?.bullets || unit.bullets || ['Add detail or credential...'];
+    return (
+      <div
+        className={isSectionHovered ? styles.sectionHoverActive : ''}
+        style={mergedStyles}
+        onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
+        onMouseLeave={() => setHoveredSectionId(null)}
+      >
+        <ul className={styles.bulletsList}>
+          {bullets.map((bullet: string, bulletIdx: number) => (
+            <li key={bulletIdx} className={styles.bulletItem} style={{ position: 'relative' }}>
+              <span className={styles.bulletDot}>•</span>
+              <div className={styles.bulletContent}>
+                <AutoSizeTextarea
+                  value={bullet}
+                  onChange={(val) => {
+                    setSections(prev => prev.map(s => {
+                      if (s.id === unit.sectionId) {
+                        const updated = [...(s.bullets || [])];
+                        updated[bulletIdx] = val;
+                        return { ...s, bullets: updated };
+                      }
+                      return s;
+                    }));
+                  }}
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
   }
 
   return null;

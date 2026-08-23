@@ -25,8 +25,14 @@ export const HeaderSettingsPopover: React.FC<HeaderSettingsPopoverProps> = ({
     window.dispatchEvent(new Event('cv-style-change'));
   };
 
-  const topPos = popoverPosition ? Math.max(60, Math.min(window.innerHeight - 480, popoverPosition.top - 10)) : 100;
-  const leftPos = popoverPosition ? Math.max(16, popoverPosition.left - 305) : 100;
+  const popoverWidth = 290;
+  const popoverHeight = 460;
+  const leftPos = popoverPosition
+    ? Math.min(Math.max(340, popoverPosition.left + 35), (typeof window !== 'undefined' ? window.innerWidth : 1200) - popoverWidth - 16)
+    : 340;
+  const topPos = popoverPosition
+    ? Math.min(Math.max(60, popoverPosition.top - 10), (typeof window !== 'undefined' ? window.innerHeight : 800) - popoverHeight - 16)
+    : 100;
 
   return createPortal(
     <div
@@ -137,41 +143,6 @@ export const HeaderSettingsPopover: React.FC<HeaderSettingsPopoverProps> = ({
               onChange={(e) => updateHeaderStyle('titleColor', e.target.value)}
             />
           </div>
-        </div>
-
-        <div className={styles.popoverToggles}>
-          <button
-            type="button"
-            className={`${styles.popoverToggleBtn} ${headerStyles.nameWeight === 'normal' ? styles.popoverToggleBtnActive : ''}`}
-            onClick={() => updateHeaderStyle('nameWeight', headerStyles.nameWeight === 'normal' ? 'bold' : 'normal')}
-            title="Toggle Bold Name"
-          >
-            <strong>N-Bold</strong>
-          </button>
-          <button
-            type="button"
-            className={`${styles.popoverToggleBtn} ${headerStyles.nameStyle === 'italic' ? styles.popoverToggleBtnActive : ''}`}
-            onClick={() => updateHeaderStyle('nameStyle', headerStyles.nameStyle === 'italic' ? 'normal' : 'italic')}
-            title="Toggle Italic Name"
-          >
-            <em>N-Italic</em>
-          </button>
-          <button
-            type="button"
-            className={`${styles.popoverToggleBtn} ${headerStyles.titleWeight === 'bold' ? styles.popoverToggleBtnActive : ''}`}
-            onClick={() => updateHeaderStyle('titleWeight', headerStyles.titleWeight === 'bold' ? 'normal' : 'bold')}
-            title="Toggle Bold Title"
-          >
-            <strong>T-Bold</strong>
-          </button>
-          <button
-            type="button"
-            className={`${styles.popoverToggleBtn} ${headerStyles.titleStyle === 'italic' ? styles.popoverToggleBtnActive : ''}`}
-            onClick={() => updateHeaderStyle('titleStyle', headerStyles.titleStyle === 'italic' ? 'normal' : 'italic')}
-            title="Toggle Italic Title"
-          >
-            <em>T-Italic</em>
-          </button>
         </div>
 
         <div className={styles.popoverControlGroup} style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '4px' }}>

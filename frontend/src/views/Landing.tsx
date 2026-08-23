@@ -180,25 +180,25 @@ export const Landing: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#07070a] text-slate-100 flex flex-col font-sans overflow-x-hidden">
       {/* Top Header Bar */}
-      <header className="border-b border-white/5 bg-[#07070a]/90 backdrop-blur-md sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="bg-indigo-600 p-2 rounded-lg text-white shadow-lg shadow-indigo-600/30 animate-pulse">
+      <header className="border-b border-white/5 bg-[#07070a]/90 backdrop-blur-md sticky top-0 z-50 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="bg-indigo-600 p-1.5 sm:p-2 rounded-lg text-white shadow-lg shadow-indigo-600/30 shrink-0">
             <Command size={18} />
           </div>
-          <span className="font-bold text-lg tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400">
+          <span className="font-bold text-base sm:text-lg tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400 truncate">
             LebenslaufAI
           </span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
           <button
             onClick={() => navigateTo('login')}
-            className="text-slate-400 hover:text-white text-sm font-medium transition-colors"
+            className="text-slate-400 hover:text-white text-xs sm:text-sm font-medium transition-colors whitespace-nowrap"
           >
             Sign In
           </button>
           <button
             onClick={() => navigateTo('register')}
-            className="bg-white hover:bg-slate-100 text-slate-900 text-sm font-semibold px-4 py-2 rounded-lg transition-all shadow-md shadow-white/5"
+            className="bg-white hover:bg-slate-100 text-slate-900 text-xs sm:text-sm font-semibold px-3 py-2 sm:px-4 rounded-lg transition-all shadow-md shadow-white/5 whitespace-nowrap"
           >
             Launch Workspace
           </button>
@@ -208,7 +208,7 @@ export const Landing: React.FC = () => {
       {/* Main Grid Workspace */}
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-hidden">
         {/* Left Control Panel */}
-        <section className="lg:col-span-5 p-8 lg:p-12 flex flex-col justify-between border-r border-white/5 bg-[#09090d] overflow-y-auto">
+        <section className="lg:col-span-5 p-5 sm:p-8 lg:p-12 flex flex-col justify-between border-r border-white/5 bg-[#09090d] overflow-y-auto">
           <div>
             {/* Title Brand & Motto */}
             <div className="mb-8">
@@ -314,7 +314,7 @@ export const Landing: React.FC = () => {
                 </div>
                 <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden border border-white/5">
                   <div
-                    className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-amber-400 transition-all duration-500 rounded-full"
+                    className="h-full bg-indigo-500 transition-all duration-500 rounded-full"
                     style={{ width: `${atsScore}%` }}
                   />
                 </div>
@@ -329,7 +329,7 @@ export const Landing: React.FC = () => {
           <div className="pt-6 border-t border-white/5">
             <button
               onClick={() => navigateTo('register')}
-              className="w-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:opacity-95 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-xl shadow-indigo-600/10 flex items-center justify-center gap-2 group text-base"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 group text-base"
             >
               Start Tailoring Your CV
               <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
@@ -341,9 +341,9 @@ export const Landing: React.FC = () => {
         </section>
 
         {/* Right Preview Sheet Pane */}
-        <section className="lg:col-span-7 p-6 lg:p-12 bg-[#050508] flex items-center justify-center overflow-y-auto">
+        <section className="lg:col-span-7 p-4 sm:p-6 lg:p-12 bg-[#050508] flex items-center justify-center overflow-y-auto">
           {/* Mock CV Paper */}
-          <div className="w-full max-w-[700px] bg-white text-slate-800 p-8 lg:p-12 rounded-xl shadow-2xl border border-slate-200/80 font-serif leading-relaxed animate-fade-in relative">
+          <div className="w-full max-w-[700px] bg-white text-slate-800 p-5 sm:p-8 lg:p-12 rounded-xl shadow-2xl border border-slate-200/80 font-serif leading-relaxed animate-fade-in relative">
             
             {/* Real-time indicator flag */}
             <div className="absolute top-4 right-4 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded border border-indigo-100 flex items-center gap-1">

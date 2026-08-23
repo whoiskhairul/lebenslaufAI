@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Mail, Lock, ShieldCheck } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { apiClient } from '../../api/apiClient';
@@ -159,7 +159,7 @@ export const LoginPage: React.FC = () => {
                   <input
                     type="password"
                     className={styles.authInput}
-                    placeholder="••••••••••••"
+                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -176,7 +176,7 @@ export const LoginPage: React.FC = () => {
                   />
                   Remember this device
                 </label>
-                <a href="/reset-password" onClick={(e) => navigateTo('/reset-password', e)} style={{ color: '#a78bfa', textDecoration: 'none' }}>
+                <a href="/reset-password" onClick={(e) => navigateTo('/reset-password', e)} style={{ color: '#818cf8', textDecoration: 'none' }}>
                   Forgot Password?
                 </a>
               </div>
