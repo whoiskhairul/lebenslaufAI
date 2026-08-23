@@ -4,9 +4,7 @@ import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { MasterProfileSkeleton } from '../components/skeleton/MasterProfileSkeleton';
-import {
-  User, Briefcase, FolderGit2, Dumbbell, GraduationCap, Award, Trash2, Plus, Edit3, Check, X, Upload, Brain, Wand2, Sparkles, Lock, AlertCircle, ChevronLeft, ChevronRight
-} from 'lucide-react';
+import { User, Briefcase, FolderGit2, Dumbbell, GraduationCap, Trash2, Plus, Edit3, Check, X, Upload, Brain, Wand2, Sparkles, Lock, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import styles from './MasterProfile.module.css';
 import { Toast } from '../components/Toast';
 

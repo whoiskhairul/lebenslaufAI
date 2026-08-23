@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Briefcase, Plus, Trash, ArrowUp, ArrowDown, Sparkles, MapPin, Calendar, Check,
-  ChevronDown, ChevronUp, Layers
-} from 'lucide-react';
+import { Briefcase, Plus, Trash, ArrowUp, ArrowDown, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import { parseDate } from '../../utils/dateUtils';
 import styles from '../../../EditorNew.module.css';
 

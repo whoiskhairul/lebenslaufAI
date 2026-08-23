@@ -1,7 +1,5 @@
 import React from 'react';
-import {
-  Layers, Plus, Trash, ArrowUp, ArrowDown, Sparkles, List, Columns2, Briefcase, AlignLeft
-} from 'lucide-react';
+import { Plus, Trash, ArrowUp, ArrowDown, Sparkles, List, Columns2, Briefcase, AlignLeft } from 'lucide-react';
 import styles from '../../../EditorNew.module.css';
 
 export interface CustomSectionEntry {

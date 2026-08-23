@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { ArrowRight, Github, Linkedin, Twitter, Sparkles } from 'lucide-react';
 import { navigateTo } from '../../utils/navigation';
 import styles from './Footer.module.css';
@@ -76,7 +76,7 @@ export const Footer: React.FC = () => {
         </div>
 
         <div className={styles.bottomBar}>
-          <div>Â© {new Date().getFullYear()} Lebenslauf AI Inc. All rights reserved.</div>
+          <div>© {new Date().getFullYear()} Lebenslauf AI Inc. All rights reserved.</div>
           <div>Crafted with precision for modern job seekers.</div>
         </div>
       </div>

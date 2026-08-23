@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import {
-  ArrowLeft, Settings, Sliders, ChevronDown, ChevronUp, Sparkles, RotateCcw,
-  User, FileText, Briefcase, Code, GraduationCap, Globe, Layers, Eye, EyeOff
-} from 'lucide-react';
+import { ArrowLeft, Sliders, Sparkles, RotateCcw, User, FileText, Briefcase, Code, GraduationCap, Globe, Layers, Eye, EyeOff } from 'lucide-react';
 import styles from '../../../EditorNew.module.css';
 
 import { HeaderEditor } from './HeaderEditor';

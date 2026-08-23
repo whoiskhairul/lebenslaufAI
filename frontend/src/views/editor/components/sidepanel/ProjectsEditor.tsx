@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Code, Plus, Trash, ArrowUp, ArrowDown, Sparkles, ExternalLink, Calendar,
-  ChevronDown, ChevronUp
-} from 'lucide-react';
+import { Code, Plus, Trash, ArrowUp, ArrowDown, ExternalLink, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import styles from '../../../EditorNew.module.css';
 
 export interface ProjectItem {

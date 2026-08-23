@@ -57,7 +57,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
         </button>
         <div className={styles.logoContainer}>
           <span className={styles.logoIcon}>📄</span>
-          <h1 className={styles.logoText}>ResumeAI</h1>
+          <h1 className={styles.logoText}>LebenslaufAI</h1>
         </div>
         <button className={styles.themeBtn} onClick={toggleTheme} aria-label="Toggle theme">
           {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
@@ -80,7 +80,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
 
           <div className={styles.sidebarLogo}>
             <span className={styles.logoIconLarge}>📄</span>
-            <span className={styles.logoTitle}>ResumeAI</span>
+            <span className={styles.logoTitle}>LebenslaufAI</span>
           </div>
 
           <nav className={styles.nav}>

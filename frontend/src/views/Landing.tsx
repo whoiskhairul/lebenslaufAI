@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, Globe, Sparkles, CheckCircle2, Command, FileText, Code2, Briefcase } from 'lucide-react';
+import { ArrowRight, Globe, Sparkles, CheckCircle2, Command, Code2, Briefcase } from 'lucide-react';
 import { navigateTo } from '../utils/navigation';
 
 interface Preset {

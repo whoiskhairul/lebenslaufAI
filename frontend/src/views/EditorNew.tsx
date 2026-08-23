@@ -1,13 +1,11 @@
-﻿import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Toast } from '../components/Toast';
-import {
-  Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Brain, Award, Save, RefreshCw, GripVertical, Trash, Plus, Settings, ArrowUp, ArrowDown, Maximize2, Minimize2, LayoutGrid, Layers, Sliders, ChevronUp, ChevronDown, User, Briefcase, Code, GraduationCap, Globe, Eye, EyeOff, RotateCcw
-} from 'lucide-react';
+import { Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Brain, Save, RefreshCw, Trash, Plus, Settings, Minimize2, LayoutGrid, Layers, Sliders, User, Briefcase, Code, GraduationCap, Globe, Eye, EyeOff, RotateCcw } from 'lucide-react';
 import styles from './EditorNew.module.css';
 
 import { ATSDashboard, ATSReport, Proposal } from '../components/ATSDashboard';
@@ -75,7 +73,7 @@ const getParsedLetter = (content: string, editablePersonalInfo: any): ParsedLett
       subject: '',
       salutation: '',
       body: '',
-      closing_salutation: 'Mit freundlichen GrÃ¼ÃŸen',
+      closing_salutation: 'Mit freundlichen Grüßen',
       candidate_name: editablePersonalInfo.full_name || '',
       is_json: false
     };
@@ -116,12 +114,12 @@ const getParsedLetter = (content: string, editablePersonalInfo: any): ParsedLett
     'sincerely',
     'best regards',
     'kind regards',
-    'viele grÃ¼ÃŸe',
-    'freundliche grÃ¼ÃŸe',
+    'viele grüße',
+    'freundliche grüße',
     'hochachtungsvoll',
     'yours truly',
     'mit besten',
-    'grÃ¼ÃŸe'
+    'grüße'
   ];
   for (let i = lines.length - 1; i >= 0; i--) {
     const lineLower = lines[i].toLowerCase().trim();
@@ -161,7 +159,7 @@ const getParsedLetter = (content: string, editablePersonalInfo: any): ParsedLett
     subject: '',
     salutation: '',
     body: bodyText,
-    closing_salutation: closingText || 'Mit freundlichen GrÃ¼ÃŸen',
+    closing_salutation: closingText || 'Mit freundlichen Grüßen',
     candidate_name: nameText || editablePersonalInfo.full_name || '',
     is_json: false
   };
@@ -1072,6 +1070,15 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     window.dispatchEvent(new Event('cv-style-change'));
   }, [customStyles, sections, template]);
 
+  // Re-measure canvas fields when the preview pane becomes visible again on mobile —
+  // textareas measured while display:none collapse to zero height
+  useEffect(() => {
+    if (!isMobileViewport || mobileActivePane !== 'preview') return;
+    window.dispatchEvent(new Event('cv-style-change'));
+    const timer = setTimeout(() => window.dispatchEvent(new Event('cv-style-change')), 150);
+    return () => clearTimeout(timer);
+  }, [isMobileViewport, mobileActivePane]);
+
   const [masterProfileData, setMasterProfileData] = useState<any>(null);
 
   // Load master profile projects and info for tailoring selection & diagnostics
@@ -1436,7 +1443,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         (exp.bullets || []).forEach((bullet, bIdx) => {
           options.push({
             id: `bullet_${exp.id}_${bIdx}`,
-            label: `  â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+            label: `  ↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
           });
         });
       });
@@ -1450,7 +1457,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         (proj.bullets || []).forEach((bullet, bIdx) => {
           options.push({
             id: `bullet_${proj.id}_${bIdx}`,
-            label: `  â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+            label: `  ↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
           });
         });
       });
@@ -1464,7 +1471,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         (edu.bullets || []).forEach((bullet, bIdx) => {
           options.push({
             id: `bullet_${edu.id}_${bIdx}`,
-            label: `  â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+            label: `  ↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
           });
         });
       });
@@ -1472,7 +1479,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       (targetSec.bullets || []).forEach((bullet, bIdx) => {
         options.push({
           id: `bullet_${targetSec.id}_${bIdx}`,
-          label: `â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+          label: `↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
         });
       });
     }
@@ -1675,14 +1682,14 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       if (type === 'summary') {
         setEditableSummary(proposed);
       } else if (type === 'custom') {
-        const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter(Boolean);
+        const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
         setSections(prev => prev.map(s => s.id === sectionId ? { ...s, bullets } : s));
       } else if (type === 'experience') {
         const blocks = proposed.split('\n\n');
         setEditableExperiences(prev => prev.map((exp, idx) => {
           const block = blocks[idx] || blocks[0];
           if (!block) return exp;
-          const bullets = block.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter((b: string) => b && !b.toLowerCase().includes(' at '));
+          const bullets = block.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter((b: string) => b && !b.toLowerCase().includes(' at '));
           return bullets.length > 0 ? { ...exp, bullets } : exp;
         }));
       } else if (type === 'projects') {
@@ -1690,7 +1697,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         setEditableProjects(prev => prev.map((proj, idx) => {
           const block = blocks[idx] || blocks[0];
           if (!block) return proj;
-          const bullets = block.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter((b: string) => b && !b.includes('('));
+          const bullets = block.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter((b: string) => b && !b.includes('('));
           return bullets.length > 0 ? { ...proj, bullets } : proj;
         }));
       } else if (type === 'education') {
@@ -1698,13 +1705,13 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         setEditableEducations(prev => prev.map((edu, idx) => {
           const block = blocks[idx] || blocks[0];
           if (!block) return edu;
-          const bullets = block.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter((b: string) => b && !b.includes('-'));
+          const bullets = block.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter((b: string) => b && !b.includes('-'));
           return bullets.length > 0 ? { ...edu, bullets } : edu;
         }));
       }
     } else if (scope.startsWith('entry_')) {
       const itemId = scope.replace('entry_', '');
-      const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter(Boolean);
+      const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
       if (bullets.length > 0) {
         if (type === 'experience') {
           setEditableExperiences(prev => prev.map(e => e.id === itemId ? { ...e, bullets } : e));
@@ -1718,7 +1725,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       const parts = scope.replace('bullet_', '').split('_');
       const itemId = parts[0];
       const bulletIdx = parseInt(parts[1], 10);
-      const cleanBullet = proposed.trim().replace(/^[-â€¢*]\s*/, '');
+      const cleanBullet = proposed.trim().replace(/^[-•*]\s*/, '');
 
       if (cleanBullet) {
         if (type === 'experience') {
@@ -2087,7 +2094,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   useEffect(() => {
     const measureAndLayout = () => {
       if (!hiddenCanvasRef.current) return;
-      // Defer measurement while the canvas pane is hidden (mobile Editor mode) â€” zero-height reads would corrupt pagination
+      // Defer measurement while the canvas pane is hidden (mobile Editor mode) — zero-height reads would corrupt pagination
       if (hiddenCanvasRef.current.getBoundingClientRect().width === 0) return;
 
       // Create flat elements stream based on sections order and visible elements
@@ -2355,6 +2362,11 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         setCurrentVersion(ver);
         initializeVersionFields(ver);
         setApplicationTracked(!!ver.application);
+        // On mobile, bring the fresh result into view immediately
+        if (isMobileViewport && mobileActivePane === 'editor') {
+          setMobileActivePane('preview');
+        }
+        setEditorTab('resume');
       }
     } catch (err) {
       console.error('Tailoring failed:', err);
@@ -2419,6 +2431,11 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       });
       if (res.data && res.data.success) {
         setLetterContent(res.data.content || res.data.data?.content || '');
+        // On mobile, bring the fresh letter into view immediately
+        if (isMobileViewport && mobileActivePane === 'editor') {
+          setMobileActivePane('preview');
+        }
+        setEditorTab('letter');
       }
     } catch (err) {
       console.error('Letter generation failed:', err);
@@ -3768,7 +3785,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                               <span>Personal Info & Header</span>
                             </div>
                             <div className={styles.sectionCardSubtitle}>
-                              {editablePersonalInfo.full_name || 'Your name'} â€¢ {editablePersonalInfo.title || 'Headline & Contact'}
+                              {editablePersonalInfo.full_name || 'Your name'} • {editablePersonalInfo.title || 'Headline & Contact'}
                             </div>
                           </div>
                         </div>
@@ -3842,7 +3859,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                 icon: <Globe size={16} />,
                                 iconBg: 'rgba(236, 72, 153, 0.12)',
                                 iconColor: '#ec4899',
-                                subtitle: `${itCount} skills â€¢ ${langCount} languages`
+                                subtitle: `${itCount} skills • ${langCount} languages`
                               };
                             }
                             const count = secItem.customFormat === 'keyvalue' ? (secItem.keyValuePairs?.length || 0) : (secItem.bullets?.length || 0);
@@ -3955,7 +3972,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                     }}
                                     title="Move Up"
                                   >
-                                    â–²
+                                    ▲
                                   </button>
                                   <button
                                     type="button"
@@ -3970,7 +3987,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                     }}
                                     title="Move Down"
                                   >
-                                    â–¼
+                                    ▼
                                   </button>
                                 </div>
                               </div>
@@ -4064,7 +4081,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                         boxSizing: 'border-box'
                       }}
                     >
-                      A4 (210mm Ã— 297mm)
+                      A4 (210mm × 297mm)
                     </div>
                   </div>
 

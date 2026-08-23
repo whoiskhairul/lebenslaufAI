@@ -6,9 +6,7 @@ import { formatPhoneNumber } from '../utils/phoneUtils';
 import { AutoSizeTextarea } from './AutoSizeTextarea';
 import { HeaderSettingsPopover } from './HeaderSettingsPopover';
 import { SectionSettingsPopover } from './SectionSettingsPopover';
-import {
-  Settings, ChevronUp, ChevronDown, Plus, Sparkles, X, ArrowUp, ArrowDown, Trash, EyeOff, RotateCcw
-} from 'lucide-react';
+import { Settings, ChevronUp, ChevronDown, Plus, Sparkles, X, EyeOff, RotateCcw } from 'lucide-react';
 import styles from '../../EditorNew.module.css';
 
 const ensureAbsoluteUrl = (url: string) => {
