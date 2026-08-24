@@ -4,9 +4,7 @@ import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { SettingsSkeleton } from '../components/skeleton/SettingsSkeleton';
-import {
-  User as UserIcon, Shield, Key, Moon, Sun, Eye, EyeOff, Sparkles, CheckCircle2, AlertTriangle, Lock, LogOut, Laptop, Check, Image, Trash2, Link
-} from 'lucide-react';
+import { User as UserIcon, Shield, Key, Moon, Sun, Eye, EyeOff, Sparkles, CheckCircle2, AlertTriangle, LogOut, Laptop, Check, Trash2 } from 'lucide-react';
 import styles from './Settings.module.css';
 
 export const Settings: React.FC = () => {
@@ -464,7 +462,7 @@ export const Settings: React.FC = () => {
                   <div className={styles.infoBox}>
                     <Sparkles size={16} className={styles.infoIcon} />
                     <p>
-                      If no API key is specified, ResumeAI falls back to our realistic local AI Engine mock mode.
+                      If no API key is specified, LebenslaufAI falls back to our realistic local AI Engine mock mode.
                     </p>
                   </div>
 

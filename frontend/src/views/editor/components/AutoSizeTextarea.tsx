@@ -64,15 +64,17 @@ export const AutoSizeTextarea: React.FC<AutoSizeTextareaProps> = ({
   }, [autoFocus]);
 
   const adjustHeight = () => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight + 2}px`;
-      if (singleLine) {
-        textareaRef.current.style.width = '0px';
-        const hasVal = Boolean(localVal || value);
-        const minW = hasVal ? 5 : 30;
-        textareaRef.current.style.width = `${Math.max(minW, textareaRef.current.scrollWidth + 6)}px`;
-      }
+    const el = textareaRef.current;
+    if (!el) return;
+    // Never measure while hidden (display:none) — zero-height reads collapse the field
+    if (el.getBoundingClientRect().width === 0) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight + 2}px`;
+    if (singleLine) {
+      el.style.width = '0px';
+      const hasVal = Boolean(localVal || value);
+      const minW = hasVal ? 5 : 30;
+      el.style.width = `${Math.max(minW, el.scrollWidth + 6)}px`;
     }
   };
 

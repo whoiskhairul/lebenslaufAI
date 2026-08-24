@@ -65,6 +65,14 @@ export const App: React.FC = () => {
     }
   };
 
+  // Stable identity: Editor refetches everything when this object changes,
+  // so it must only change when the actual route params change.
+  // NOTE: must stay ABOVE the early returns — hooks cannot be conditional.
+  const initialJobParams = useMemo(
+    () => ({ application_id: routeParams.appId, tab: routeParams.tab }),
+    [routeParams.appId, routeParams.tab]
+  );
+
   // 1. Unauthenticated Route Resolution
   if (!isAuthenticated) {
     if (currentPath === 'login') return <LoginPage />;
@@ -75,13 +83,6 @@ export const App: React.FC = () => {
   // 2. Authenticated Route Resolution (Normalize invalid or auth paths to 'dashboard')
   const validAuthenticatedViews = ['dashboard', 'master-profile', 'editor', 'security', 'settings'];
   const activeView = validAuthenticatedViews.includes(currentPath) ? currentPath : 'dashboard';
-
-  // Stable identity: Editor refetches everything when this object changes,
-  // so it must only change when the actual route params change
-  const initialJobParams = useMemo(
-    () => ({ application_id: routeParams.appId, tab: routeParams.tab }),
-    [routeParams.appId, routeParams.tab]
-  );
 
   return (
     <AppShell activeView={activeView} onNavigate={(view) => navigateTo(view)}>

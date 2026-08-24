@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Code, Globe, Plus, Trash, ArrowUp, ArrowDown, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Layers
-} from 'lucide-react';
+import { Code, Globe, Plus, Trash, ArrowUp, ArrowDown, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import styles from '../../../EditorNew.module.css';
 
 export interface SkillItem {

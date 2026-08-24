@@ -5,9 +5,7 @@ import api from '../services/api';
 import { navigateTo } from '../utils/navigation';
 import { KanbanCardSkeleton } from '../components/skeleton/DashboardSkeleton';
 import { Skeleton } from '../components/skeleton/Skeleton';
-import {
-  Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, ExternalLink, ShieldAlert, Sparkles, CheckSquare, Info, FileText
-} from 'lucide-react';
+import { Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, ExternalLink, Sparkles, Info, FileText } from 'lucide-react';
 import styles from './Dashboard.module.css';
 
 
@@ -274,6 +272,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
               <div
                 key={col.id}
                 className={`${styles.column} ${dragOverCol === col.id ? styles.columnDragOver : ''}`}
+                style={{ '--col-accent': col.color } as React.CSSProperties}
                 onDragOver={(e) => {
                   e.preventDefault();
                   if (dragOverCol !== col.id) {

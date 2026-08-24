@@ -59,7 +59,6 @@ interface AuthState {
   setTwoFactorRequired: (required: boolean, email?: string) => void;
   logout: () => void;
   setTheme: (theme: 'light' | 'dark') => void;
-  setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebarCollapsed: () => void;
   setMobileActivePane: (pane: 'preview' | 'editor') => void;
   initAuth: () => void;
@@ -181,13 +180,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('app_theme', theme);
     set({ theme });
-  },
-
-  setSidebarCollapsed: (collapsed: boolean) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('sidebar_collapsed', String(collapsed));
-    }
-    set({ sidebarCollapsed: collapsed });
   },
 
   toggleSidebarCollapsed: () => {

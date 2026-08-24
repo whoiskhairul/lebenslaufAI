@@ -1,5 +1,5 @@
-﻿import React, { useEffect, useState } from 'react';
-import { ShieldCheck, Smartphone, Laptop, Trash2, Key, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ShieldCheck, Laptop, Trash2, Key } from 'lucide-react';
 import { apiClient } from '../../api/apiClient';
 import { useAuthStore, UserSession } from '../../store/authStore';
 import styles from './AuthPages.module.css';
@@ -174,7 +174,7 @@ export const AccountSecurityPage: React.FC = () => {
                   {s.device_info || 'Web Session'} {s.is_current && <span style={{ color: '#60a5fa', fontSize: '0.75rem', marginLeft: '0.5rem' }}>(Current Device)</span>}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.2rem' }}>
-                  IP: {s.ip_address || '127.0.0.1'} â€¢ Last active: {new Date(s.last_activity).toLocaleString()}
+                  IP: {s.ip_address || '127.0.0.1'} • Last active: {new Date(s.last_activity).toLocaleString()}
                 </div>
               </div>
               {!s.is_current && (
