@@ -748,28 +748,43 @@
 
 .canvasTabs {
   display: flex;
-  gap: var(--space-2);
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: var(--muted-light);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.canvasTabs::-webkit-scrollbar {
+  display: none;
 }
 
 .canvasTabBtn {
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  padding: 0.45rem 0.9rem;
+  border-radius: calc(var(--radius-md) - 3px);
   font-family: var(--font-headers);
   font-weight: 600;
   font-size: var(--text-sm);
   color: var(--muted);
+  white-space: nowrap;
   transition: all var(--transition-fast);
   cursor: pointer;
 }
 
 .canvasTabBtn:hover {
-  background: var(--muted-light);
+  background: var(--card-bg, rgba(255, 255, 255, 0.6));
   color: var(--foreground);
 }
 
 .canvasTabBtn.activeCanvasTab {
-  background: rgba(99, 102, 241, 0.08);
-  color: var(--primary);
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
 }
 
 .exportActions {
@@ -5059,41 +5074,34 @@
   }
 
   .canvasTabs {
-    width: 100%;
+    flex: 1 1 100%;
+    max-width: none;
   }
 
   .canvasTabBtn {
-    flex: 1;
+    flex: 1 0 auto;
     text-align: center;
-    white-space: nowrap;
+    padding: 0.4rem 0.8rem;
+    font-size: 12.5px;
   }
 
-  /* Compact, symmetric Save / Download action row */
+  /* Compact Save / Download action row */
   .exportActions {
-    width: 100%;
-    gap: 8px;
+    width: auto;
+    margin-left: auto;
+    gap: 6px;
   }
 
   .exportActions > button,
   .exportActions > div {
-    flex: 1 1 0;
+    flex: 0 1 auto;
     min-width: 0;
-  }
-
-  .exportActions > div {
-    display: flex;
-  }
-
-  .exportActions > div > button {
-    flex: 1;
-    width: 100%;
-    min-width: 0;
-    justify-content: center;
   }
 
   .exportActions button {
-    padding: 9px 12px;
-    font-size: 13px;
+    padding: 7px 10px;
+    font-size: 12.5px;
+    gap: 5px;
     white-space: nowrap;
   }
 

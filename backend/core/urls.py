@@ -9,6 +9,7 @@ urlpatterns = [
     path('api/v1/master-profile/', include('master_profile.urls')),
     path('api/v1/resume/', include('resume.urls')),
     path('api/v1/', include('applications.urls')),
+    path('api/v1/admin/', include('admin_panel.urls')),
 ]
 
 

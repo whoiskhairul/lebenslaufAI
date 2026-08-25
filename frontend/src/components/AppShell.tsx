@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuthStore } from '../store/authStore';
 import {
-  LayoutDashboard, UserCircle, Wand2, Settings as SettingsIcon, LogOut, Sun, Moon, Eye, Sliders, ChevronLeft, ChevronRight
+  LayoutDashboard, UserCircle, Wand2, Settings as SettingsIcon, LogOut, Sun, Moon, Eye, Sliders, ChevronLeft, ChevronRight, ShieldCheck
 } from 'lucide-react';
 import styles from './AppShell.module.css';
 
@@ -25,10 +25,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
     { id: 'master-profile', label: 'Profile', icon: UserCircle },
     { id: 'editor', label: 'Tailor', icon: Wand2 },
     { id: 'settings', label: 'Settings', icon: SettingsIcon },
+    ...(user?.is_staff || user?.is_superuser
+      ? [{ id: 'admin', label: 'Admin', icon: ShieldCheck }]
+      : []),
   ];
 
-  const leftNavItems = navItems.slice(0, 2);
-  const rightNavItems = navItems.slice(2);
+  const leftNavItems = navItems.slice(0, Math.ceil(navItems.length / 2));
+  const rightNavItems = navItems.slice(Math.ceil(navItems.length / 2));
   const showPaneSwitcher = activeView === 'editor';
 
   const renderNavItem = (item: { id: string; label: string; icon: typeof LayoutDashboard }) => {
@@ -52,15 +55,15 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
     <div className={styles.container}>
       {/* Mobile Top Bar */}
       <header className={`${styles.header} no-print`}>
-        <button className={styles.logoutIconBtn} onClick={logout} aria-label="Logout" title="Logout">
-          <LogOut size={20} />
+        <button className={styles.themeBtn} onClick={toggleTheme} aria-label="Toggle theme">
+          {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
         </button>
         <div className={styles.logoContainer}>
           <span className={styles.logoIcon}>📄</span>
           <h1 className={styles.logoText}>LebenslaufAI</h1>
         </div>
-        <button className={styles.themeBtn} onClick={toggleTheme} aria-label="Toggle theme">
-          {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+        <button className={styles.logoutIconBtn} onClick={logout} aria-label="Logout" title="Logout">
+          <LogOut size={20} />
         </button>
       </header>
 
@@ -134,22 +137,22 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
             <button
               type="button"
               tabIndex={showPaneSwitcher ? 0 : -1}
-              className={`${styles.mobilePaneBtn} ${mobileActivePane === 'preview' ? styles.mobilePaneBtnActive : ''}`}
-              onClick={() => setMobileActivePane('preview')}
-              aria-label="Show CV canvas"
-            >
-              <Eye size={15} />
-              <span>Canvas</span>
-            </button>
-            <button
-              type="button"
-              tabIndex={showPaneSwitcher ? 0 : -1}
               className={`${styles.mobilePaneBtn} ${mobileActivePane === 'editor' ? styles.mobilePaneBtnActive : ''}`}
               onClick={() => setMobileActivePane('editor')}
               aria-label="Show editor controls"
             >
               <Sliders size={15} />
               <span>Editor</span>
+            </button>
+            <button
+              type="button"
+              tabIndex={showPaneSwitcher ? 0 : -1}
+              className={`${styles.mobilePaneBtn} ${mobileActivePane === 'preview' ? styles.mobilePaneBtnActive : ''}`}
+              onClick={() => setMobileActivePane('preview')}
+              aria-label="Show CV canvas"
+            >
+              <Eye size={15} />
+              <span>Canvas</span>
             </button>
           </div>
         </div>

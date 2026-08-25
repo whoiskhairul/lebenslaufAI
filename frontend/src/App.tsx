@@ -6,6 +6,7 @@ import { Dashboard } from './views/Dashboard';
 import { MasterProfile } from './views/MasterProfile';
 import { Editor } from './views/EditorNew';
 import { Settings } from './views/Settings';
+import { AdminPanel } from './views/AdminPanel';
 import { LoginPage } from './views/auth/LoginPage';
 import { RegisterPage } from './views/auth/RegisterPage';
 import { AccountSecurityPage } from './views/auth/AccountSecurityPage';
@@ -81,8 +82,12 @@ export const App: React.FC = () => {
   }
 
   // 2. Authenticated Route Resolution (Normalize invalid or auth paths to 'dashboard')
-  const validAuthenticatedViews = ['dashboard', 'master-profile', 'editor', 'security', 'settings'];
-  const activeView = validAuthenticatedViews.includes(currentPath) ? currentPath : 'dashboard';
+  const user = useAuthStore.getState().user;
+  const isAdmin = !!user?.is_staff || !!user?.is_superuser;
+  const validAuthenticatedViews = ['dashboard', 'master-profile', 'editor', 'security', 'settings', 'admin'];
+  const normalizedPath =
+    currentPath === 'admin' && !isAdmin ? 'dashboard' : currentPath;
+  const activeView = validAuthenticatedViews.includes(normalizedPath) ? normalizedPath : 'dashboard';
 
   return (
     <AppShell activeView={activeView} onNavigate={(view) => navigateTo(view)}>
@@ -95,6 +100,7 @@ export const App: React.FC = () => {
       )}
       {activeView === 'security' && <AccountSecurityPage />}
       {activeView === 'settings' && <Settings />}
+      {activeView === 'admin' && isAdmin && <AdminPanel />}
     </AppShell>
   );
 };

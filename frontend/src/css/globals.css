@@ -156,3 +156,11 @@ button {
     width: 100% !important;
   }
 }
+/* Thin scrollbar utility (WebKit pseudo-elements are not expressible in Tailwind) */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--card-border);
+  border-radius: 9999px;
+}

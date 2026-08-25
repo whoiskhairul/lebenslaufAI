@@ -6,7 +6,18 @@ import { navigateTo } from '../utils/navigation';
 import { KanbanCardSkeleton } from '../components/skeleton/DashboardSkeleton';
 import { Skeleton } from '../components/skeleton/Skeleton';
 import { Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, ExternalLink, Sparkles, Info, FileText } from 'lucide-react';
-import styles from './Dashboard.module.css';
+
+// Shared utility class strings for the kanban icon buttons
+const iconBtnBase = 'w-[26px] h-[26px] rounded-md flex items-center justify-center text-muted transition-colors';
+const fieldLabelCls = 'font-header text-xs font-bold uppercase tracking-wide text-muted';
+
+// Truncate long job titles to keep kanban cards compact (full text on hover / click)
+const TITLE_MAX_WORDS = 6;
+const truncateTitle = (text: string): { display: string; truncated: boolean } => {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= TITLE_MAX_WORDS) return { display: text, truncated: false };
+  return { display: words.slice(0, TITLE_MAX_WORDS).join(' ') + ' …', truncated: true };
+};
 
 
 interface Application {
@@ -42,6 +53,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
   // Selected Card Details Sidebar State
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  // Job titles expanded in place (kanban cards)
+  const [expandedTitles, setExpandedTitles] = useState<Record<string, boolean>>({});
 
   // Form Fields
   const [company, setCompany] = useState('');
@@ -216,30 +230,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
   ] as const;
 
   return (
-    <div className={styles.container}>
+    <div className="flex flex-col h-full">
       {/* Top Banner Row - Renders immediately! */}
-      <div className={styles.headerRow}>
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-4 md:mb-6 shrink-0">
         <div>
-          <h2 className={styles.title}>Career Command Center</h2>
-          <p className={styles.subtitle}>Track applications, verify conversions, and launch tailoring tasks.</p>
+          <h2 className="font-header text-xl md:text-2xl font-extrabold text-foreground">Career Command Center</h2>
+          <p className="text-xs md:text-sm text-muted">Track applications, verify conversions, and launch tailoring tasks.</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)} className={styles.newBtn}>
+        <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 justify-center">
           <Plus size={18} />
           <span>Track Application</span>
         </Button>
       </div>
 
       {/* Analytics Panel - Values show inline skeleton while loading */}
-      <div className={styles.metricsGrid}>
-        <div className={`${styles.metricCard} glass-card`}>
-          <p className={styles.metricLabel}>Total Applications</p>
-          <p className={styles.metricVal}>
+      <div className="grid grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 md:gap-4 mb-6 md:mb-8 shrink-0">
+        <div className="glass-card px-4 py-3 md:px-6 md:py-4 text-left">
+          <p className={fieldLabelCls}>Total Applications</p>
+          <p className="font-header text-lg md:text-2xl font-extrabold text-foreground">
             {isInitialLoading ? <Skeleton variant="text" width={40} height={28} /> : totalApps}
           </p>
         </div>
-        <div className={`${styles.metricCard} glass-card`}>
-          <p className={styles.metricLabel}>Average Match Score</p>
-          <p className={styles.metricVal}>
+        <div className="glass-card px-4 py-3 md:px-6 md:py-4 text-left">
+          <p className={fieldLabelCls}>Average Match Score</p>
+          <p className="font-header text-lg md:text-2xl font-extrabold text-foreground">
             {isInitialLoading ? (
               <Skeleton variant="text" width={55} height={28} />
             ) : avgMatchScore === '--' ? (
@@ -249,30 +263,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
             )}
           </p>
         </div>
-        <div className={`${styles.metricCard} glass-card`}>
-          <p className={styles.metricLabel}>Upcoming Interviews</p>
-          <p className={styles.metricVal}>
+        <div className="glass-card px-4 py-3 md:px-6 md:py-4 text-left">
+          <p className={fieldLabelCls}>Upcoming Interviews</p>
+          <p className="font-header text-lg md:text-2xl font-extrabold text-foreground">
             {isInitialLoading ? <Skeleton variant="text" width={40} height={28} /> : interviewApps}
           </p>
         </div>
-        <div className={`${styles.metricCard} glass-card`}>
-          <p className={styles.metricLabel}>Conversion Rate</p>
-          <p className={styles.metricVal}>
+        <div className="glass-card px-4 py-3 md:px-6 md:py-4 text-left">
+          <p className={fieldLabelCls}>Conversion Rate</p>
+          <p className="font-header text-lg md:text-2xl font-extrabold text-foreground">
             {isInitialLoading ? <Skeleton variant="text" width={50} height={28} /> : `${conversionRate}%`}
           </p>
         </div>
       </div>
 
       {/* Kanban Board Container - Board layout & headers render immediately */}
-      <div className={styles.boardScroll}>
-        <div className={styles.board}>
+      <div className="flex-1 overflow-x-auto overflow-y-hidden p-1 pb-4 snap-x snap-proximity md:snap-none thin-scrollbar">
+        <div className="flex gap-3.5 h-full min-w-[1000px]">
           {columns.map((col) => {
             const colApps = applications.filter((app) => app.status === col.id);
+            const isDragOver = dragOverCol === col.id;
             return (
               <div
                 key={col.id}
-                className={`${styles.column} ${dragOverCol === col.id ? styles.columnDragOver : ''}`}
                 style={{ '--col-accent': col.color } as React.CSSProperties}
+                className={`relative overflow-hidden flex-1 flex flex-col bg-card border border-cardline rounded-[14px] p-3 min-w-[240px] h-full transition-all duration-200
+                  before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-[3px] before:bg-[var(--col-accent,var(--primary))] before:opacity-85
+                  ${isDragOver ? 'border-[var(--col-accent,var(--primary))] shadow-[0_0_0_2px_var(--col-accent,var(--primary))] scale-[1.01]' : ''}`}
                 onDragOver={(e) => {
                   e.preventDefault();
                   if (dragOverCol !== col.id) {
@@ -285,31 +302,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                   setDragOverCol(null);
                 }}
               >
-                <div className={styles.columnHeader} style={{ borderColor: col.color }}>
-                  <div className={styles.columnLabel}>
-                    <span className={styles.dot} style={{ backgroundColor: col.color }}></span>
-                    <h3>{col.label}</h3>
+                <div className="flex justify-between items-center mb-3 pb-2 border-b border-cardline shrink-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-[var(--col-accent,var(--primary))] shadow-[0_0_6px_var(--col-accent,transparent)] shrink-0"></span>
+                    <h3 className="font-header text-sm font-bold text-foreground truncate">{col.label}</h3>
                   </div>
-                  <span className={styles.countBadge}>
+                  <span className="text-xs font-bold text-muted bg-mutedlight px-2 py-0.5 rounded-full shrink-0">
                     {isInitialLoading ? <Skeleton variant="text" width={16} height={14} /> : colApps.length}
                   </span>
                 </div>
 
-                <div className={styles.cardsContainer}>
+                <div className="flex-1 flex flex-col gap-2.5 overflow-y-auto px-0.5 pb-1.5 thin-scrollbar">
                   {isInitialLoading ? (
                     <>
                       <KanbanCardSkeleton />
                       <KanbanCardSkeleton />
                     </>
                   ) : colApps.length === 0 ? (
-                    <div className={styles.emptyState}>No items</div>
+                    <div className="flex justify-center items-center h-[72px] text-muted text-xs border-[1.5px] border-dashed border-cardline rounded-[10px] opacity-80">No items</div>
                   ) : (
                     colApps.map((app) => {
                       const score = atsScores[app.id];
                       return (
                         <div
                           key={app.id}
-                          className={`${styles.card} glass-card`}
                           draggable
                           onDragStart={(e) => handleDragStart(e, app.id)}
                           onClick={() => {
@@ -317,51 +333,66 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                             setIsDetailsOpen(true);
                             navigateTo(`/dashboard?appId=${app.id}`);
                           }}
-                          style={{ cursor: 'pointer' }}
+                          className="px-4 py-3 text-left flex flex-col bg-card border border-cardline rounded-xl shadow-sm animate-cardSlideIn cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--col-accent,var(--primary))] active:scale-[0.98]"
                         >
 
 
-                          <div className={styles.cardHeader}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <h4>{app.position}</h4>
+                          <div>
+                            <div className="flex justify-between items-start gap-2">
+                              {(() => {
+                                const t = truncateTitle(app.position);
+                                const isExpanded = !!expandedTitles[app.id];
+                                return (
+                                  <h4
+                                    className={`font-header text-sm font-bold text-foreground mb-0.5 break-words ${t.truncated ? 'cursor-pointer' : ''}`}
+                                    title={app.position}
+                                    onClick={t.truncated ? (e) => {
+                                      e.stopPropagation();
+                                      setExpandedTitles(prev => ({ ...prev, [app.id]: !isExpanded }));
+                                    } : undefined}
+                                  >
+                                    {!t.truncated ? app.position : (
+                                      <span>
+                                        {isExpanded ? app.position : t.display}{' '}
+                                        <span className="text-primary font-semibold text-xs">{isExpanded ? '(less)' : '(more)'}</span>
+                                      </span>
+                                    )}
+                                  </h4>
+                                );
+                              })()}
                               {score !== undefined && (
-                                <span className={styles.scoreBadge} style={{
-                                  background: score > 80 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                                  color: score > 80 ? 'var(--success)' : 'var(--warning)',
-                                  fontSize: '10px',
-                                  fontWeight: 'bold',
-                                  padding: '1px 5px',
-                                  borderRadius: '4px'
-                                }}>
+                                <span
+                                  className={`text-[10px] font-bold px-[5px] py-px rounded shrink-0 ${score > 80 ? 'bg-emerald-500/10 text-success' : 'bg-amber-500/10 text-warning'}`}
+                                >
                                   {score}%
                                 </span>
                               )}
                             </div>
-                            <p>{app.company}</p>
+                            <p className="text-xs text-muted font-medium">{app.company}</p>
                           </div>
 
-                          <div className={styles.cardDetails}>
+                          <div className="flex flex-wrap gap-2 my-3">
                             {app.location && (
-                              <span className={styles.detailItem}>
+                              <span className="inline-flex items-center gap-1 text-xs text-muted">
                                 <MapPin size={12} /> {app.location}
                               </span>
                             )}
                             {app.salary && (
-                              <span className={styles.detailItem}>
+                              <span className="inline-flex items-center gap-1 text-xs text-muted">
                                 <DollarSign size={12} /> {app.salary}
                               </span>
                             )}
                             {app.deadline && (
-                              <span className={styles.detailItem}>
+                              <span className="inline-flex items-center gap-1 text-xs text-muted">
                                 <Calendar size={12} /> {app.deadline}
                               </span>
                             )}
                           </div>
 
-                          {app.notes && <p className={styles.cardNotes}>{app.notes}</p>}
+                          {app.notes && <p className="text-xs text-muted leading-normal mb-3 bg-black/[0.03] px-2 py-2 rounded-md max-h-[50px] overflow-hidden text-ellipsis whitespace-nowrap">{app.notes}</p>}
 
-                          <div className={styles.cardFooter} onClick={(e) => e.stopPropagation()}>
-                            <div className={styles.arrows}>
+                          <div className="flex justify-between items-center mt-auto border-t border-cardline pt-2" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex gap-1">
                               <button
                                 onClick={() => {
                                   const idx = columns.findIndex(c => c.id === app.status);
@@ -369,6 +400,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                                 }}
                                 disabled={app.status === 'wishlist'}
                                 title="Move left"
+                                className={`${iconBtnBase} hover:bg-mutedlight hover:text-foreground disabled:opacity-30`}
                               >
                                 <ArrowLeft size={14} />
                               </button>
@@ -379,12 +411,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                                 }}
                                 disabled={app.status === 'rejected'}
                                 title="Move right"
+                                className={`${iconBtnBase} hover:bg-mutedlight hover:text-foreground disabled:opacity-30`}
                               >
                                 <ArrowRight size={14} />
                               </button>
                             </div>
 
-                            <div className={styles.actions}>
+                            <div className="flex gap-1">
                               <button
                                 onClick={() => onNavigateToEditor({
                                   company: app.company,
@@ -393,12 +426,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                                   application_id: app.id
                                 })}
                                 title="Open Tailoring Canvas"
-                                className={styles.editorLink}
+                                className={`${iconBtnBase} hover:bg-mutedlight hover:text-primary`}
                               >
                                 <ExternalLink size={14} />
                               </button>
-                              <button onClick={() => handleDelete(app.id)} title="Delete card">
-                                <Trash2 size={14} className={styles.deleteIcon} />
+                              <button onClick={() => handleDelete(app.id)} title="Delete card" className={`${iconBtnBase} hover:bg-mutedlight`}>
+                                <Trash2 size={14} className="text-danger" />
                               </button>
                             </div>
                           </div>
@@ -415,89 +448,89 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
 
       {/* Slide-out Application Details Side Panel */}
       {isDetailsOpen && selectedApp && (
-        <div className={styles.modalOverlay} onClick={() => { setIsDetailsOpen(false); setSelectedApp(null); navigateTo('/dashboard'); }}>
-          <div className={`${styles.detailsSidebar} glass`} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.sidebarHeader}>
-              <h3>Application Command Center</h3>
-              <Button variant="ghost" onClick={() => { setIsDetailsOpen(false); setSelectedApp(null); navigateTo('/dashboard'); }} className={styles.closeBtn}>
+        <div className="fixed inset-0 z-[800] bg-black/50 backdrop-blur-sm flex items-center justify-center" onClick={() => { setIsDetailsOpen(false); setSelectedApp(null); navigateTo('/dashboard'); }}>
+          <div className="absolute top-0 right-0 w-full max-w-[480px] h-auto md:h-full bottom-[calc(76px+env(safe-area-inset-bottom,0px))] md:bottom-0 bg-card border-l border-cardline shadow-lg flex flex-col z-[800] animate-panelSlideIn text-left" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-4 md:px-6 py-3 md:py-4 border-b border-cardline">
+              <h3 className="text-base text-foreground">Application Command Center</h3>
+              <Button variant="ghost" onClick={() => { setIsDetailsOpen(false); setSelectedApp(null); navigateTo('/dashboard'); }} className="w-[30px] h-[30px] flex items-center justify-center p-0">
                 X
               </Button>
             </div>
 
 
-            <div className={styles.sidebarContent}>
-              <div className={styles.sidebarField}>
+            <div className="flex-1 px-4 md:px-6 py-4 md:py-6 overflow-y-auto flex flex-col gap-4 md:gap-6">
+              <div className="flex flex-col gap-1">
                 <h2>{selectedApp.position}</h2>
-                <h3 className={styles.sidebarCompany}>{selectedApp.company}</h3>
+                <h3 className="text-primary text-lg font-semibold">{selectedApp.company}</h3>
               </div>
 
-              <div className={styles.sidebarMetaGrid}>
-                <div className={styles.metaBox}>
+              <div className="grid grid-cols-2 gap-4 bg-slate-500/5 p-4 rounded-lg">
+                <div className="flex items-center gap-2 text-muted">
                   <MapPin size={16} />
                   <div>
-                    <label>Location</label>
-                    <p>{selectedApp.location || 'Not Specified'}</p>
+                    <label className={fieldLabelCls}>Location</label>
+                    <p className="text-foreground text-sm font-semibold m-0">{selectedApp.location || 'Not Specified'}</p>
                   </div>
                 </div>
-                <div className={styles.metaBox}>
+                <div className="flex items-center gap-2 text-muted">
                   <DollarSign size={16} />
                   <div>
-                    <label>Salary</label>
-                    <p>{selectedApp.salary || 'Not Specified'}</p>
+                    <label className={fieldLabelCls}>Salary</label>
+                    <p className="text-foreground text-sm font-semibold m-0">{selectedApp.salary || 'Not Specified'}</p>
                   </div>
                 </div>
-                <div className={styles.metaBox}>
+                <div className="flex items-center gap-2 text-muted">
                   <Calendar size={16} />
                   <div>
-                    <label>Deadline</label>
-                    <p>{selectedApp.deadline || 'Not Specified'}</p>
+                    <label className={fieldLabelCls}>Deadline</label>
+                    <p className="text-foreground text-sm font-semibold m-0">{selectedApp.deadline || 'Not Specified'}</p>
                   </div>
                 </div>
-                <div className={styles.metaBox}>
+                <div className="flex items-center gap-2 text-muted">
                   <Info size={16} />
                   <div>
-                    <label>Status</label>
-                    <p style={{ textTransform: 'capitalize' }}>{selectedApp.status}</p>
+                    <label className={fieldLabelCls}>Status</label>
+                    <p style={{ textTransform: 'capitalize' }} className="text-foreground text-sm font-semibold m-0">{selectedApp.status}</p>
                   </div>
                 </div>
               </div>
 
               {selectedApp.url && (
-                <div className={styles.sidebarField}>
-                  <label>Job Listing URL</label>
-                  <a href={selectedApp.url} target="_blank" rel="noreferrer" className={styles.listingUrl}>
+                <div className="flex flex-col gap-1">
+                  <label className={fieldLabelCls}>Job Listing URL</label>
+                  <a href={selectedApp.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-secondary hover:text-secondaryhover text-sm break-all">
                     {selectedApp.url} <ExternalLink size={12} />
                   </a>
                 </div>
               )}
 
               {selectedApp.job_description && (
-                <div className={styles.sidebarField}>
-                  <label>Raw Job Description</label>
-                  <pre className={styles.jobDescPre}>{selectedApp.job_description}</pre>
+                <div className="flex flex-col gap-1">
+                  <label className={fieldLabelCls}>Raw Job Description</label>
+                  <pre className="bg-slate-500/5 p-4 rounded-lg font-body text-xs text-foreground whitespace-pre-wrap max-h-[200px] overflow-y-auto border border-cardline">{selectedApp.job_description}</pre>
                 </div>
               )}
 
               {selectedApp.notes && (
-                <div className={styles.sidebarField}>
-                  <label>Progress Notes</label>
-                  <p className={styles.sidebarNotes}>{selectedApp.notes}</p>
+                <div className="flex flex-col gap-1">
+                  <label className={fieldLabelCls}>Progress Notes</label>
+                  <p className="text-sm text-foreground leading-relaxed m-0">{selectedApp.notes}</p>
                 </div>
               )}
 
 
               {/* Tailored Document Reference */}
               {resumeVersions.filter(v => v.application === selectedApp.id).length > 0 && (
-                <div className={styles.sidebarField}>
-                  <label>Tailored Document</label>
-                  <div className={styles.versionsList}>
+                <div className="flex flex-col gap-1">
+                  <label className={fieldLabelCls}>Tailored Document</label>
+                  <div className="flex flex-col gap-2 mt-2">
                     {resumeVersions.filter(v => v.application === selectedApp.id).map((v) => (
-                      <div key={v.id} className={styles.versionItem}>
-                        <div className={styles.versionInfo}>
-                          <FileText size={16} className={styles.docIcon} />
+                      <div key={v.id} className="flex justify-between items-center bg-slate-500/5 border border-cardline px-3 py-2 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <FileText size={16} className="text-primary shrink-0" />
                           <div>
-                            <p className={styles.versionName}>Tailored Resume</p>
-                            <span className={styles.versionDate}>
+                            <p className="text-xs font-bold text-foreground m-0">Tailored Resume</p>
+                            <span className="text-[10px] text-muted">
                               Score: <strong style={{ color: v.ats_score > 80 ? 'var(--success)' : 'var(--warning)' }}>{v.ats_score}%</strong> • {new Date(v.created_at).toLocaleDateString()}
                             </span>
                           </div>
@@ -533,7 +566,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                 </div>
               )}
 
-              <div className={styles.sidebarActions}>
+              <div className="flex flex-col gap-3 mt-auto pt-4 border-t border-cardline">
                 <Button
                   onClick={() => {
                     setIsDetailsOpen(false);
@@ -544,7 +577,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                       application_id: selectedApp.id
                     });
                   }}
-                  className={styles.sidebarActionBtn}
+                  className="w-full"
                 >
                   <Sparkles size={16} />
                   <span>Launch Tailoring Canvas</span>
@@ -553,7 +586,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                 <Button
                   variant="secondary"
                   onClick={() => handleDelete(selectedApp.id)}
-                  className={styles.sidebarDeleteBtn}
+                  className="w-full text-danger"
                 >
                   <Trash2 size={16} />
                   <span>Delete Tracking Card</span>
@@ -566,19 +599,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
 
       {/* Creation Modal Overlay */}
       {isModalOpen && (
-        <div className={styles.modalOverlay}>
-          <div className={`${styles.modal} glass`}>
-            <div className={styles.modalHeader}>
-              <h3>Track Job Application</h3>
-              <Button variant="ghost" onClick={() => setIsModalOpen(false)} className={styles.closeBtn}>
+        <div className="fixed inset-0 z-[800] bg-black/50 backdrop-blur-sm flex items-center justify-center">
+          <div className="w-full max-w-[580px] mx-3 md:mx-0 bg-card border border-cardline rounded-2xl md:rounded-3xl p-4 md:p-6 max-h-[85vh] md:max-h-[90vh] overflow-y-auto shadow-lg">
+            <div className="flex justify-between items-center mb-4 border-b border-cardline pb-2">
+              <h3 className="text-base md:text-lg text-foreground">Track Job Application</h3>
+              <Button variant="ghost" onClick={() => setIsModalOpen(false)} className="w-[30px] h-[30px] flex items-center justify-center p-0">
                 X
               </Button>
             </div>
 
-            {errorMsg && <div className={styles.errorBanner}>{errorMsg}</div>}
+            {errorMsg && <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm mb-4">{errorMsg}</div>}
 
-            <form onSubmit={handleCreate} className={styles.modalForm}>
-              <div className={styles.formRow}>
+            <form onSubmit={handleCreate} className="flex flex-col gap-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputField
                   label="Company Name *"
                   id="modalCompany"
@@ -595,7 +628,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                 />
               </div>
 
-              <div className={styles.formRow}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputField
                   label="Salary Range"
                   id="modalSalary"
@@ -612,7 +645,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                 />
               </div>
 
-              <div className={styles.formRow}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputField
                   label="Application Deadline"
                   id="modalDeadline"
@@ -620,12 +653,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                   value={deadline}
                   onChange={(e) => setDeadline(e.target.value)}
                 />
-                <div className={styles.selectGroup}>
-                  <label htmlFor="modalStatus">Kanban Column</label>
+                <div className="flex flex-col mb-4">
+                  <label htmlFor="modalStatus" className="font-header font-semibold text-sm mb-1 text-left text-foreground">Kanban Column</label>
                   <select
                     id="modalStatus"
                     value={status}
                     onChange={(e) => setStatus(e.target.value as any)}
+                    className="px-4 py-3 rounded-lg border border-cardline bg-card text-foreground focus:border-primary outline-none transition-colors"
                   >
                     <option value="wishlist">Wishlist</option>
                     <option value="preparing">Preparing</option>
@@ -663,7 +697,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                 onChange={(e) => setNotes(e.target.value)}
               />
 
-              <div className={styles.modalFooter}>
+              <div className="flex flex-col-reverse md:flex-row md:justify-end gap-3 mt-4 border-t border-cardline pt-4 [&>button]:w-full md:[&>button]:w-auto">
                 <Button variant="secondary" type="button" onClick={() => setIsModalOpen(false)}>
                   Cancel
                 </Button>

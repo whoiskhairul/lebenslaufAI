@@ -5,8 +5,97 @@ import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { MasterProfileSkeleton } from '../components/skeleton/MasterProfileSkeleton';
 import { User, Briefcase, FolderGit2, Dumbbell, GraduationCap, Trash2, Plus, Edit3, Check, X, Upload, Brain, Wand2, Sparkles, Lock, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import styles from './MasterProfile.module.css';
 import { Toast } from '../components/Toast';
+
+// Tailwind class map -------- replaces the former MasterProfile.module.css (mobile-first, md: = desktop)
+const cls = {
+  container: 'flex flex-col h-auto min-h-full md:h-full',
+  headerRow: 'mb-4 md:mb-6 shrink-0 text-left',
+  title: 'font-header text-xl md:text-2xl font-extrabold text-foreground',
+  subtitle: 'text-sm text-muted',
+  importBtn: 'flex items-center gap-2',
+  layout: 'flex flex-col md:flex-row gap-6 flex-1 items-stretch overflow-visible md:overflow-hidden',
+  tabs: 'glass-card flex w-full flex-row overflow-x-auto p-2 md:w-[220px] md:flex-col md:p-4 md:shrink-0 thin-scrollbar',
+  tabBtn: 'flex items-center gap-2 md:gap-3 px-3 py-2 md:px-4 md:py-3 rounded-md whitespace-nowrap text-muted font-header font-semibold text-sm transition-colors text-left hover:bg-mutedlight hover:text-foreground',
+  activeTab: 'bg-[rgba(99,102,241,0.08)] text-primary max-md:border-b-[3px] max-md:border-b-primary md:border-l-[3px] md:border-l-primary',
+  viewport: 'glass-card flex-1 p-4 md:p-8 text-left md:h-full md:overflow-y-auto',
+  successBanner: 'bg-[rgba(16,185,129,0.08)] border border-[rgba(16,185,129,0.2)] text-success px-4 py-3 rounded-lg mb-4 md:mb-6 text-sm font-medium',
+  errorBanner: 'bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg mb-4 md:mb-6 text-sm font-medium',
+  form: 'flex flex-col gap-2',
+  formGrid: 'grid grid-cols-1 md:grid-cols-2 gap-4',
+  saveBtn: 'self-start mt-4',
+  listSection: 'flex flex-col gap-4',
+  sectionHeader: 'flex flex-wrap justify-between items-center gap-2 [&>h3]:text-lg [&>h3]:text-foreground [&>h3]:m-0',
+  inlineForm: 'glass-card p-4 md:p-6 flex flex-col gap-2 mb-4',
+  checkboxLabel: 'inline-flex items-center gap-2 text-sm mb-4 cursor-pointer text-foreground',
+  formActions: 'flex flex-wrap justify-end gap-3 mt-2 max-md:[&>button]:flex-1',
+  itemsList: 'flex flex-col gap-4',
+  listItem: 'glass-card p-4 md:px-6',
+  itemHeader: 'flex justify-between items-start gap-2 [&>h4]:text-base [&>h4]:font-bold [&>h4]:text-foreground [&>h4]:break-words',
+  itemSub: 'text-sm text-muted font-medium mt-0.5 break-words',
+  subtext: 'font-medium text-muted text-sm',
+  deleteBtn: 'bg-transparent border-none p-1 cursor-pointer inline-flex items-center justify-center text-muted transition-colors hover:text-danger shrink-0',
+  itemBullets: 'mt-4 pl-4 flex flex-col gap-2 list-disc [&>li]:text-sm [&>li]:text-muted [&>li]:leading-normal marker:text-muted',
+  tags: 'flex flex-wrap gap-2 mt-2',
+  tag: 'bg-mutedlight text-muted text-xs px-2.5 py-0.5 rounded-md font-semibold',
+  selectGroup: 'flex flex-col mb-4 [&>label]:font-header [&>label]:font-semibold [&>label]:text-sm [&>label]:mb-1 [&>select]:px-4 [&>select]:py-3 [&>select]:rounded-lg [&>select]:border [&>select]:border-cardline [&>select]:bg-card [&>select]:text-foreground [&>select]:outline-none [&>select]:focus:border-primary [&>select]:transition-colors',
+  skillsRegistry: 'flex flex-col gap-6',
+  skillCategoryBlock: 'border-b border-cardline pb-4 last:border-b-0 last:pb-0',
+  categoryTitle: 'text-base mb-3 text-foreground m-0',
+  categoryActionBtn: 'bg-transparent border-none p-1 cursor-pointer inline-flex items-center justify-center text-muted opacity-60 hover:text-primary hover:opacity-100 transition-colors',
+  skillsGrid: 'flex flex-wrap gap-3',
+  animateFadeOut: 'opacity-15 scale-95 transition-all duration-150',
+  skillTagCard: 'inline-flex items-center gap-3 bg-card border border-cardline px-3 py-1.5 rounded-lg text-sm font-medium',
+  iconOrderBtn: 'bg-transparent border-none p-0.5 cursor-pointer inline-flex items-center justify-center text-muted transition-colors hover:text-primary',
+  skillDeleteBtn: 'bg-transparent border-none cursor-pointer text-danger font-bold text-xs',
+  inlineSkillInputContainer: 'inline-flex items-center gap-2 bg-card border border-primary px-3 py-1.5 rounded-lg',
+  inlineSkillInput: 'border-none bg-transparent outline-none text-sm text-foreground w-[130px]',
+  inlineSkillActionBtn: 'bg-transparent border-none p-0.5 cursor-pointer inline-flex items-center justify-center text-muted transition-colors hover:text-primary [title=Cancel]&:hover:text-danger',
+  addSkillTriggerBtn: 'inline-flex items-center gap-1 bg-transparent border border-dashed border-cardline text-primary px-3 py-1.5 rounded-lg text-sm font-semibold cursor-pointer transition-all hover:bg-mutedlight hover:border-primary',
+  modalOverlay: 'fixed inset-0 z-[800] bg-black/50 backdrop-blur-sm flex items-center justify-center',
+  modal: 'w-full max-w-[640px] mx-3 bg-card border border-cardline rounded-2xl md:rounded-3xl p-4 md:p-6 max-h-[85vh] md:max-h-[90vh] flex flex-col shadow-lg text-foreground',
+  modalHeader: 'flex justify-between items-center mb-4 border-b border-cardline pb-2 shrink-0 [&>h3]:text-lg [&>h3]:text-foreground [&>h3]:font-header [&>h3]:font-extrabold [&>h3]:m-0',
+  closeBtn: 'w-[30px] h-[30px] flex items-center justify-center text-muted transition-colors hover:text-foreground bg-transparent border-none cursor-pointer p-0',
+  wizardStep: 'flex flex-col flex-1 overflow-hidden',
+  stepDesc: 'text-sm text-muted leading-normal mb-4 text-left',
+  fileInputGroup: 'mb-3 flex justify-start',
+  fileLabel: 'inline-flex items-center gap-2 px-4 py-2 border border-dashed border-cardline rounded-lg text-xs cursor-pointer text-muted transition-all bg-[var(--glass-bg)] hover:border-primary hover:text-foreground',
+  cvTextarea: 'w-full h-[180px] p-4 rounded-lg border border-cardline bg-card text-foreground text-sm leading-normal resize-none mb-4 outline-none font-body focus:border-primary transition-colors',
+  wizardScroller: 'flex-1 overflow-y-auto pr-2 flex flex-col gap-4 mb-4 thin-scrollbar',
+  parsedCard: 'bg-[var(--glass-bg)] border border-cardline rounded-2xl p-4 text-left [&>h4]:text-xs md:[&>h4]:text-sm [&>h4]:font-header [&>h4]:font-bold [&>h4]:uppercase [&>h4]:text-primary [&>h4]:border-b [&>h4]:border-cardline [&>h4]:pb-2 [&>h4]:mb-3 [&>h4]:mt-0',
+  reviewItem: 'border-b border-dashed border-cardline py-3 last:border-b-0',
+  reviewCheckbox: 'inline-flex items-center gap-2 text-sm font-semibold cursor-pointer mb-2 text-foreground',
+  reviewFields: 'pl-4 md:pl-6 flex flex-col gap-2',
+  bulletsEdit: 'w-full h-[90px] px-3 py-2 rounded-lg border border-cardline bg-card text-foreground text-xs leading-snug resize-y outline-none font-body focus:border-primary transition-colors',
+  skillsReviewGrid: 'flex flex-wrap gap-2',
+  skillCheckCard: 'inline-flex items-center gap-2 bg-card border border-cardline px-3 py-1.5 rounded-lg text-xs cursor-pointer text-foreground transition-all has-[:checked]:border-primary has-[:checked]:bg-[rgba(99,102,241,0.05)]',
+  modalFooter: 'flex flex-col-reverse sm:flex-row sm:justify-end gap-3 border-t border-cardline pt-4 shrink-0 max-sm:[&>button]:w-full',
+  aiSummaryWidgetCompact: 'flex justify-between items-center gap-3 bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.25)] rounded-lg px-3 py-2.5 mb-3',
+  aiCompactLeft: 'flex items-center gap-2 flex-wrap',
+  aiCompactTitle: 'text-[0.82rem] font-bold text-foreground',
+  tagDoneCompact: 'text-[0.72rem] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-green-600 border border-emerald-500/30',
+  tagMissingCompact: 'text-[0.72rem] font-semibold px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 border border-red-500/30',
+  generateAiBtnCompact: '!inline-flex !items-center !gap-1 !bg-primary !text-white !border-none font-semibold !text-[0.78rem] !px-3 !py-1.5 rounded-md shadow-[0_2px_8px_rgba(99,102,241,0.25)] hover:shadow-[0_4px_12px_rgba(99,102,241,0.4)] hover:-translate-y-px transition-all',
+  lockedBadgeCompact: 'inline-flex items-center gap-1 px-2.5 py-1.5 bg-red-500/[0.08] border border-red-500/25 text-red-500 rounded-md text-xs font-semibold',
+  missingInlineNotice: 'flex items-center flex-wrap gap-1.5 text-xs text-muted mb-3',
+  lockedBadge: 'inline-flex items-center gap-1 px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-500 rounded-lg text-[0.78rem] font-semibold',
+  missingNotice: 'mt-3 pt-3 border-t border-dashed border-[rgba(99,102,241,0.2)] [&>p]:m-0 [&>p]:mb-2 [&>p]:text-[0.8rem] [&>p]:text-muted',
+  missingTags: 'flex flex-wrap gap-2',
+  tagDone: 'text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/[0.12] text-green-600 border border-emerald-500/30',
+  tagMissing: 'text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-600 border border-red-500/30',
+  summaryContainer: 'relative w-full',
+  skeletonOverlay: 'absolute top-8 inset-x-0 bottom-0 z-10 bg-slate-900/85 backdrop-blur-sm rounded-lg p-5 flex flex-col gap-3 border border-primary animate-fadeIn',
+  skeletonHeader: 'flex items-center gap-2 text-[0.85rem] font-semibold text-indigo-300',
+  skeletonShimmerLine: 'h-3 rounded bg-[linear-gradient(90deg,rgba(99,102,241,0.15)_25%,rgba(99,102,241,0.35)_50%,rgba(99,102,241,0.15)_75%)] bg-[length:200%_100%] animate-shimmer',
+  errorAlertBanner: 'flex items-start gap-3 bg-gradient-to-br from-red-500/10 to-rose-600/[0.06] border border-red-500/30 border-l-4 border-l-red-500 rounded-lg px-4 py-3 mb-4 animate-fadeIn',
+  errorAlertIcon: 'text-red-500 shrink-0 mt-0.5',
+  errorAlertContent: 'flex flex-col gap-0.5 flex-1 text-[0.85rem] text-foreground [&>strong]:font-semibold [&>strong]:text-red-400 [&>strong]:text-[0.88rem] [&>span]:text-muted [&>span]:leading-tight',
+  errorDismissBtn: 'bg-transparent border-none text-muted cursor-pointer p-0.5 inline-flex items-center justify-center rounded transition-all hover:text-foreground hover:bg-white/10',
+  // Previously referenced but never defined in the old module - given sensible equivalents
+  modalContent: 'w-full bg-card border border-cardline rounded-2xl',
+  aiSparkleIcon: 'text-primary shrink-0 animate-pulse',
+  fieldOfStudyText: 'text-sm text-muted break-words',
+};
 
 
 interface PersonalInfo {
@@ -809,7 +898,7 @@ export const MasterProfile: React.FC = () => {
   ];
 
   return (
-    <div className={styles.container}>
+    <div className={cls.container}>
       {toast && (
         <Toast
           message={toast.message}
@@ -818,8 +907,8 @@ export const MasterProfile: React.FC = () => {
         />
       )}
       {promptModal && (
-        <div className={styles.modalOverlay}>
-          <div className={`${styles.modalContent} glass-card`} style={{ maxWidth: '400px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 10000 }}>
+        <div className={cls.modalOverlay}>
+          <div className={`${cls.modalContent} glass-card`} style={{ maxWidth: '400px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 10000 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--card-border)', paddingBottom: '12px' }}>
               <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>{promptModal.title}</h3>
               <button
@@ -874,25 +963,25 @@ export const MasterProfile: React.FC = () => {
           </div>
         </div>
       )}
-      <div className={styles.headerRow}>
+      <div className={cls.headerRow}>
         <div>
-          <h2 className={styles.title}>Master Profile Registry</h2>
-          <p className={styles.subtitle}>Your career single-source-of-truth. Securely shielded from AI alterations.</p>
+          <h2 className={cls.title}>Master Profile Registry</h2>
+          <p className={cls.subtitle}>Your career single-source-of-truth. Securely shielded from AI alterations.</p>
         </div>
-        <Button onClick={() => setIsImportModalOpen(true)} className={styles.importBtn}>
+        <Button onClick={() => setIsImportModalOpen(true)} className={cls.importBtn}>
           <Upload size={16} /> Import CV
         </Button>
       </div>
 
-      <div className={styles.layout}>
+      <div className={cls.layout}>
         {/* Sub Navigation Tabs */}
-        <div className={`${styles.tabs} glass-card`}>
+        <div className={`${cls.tabs} glass-card`}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
-                className={`${styles.tabBtn} ${activeTab === tab.id ? styles.activeTab : ''}`}
+                className={`${cls.tabBtn} ${activeTab === tab.id ? cls.activeTab : ''}`}
                 onClick={() => {
                   setActiveTab(tab.id as any);
                   setIsAdding(false);
@@ -906,21 +995,21 @@ export const MasterProfile: React.FC = () => {
         </div>
 
         {/* Content Viewport */}
-        <div className={`${styles.viewport} glass-card`}>
+        <div className={`${cls.viewport} glass-card`}>
           {isLoading ? (
             <MasterProfileSkeleton />
           ) : (
             <>
               {msg.text && (
-                <div className={msg.type === 'success' ? styles.successBanner : styles.errorBanner}>
+                <div className={msg.type === 'success' ? cls.successBanner : cls.errorBanner}>
                   {msg.text}
                 </div>
               )}
 
               {/* Personal Info Tab */}
               {activeTab === 'info' && (
-                <form onSubmit={handleSaveInfo} className={styles.form}>
-                  <div className={styles.formGrid}>
+                <form onSubmit={handleSaveInfo} className={cls.form}>
+                  <div className={cls.formGrid}>
                     <InputField
                       label="Full Name"
                       id="infoName"
@@ -942,7 +1031,7 @@ export const MasterProfile: React.FC = () => {
                     />
                   </div>
 
-                  <div className={styles.formGrid}>
+                  <div className={cls.formGrid}>
                     <InputField
                       label="Email Address"
                       id="infoEmail"
@@ -975,7 +1064,7 @@ export const MasterProfile: React.FC = () => {
                     })}
                   />
 
-                  <div className={styles.formGrid}>
+                  <div className={cls.formGrid}>
                     <InputField
                       label="Date of Birth"
                       id="infoDOB"
@@ -998,7 +1087,7 @@ export const MasterProfile: React.FC = () => {
                     />
                   </div>
 
-                  <div className={styles.formGrid}>
+                  <div className={cls.formGrid}>
                     <InputField
                       label="LinkedIn Profile URL"
                       id="infoLinkedIn"
@@ -1021,7 +1110,7 @@ export const MasterProfile: React.FC = () => {
                     />
                   </div>
 
-                  <div className={styles.formGrid}>
+                  <div className={cls.formGrid}>
                     <InputField
                       label="Website / Portfolio URL"
                       id="infoWebsite"
@@ -1087,7 +1176,7 @@ export const MasterProfile: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className={styles.formGrid} style={{ marginTop: '16px' }}>
+                  <div className={cls.formGrid} style={{ marginTop: '16px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
                       <label htmlFor="infoSignatureUpload" style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main, #1e293b)' }}>Signature Image</label>
                       {profile.personal_info.signature_image ? (
@@ -1201,14 +1290,14 @@ export const MasterProfile: React.FC = () => {
                   </div>
 
                   {/* Compact Executive Profile Summary AI Generator Widget */}
-                  <div className={styles.aiSummaryWidgetCompact}>
-                    <div className={styles.aiCompactLeft}>
-                      <Sparkles size={16} className={styles.aiSparkleIcon} />
-                      <span className={styles.aiCompactTitle}>AI Executive Summary Assistant</span>
+                  <div className={cls.aiSummaryWidgetCompact}>
+                    <div className={cls.aiCompactLeft}>
+                      <Sparkles size={16} className={cls.aiSparkleIcon} />
+                      <span className={cls.aiCompactTitle}>AI Executive Summary Assistant</span>
                       {isSummaryAiUnlocked ? (
-                        <span className={styles.tagDoneCompact}>✓ All sections ready</span>
+                        <span className={cls.tagDoneCompact}>✓ All sections ready</span>
                       ) : (
-                        <span className={styles.tagMissingCompact}>
+                        <span className={cls.tagMissingCompact}>
                           {3 - missingSummarySections.length}/3 sections completed
                         </span>
                       )}
@@ -1220,12 +1309,12 @@ export const MasterProfile: React.FC = () => {
                           onClick={handleGenerateSummaryAI}
                           isLoading={isGeneratingSummary}
                           variant="secondary"
-                          className={styles.generateAiBtnCompact}
+                          className={cls.generateAiBtnCompact}
                         >
                           <Wand2 size={13} /> Generate with AI
                         </Button>
                       ) : (
-                        <div className={styles.lockedBadgeCompact} title={`Add at least 1 item to: ${missingSummarySections.join(', ')}`}>
+                        <div className={cls.lockedBadgeCompact} title={`Add at least 1 item to: ${missingSummarySections.join(', ')}`}>
                           <Lock size={12} /> AI Locked
                         </div>
                       )}
@@ -1233,29 +1322,29 @@ export const MasterProfile: React.FC = () => {
                   </div>
 
                   {!isSummaryAiUnlocked && (
-                    <div className={styles.missingInlineNotice}>
+                    <div className={cls.missingInlineNotice}>
                       <span>Required to unlock AI: </span>
-                      <span className={profile.work_experiences.length > 0 ? styles.tagDone : styles.tagMissing}>
-                        {profile.work_experiences.length > 0 ? '✓' : '✗'} Work History
+                      <span className={profile.work_experiences.length > 0 ? cls.tagDone : cls.tagMissing}>
+                        {profile.work_experiences.length > 0 ? '✓' : '✓'} Work History
                       </span>
-                      <span className={profile.projects.length > 0 ? styles.tagDone : styles.tagMissing}>
-                        {profile.projects.length > 0 ? '✓' : '✗'} Projects
+                      <span className={profile.projects.length > 0 ? cls.tagDone : cls.tagMissing}>
+                        {profile.projects.length > 0 ? '✓' : '✓'} Projects
                       </span>
-                      <span className={profile.skills.length > 0 ? styles.tagDone : styles.tagMissing}>
-                        {profile.skills.length > 0 ? '✓' : '✗'} Skills
+                      <span className={profile.skills.length > 0 ? cls.tagDone : cls.tagMissing}>
+                        {profile.skills.length > 0 ? '✓' : '✓'} Skills
                       </span>
                     </div>
                   )}
 
-                  <div className={styles.summaryContainer}>
+                  <div className={cls.summaryContainer}>
                     {isGeneratingSummary && (
-                      <div className={styles.skeletonOverlay}>
-                        <div className={styles.skeletonHeader}>
+                      <div className={cls.skeletonOverlay}>
+                        <div className={cls.skeletonHeader}>
                           <Wand2 size={16} /> Synthesizing your work history, projects & skills...
                         </div>
-                        <div className={styles.skeletonShimmerLine} style={{ width: '96%' }} />
-                        <div className={styles.skeletonShimmerLine} style={{ width: '88%' }} />
-                        <div className={styles.skeletonShimmerLine} style={{ width: '74%' }} />
+                        <div className={cls.skeletonShimmerLine} style={{ width: '96%' }} />
+                        <div className={cls.skeletonShimmerLine} style={{ width: '88%' }} />
+                        <div className={cls.skeletonShimmerLine} style={{ width: '74%' }} />
                       </div>
                     )}
                     <div style={isGeneratingSummary ? { opacity: 0, filter: 'blur(4px)', pointerEvents: 'none' } : undefined}>
@@ -1274,7 +1363,7 @@ export const MasterProfile: React.FC = () => {
                     </div>
                   </div>
 
-                  <Button type="submit" isLoading={isSaving} className={styles.saveBtn}>
+                  <Button type="submit" isLoading={isSaving} className={cls.saveBtn}>
                     Save Changes
                   </Button>
                 </form>
@@ -1282,8 +1371,8 @@ export const MasterProfile: React.FC = () => {
 
               {/* Experience Tab */}
               {activeTab === 'experience' && (
-                <div className={styles.listSection}>
-                  <div className={styles.sectionHeader}>
+                <div className={cls.listSection}>
+                  <div className={cls.sectionHeader}>
                     <h3>Work History ({profile.work_experiences.length})</h3>
                     {!isAdding && (
                       <Button onClick={() => setIsAdding(true)} variant="secondary">
@@ -1293,17 +1382,17 @@ export const MasterProfile: React.FC = () => {
                   </div>
 
                   {isAdding && (
-                    <form onSubmit={handleAddExperience} className={`${styles.inlineForm} glass-card`}>
+                    <form onSubmit={handleAddExperience} className={`${cls.inlineForm} glass-card`}>
                       <h4>{editingId ? 'Edit Work Experience' : 'Add Work Experience'}</h4>
-                      <div className={styles.formGrid}>
+                      <div className={cls.formGrid}>
                         <InputField label="Company Name *" id="addExpCompany" value={expCompany} onChange={e => setExpCompany(e.target.value)} />
                         <InputField label="Job Title *" id="addExpPosition" value={expPosition} onChange={e => setExpPosition(e.target.value)} />
                       </div>
-                      <div className={styles.formGrid}>
+                      <div className={cls.formGrid}>
                         <InputField label="Start Date" id="addExpStart" placeholder="e.g. Jan 2022" value={expStart} onChange={e => setExpStart(e.target.value)} />
                         <InputField label="End Date" id="addExpEnd" placeholder="e.g. Present" value={expEnd} onChange={e => setExpEnd(e.target.value)} disabled={expCurrent} />
                       </div>
-                      <label className={styles.checkboxLabel}>
+                      <label className={cls.checkboxLabel}>
                         <input type="checkbox" checked={expCurrent} onChange={e => {
                           setExpCurrent(e.target.checked);
                           if (e.target.checked) setExpEnd('Present');
@@ -1320,7 +1409,7 @@ export const MasterProfile: React.FC = () => {
                         onChange={e => setExpBullets(e.target.value)}
                       />
 
-                      <div className={styles.formActions}>
+                      <div className={cls.formActions}>
                         <Button variant="ghost" type="button" onClick={() => {
                           setIsAdding(false);
                           setEditingId(null);
@@ -1331,25 +1420,25 @@ export const MasterProfile: React.FC = () => {
                     </form>
                   )}
 
-                  <div className={styles.itemsList}>
+                  <div className={cls.itemsList}>
                     {profile.work_experiences.map((exp) => (
-                      <div key={exp.id} className={`${styles.listItem} glass-card`}>
-                        <div className={styles.itemHeader}>
+                      <div key={exp.id} className={`${cls.listItem} glass-card`}>
+                        <div className={cls.itemHeader}>
                           <div>
                             <h4>{exp.position}</h4>
-                            <p className={styles.itemSub}>{exp.company} | {exp.start_date} - {exp.end_date}</p>
+                            <p className={cls.itemSub}>{exp.company} | {exp.start_date} - {exp.end_date}</p>
                           </div>
                           <div style={{ display: 'flex', gap: '8px' }}>
-                            <button type="button" onClick={() => handleStartEditExperience(exp)} className={styles.deleteBtn} style={{ color: 'var(--primary-color, #4f46e5)' }} title="Edit experience">
+                            <button type="button" onClick={() => handleStartEditExperience(exp)} className={cls.deleteBtn} style={{ color: 'var(--primary-color, #4f46e5)' }} title="Edit experience">
                               <Edit3 size={16} />
                             </button>
-                            <button type="button" onClick={() => handleDeleteExperience(exp.id!)} className={styles.deleteBtn}>
+                            <button type="button" onClick={() => handleDeleteExperience(exp.id!)} className={cls.deleteBtn}>
                               <Trash2 size={16} />
                             </button>
                           </div>
                         </div>
                         {exp.bullets.length > 0 && (
-                          <ul className={styles.itemBullets}>
+                          <ul className={cls.itemBullets}>
                             {exp.bullets.map((b, i) => <li key={i}>{b}</li>)}
                           </ul>
                         )}
@@ -1361,8 +1450,8 @@ export const MasterProfile: React.FC = () => {
 
               {/* Projects Tab */}
               {activeTab === 'projects' && (
-                <div className={styles.listSection}>
-                  <div className={styles.sectionHeader}>
+                <div className={cls.listSection}>
+                  <div className={cls.sectionHeader}>
                     <h3>Featured Projects ({profile.projects.length})</h3>
                     {!isAdding && (
                       <Button onClick={() => setIsAdding(true)} variant="secondary">
@@ -1372,13 +1461,13 @@ export const MasterProfile: React.FC = () => {
                   </div>
 
                   {isAdding && (
-                    <form onSubmit={handleAddProject} className={`${styles.inlineForm} glass-card`}>
+                    <form onSubmit={handleAddProject} className={`${cls.inlineForm} glass-card`}>
                       <h4>{editingId ? 'Edit Project Details' : 'Add Project Details'}</h4>
-                      <div className={styles.formGrid}>
+                      <div className={cls.formGrid}>
                         <InputField label="Project Title *" id="addProjTitle" value={projTitle} onChange={e => setProjTitle(e.target.value)} />
                         <InputField label="Role" id="addProjRole" value={projRole} onChange={e => setProjRole(e.target.value)} />
                       </div>
-                      <div className={styles.formGrid}>
+                      <div className={cls.formGrid}>
                         <InputField label="Link / URL" id="addProjLink" placeholder="https://github.com/..." value={projLink} onChange={e => setProjLink(e.target.value)} />
                         <InputField label="Year / Date" id="addProjDate" placeholder="e.g. 2017" value={projDate} onChange={e => setProjDate(e.target.value)} />
                       </div>
@@ -1393,7 +1482,7 @@ export const MasterProfile: React.FC = () => {
                         onChange={e => setProjBullets(e.target.value)}
                       />
 
-                      <div className={styles.formActions}>
+                      <div className={cls.formActions}>
                         <Button variant="ghost" type="button" onClick={() => {
                           setIsAdding(false);
                           setEditingId(null);
@@ -1404,29 +1493,29 @@ export const MasterProfile: React.FC = () => {
                     </form>
                   )}
 
-                  <div className={styles.itemsList}>
+                  <div className={cls.itemsList}>
                     {profile.projects.map((proj) => (
-                      <div key={proj.id} className={`${styles.listItem} glass-card`}>
-                        <div className={styles.itemHeader}>
+                      <div key={proj.id} className={`${cls.listItem} glass-card`}>
+                        <div className={cls.itemHeader}>
                           <div>
-                            <h4>{proj.title} {proj.role && <span className={styles.subtext}>({proj.role})</span>}</h4>
+                            <h4>{proj.title} {proj.role && <span className={cls.subtext}>({proj.role})</span>}</h4>
                             {proj.technologies.length > 0 && (
-                              <div className={styles.tags}>
-                                {proj.technologies.map((t, i) => <span key={i} className={styles.tag}>{t}</span>)}
+                              <div className={cls.tags}>
+                                {proj.technologies.map((t, i) => <span key={i} className={cls.tag}>{t}</span>)}
                               </div>
                             )}
                           </div>
                           <div style={{ display: 'flex', gap: '8px' }}>
-                            <button type="button" onClick={() => handleStartEditProject(proj)} className={styles.deleteBtn} style={{ color: 'var(--primary-color, #4f46e5)' }} title="Edit project">
+                            <button type="button" onClick={() => handleStartEditProject(proj)} className={cls.deleteBtn} style={{ color: 'var(--primary-color, #4f46e5)' }} title="Edit project">
                               <Edit3 size={16} />
                             </button>
-                            <button type="button" onClick={() => handleDeleteProject(proj.id!)} className={styles.deleteBtn}>
+                            <button type="button" onClick={() => handleDeleteProject(proj.id!)} className={cls.deleteBtn}>
                               <Trash2 size={16} />
                             </button>
                           </div>
                         </div>
                         {proj.bullets.length > 0 && (
-                          <ul className={styles.itemBullets}>
+                          <ul className={cls.itemBullets}>
                             {proj.bullets.map((b, i) => <li key={i}>{b}</li>)}
                           </ul>
                         )}
@@ -1438,8 +1527,8 @@ export const MasterProfile: React.FC = () => {
 
               {/* Skills Tab */}
               {activeTab === 'skills' && (
-                <div className={styles.listSection}>
-                  <div className={styles.sectionHeader}>
+                <div className={cls.listSection}>
+                  <div className={cls.sectionHeader}>
                     <h3>Skills Registry ({profile.skills.length})</h3>
                     {!isAdding && (
                       <Button onClick={() => setIsAdding(true)} variant="secondary">
@@ -1449,12 +1538,12 @@ export const MasterProfile: React.FC = () => {
                   </div>
 
                   {isAdding && (
-                    <form onSubmit={handleAddSkill} className={`${styles.inlineForm} glass-card`}>
+                    <form onSubmit={handleAddSkill} className={`${cls.inlineForm} glass-card`}>
                       <h4>{editingId ? 'Edit Skill Tag' : 'Add Skill Tag'}</h4>
-                      <div className={styles.formGrid}>
+                      <div className={cls.formGrid}>
                         <InputField label="Skill Name *" id="addSkillName" placeholder="e.g. React" value={skillName} onChange={e => setSkillName(e.target.value)} />
 
-                        <div className={styles.selectGroup}>
+                        <div className={cls.selectGroup}>
                           <label htmlFor="addSkillCat">Category / Group *</label>
                           <select id="addSkillCat" value={skillCategory} onChange={e => {
                             const val = e.target.value;
@@ -1530,7 +1619,7 @@ export const MasterProfile: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className={styles.formActions}>
+                      <div className={cls.formActions}>
                         <Button variant="ghost" type="button" onClick={() => {
                           setIsAdding(false);
                           setEditingId(null);
@@ -1541,7 +1630,7 @@ export const MasterProfile: React.FC = () => {
                     </form>
                   )}
 
-                  <div className={styles.skillsRegistry}>
+                  <div className={cls.skillsRegistry}>
                     {/* Render grouped skills */}
                     {Object.entries(
                       localSkills.reduce((acc, curr) => {
@@ -1571,51 +1660,51 @@ export const MasterProfile: React.FC = () => {
                       .map(([category, skills]) => {
                         const sortedSkills = [...skills].sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
                         return (
-                          <div key={category} className={styles.skillCategoryBlock}>
+                          <div key={category} className={cls.skillCategoryBlock}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                              <h4 className={styles.categoryTitle} style={{ marginBottom: 0 }}>{category}</h4>
+                              <h4 className={cls.categoryTitle} style={{ marginBottom: 0 }}>{category}</h4>
                               <button
                                 type="button"
-                                className={styles.categoryActionBtn}
+                                className={cls.categoryActionBtn}
                                 onClick={() => handleRenameCategory(category)}
                                 title="Rename Category"
                               >
                                 <Edit3 size={14} />
                               </button>
                             </div>
-                            <div className={styles.skillsGrid}>
+                            <div className={cls.skillsGrid}>
                               {sortedSkills.map((s, idx) => {
                                 const isAnimating = s.id === animatingSkillId || s.id === animatingPartnerSkillId;
-                                const animationClass = isAnimating ? styles.animateFadeOut : '';
+                                const animationClass = isAnimating ? cls.animateFadeOut : '';
 
                                 return (
-                                  <div key={s.id} className={`${styles.skillTagCard} ${animationClass}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                  <div key={s.id} className={`${cls.skillTagCard} ${animationClass}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                                     <span>{s.name}</span>
                                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                     {idx > 0 && (
-                                      <button type="button" onClick={() => handleMoveSkill(s.id!, 'left')} className={styles.iconOrderBtn} title="Move left">
+                                      <button type="button" onClick={() => handleMoveSkill(s.id!, 'left')} className={cls.iconOrderBtn} title="Move left">
                                         <ChevronLeft size={12} />
                                       </button>
                                     )}
                                     {idx < sortedSkills.length - 1 && (
-                                      <button type="button" onClick={() => handleMoveSkill(s.id!, 'right')} className={styles.iconOrderBtn} title="Move right">
+                                      <button type="button" onClick={() => handleMoveSkill(s.id!, 'right')} className={cls.iconOrderBtn} title="Move right">
                                         <ChevronRight size={12} />
                                       </button>
                                     )}
                                     <button type="button" onClick={() => handleStartEditSkill(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', color: 'var(--primary-color, #4f46e5)' }} title="Edit skill">
                                       <Edit3 size={12} />
                                     </button>
-                                    <button onClick={() => handleDeleteSkill(s.id!)} className={styles.skillDeleteBtn}>X</button>
+                                    <button onClick={() => handleDeleteSkill(s.id!)} className={cls.skillDeleteBtn}>X</button>
                                   </div>
                                 </div>
                               );
                               })}
 
                             {inlineCategoryInput === category ? (
-                              <div className={styles.inlineSkillInputContainer}>
+                              <div className={cls.inlineSkillInputContainer}>
                                 <input
                                   type="text"
-                                  className={styles.inlineSkillInput}
+                                  className={cls.inlineSkillInput}
                                   placeholder="Type skill name..."
                                   value={inlineSkillName}
                                   onChange={(e) => setInlineSkillName(e.target.value)}
@@ -1631,7 +1720,7 @@ export const MasterProfile: React.FC = () => {
                                 />
                                 <button
                                   type="button"
-                                  className={styles.inlineSkillActionBtn}
+                                  className={cls.inlineSkillActionBtn}
                                   onClick={() => handleSaveInlineSkill(category)}
                                   title="Save"
                                 >
@@ -1639,7 +1728,7 @@ export const MasterProfile: React.FC = () => {
                                 </button>
                                 <button
                                   type="button"
-                                  className={styles.inlineSkillActionBtn}
+                                  className={cls.inlineSkillActionBtn}
                                   onClick={() => {
                                     setInlineCategoryInput(null);
                                     setInlineSkillName('');
@@ -1652,7 +1741,7 @@ export const MasterProfile: React.FC = () => {
                             ) : (
                               <button
                                 type="button"
-                                className={styles.addSkillTriggerBtn}
+                                className={cls.addSkillTriggerBtn}
                                 onClick={() => {
                                   setInlineCategoryInput(category);
                                   setInlineSkillName('');
@@ -1668,7 +1757,7 @@ export const MasterProfile: React.FC = () => {
                   </div>
                   
                   <div style={{ marginTop: '24px' }}>
-                    <Button onClick={handleSaveSkills} isLoading={isSaving} className={styles.saveBtn}>
+                    <Button onClick={handleSaveSkills} isLoading={isSaving} className={cls.saveBtn}>
                       Save Skills
                     </Button>
                   </div>
@@ -1677,8 +1766,8 @@ export const MasterProfile: React.FC = () => {
 
               {/* Education Tab */}
               {activeTab === 'education' && (
-                <div className={styles.listSection}>
-                  <div className={styles.sectionHeader}>
+                <div className={cls.listSection}>
+                  <div className={cls.sectionHeader}>
                     <h3>Education History ({profile.educations.length})</h3>
                     {!isAdding && (
                       <Button onClick={() => setIsAdding(true)} variant="secondary">
@@ -1688,21 +1777,21 @@ export const MasterProfile: React.FC = () => {
                   </div>
 
                   {isAdding && (
-                    <form onSubmit={handleAddEducation} className={`${styles.inlineForm} glass-card`}>
+                    <form onSubmit={handleAddEducation} className={`${cls.inlineForm} glass-card`}>
                       <h4>{editingId ? 'Edit Education Detail' : 'Add Education Detail'}</h4>
-                      <div className={styles.formGrid}>
+                      <div className={cls.formGrid}>
                         <InputField label="Institution Name *" id="addEduInst" value={eduInstitution} onChange={e => setEduInstitution(e.target.value)} />
                         <InputField label="Degree / Qualification" id="addEduDegree" placeholder="e.g. Bachelor of Science" value={eduDegree} onChange={e => setEduDegree(e.target.value)} />
                       </div>
-                      <div className={styles.formGrid}>
+                      <div className={cls.formGrid}>
                         <InputField label="Field of Study / Description" id="addEduField" placeholder="e.g. Computer Science or Graduated Cum Laude" value={eduFieldOfStudy} onChange={e => setEduFieldOfStudy(e.target.value)} />
                         <InputField label="Location" id="addEduLoc" placeholder="e.g. San Francisco, CA" value={eduLocation} onChange={e => setEduLocation(e.target.value)} />
                       </div>
-                      <div className={styles.formGrid}>
+                      <div className={cls.formGrid}>
                         <InputField label="Start Date" id="addEduStart" placeholder="e.g. 2012" value={eduStart} onChange={e => setEduStart(e.target.value)} />
                         <InputField label="End Date" id="addEduEnd" placeholder="e.g. 2016" value={eduEnd} onChange={e => setEduEnd(e.target.value)} disabled={eduCurrent} />
                       </div>
-                      <label className={styles.checkboxLabel}>
+                      <label className={cls.checkboxLabel}>
                         <input type="checkbox" checked={eduCurrent} onChange={e => {
                           setEduCurrent(e.target.checked);
                           if (e.target.checked) setEduEnd('Present');
@@ -1710,7 +1799,7 @@ export const MasterProfile: React.FC = () => {
                         <span>I currently study here</span>
                       </label>
 
-                      <div className={styles.formActions}>
+                      <div className={cls.formActions}>
                         <Button variant="ghost" type="button" onClick={() => {
                           setIsAdding(false);
                           setEditingId(null);
@@ -1721,26 +1810,26 @@ export const MasterProfile: React.FC = () => {
                     </form>
                   )}
 
-                  <div className={styles.itemsList}>
+                  <div className={cls.itemsList}>
                     {profile.educations.map((edu) => (
-                      <div key={edu.id} className={`${styles.listItem} glass-card`}>
-                        <div className={styles.itemHeader}>
+                      <div key={edu.id} className={`${cls.listItem} glass-card`}>
+                        <div className={cls.itemHeader}>
                           <div>
                             <h4>{edu.degree || 'Degree/Qualification'}</h4>
-                            <p className={styles.itemSub}>
+                            <p className={cls.itemSub}>
                               {edu.institution} {edu.location ? `| ${edu.location}` : ''} {edu.start_date ? `| ${edu.start_date} - ${edu.end_date}` : ''}
                             </p>
                             {edu.field_of_study && (
-                              <p className={styles.fieldOfStudyText} style={{ marginTop: '4px', fontStyle: 'italic', fontSize: '0.9em', color: 'var(--muted)' }}>
+                              <p className={cls.fieldOfStudyText} style={{ marginTop: '4px', fontStyle: 'italic', fontSize: '0.9em', color: 'var(--muted)' }}>
                                 {edu.field_of_study}
                               </p>
                             )}
                           </div>
                           <div style={{ display: 'flex', gap: '8px' }}>
-                            <button type="button" onClick={() => handleStartEditEducation(edu)} className={styles.deleteBtn} style={{ color: 'var(--primary-color, #4f46e5)' }} title="Edit education">
+                            <button type="button" onClick={() => handleStartEditEducation(edu)} className={cls.deleteBtn} style={{ color: 'var(--primary-color, #4f46e5)' }} title="Edit education">
                               <Edit3 size={16} />
                             </button>
-                            <button type="button" onClick={() => handleDeleteEducation(edu.id!)} className={styles.deleteBtn}>
+                            <button type="button" onClick={() => handleDeleteEducation(edu.id!)} className={cls.deleteBtn}>
                               <Trash2 size={16} />
                             </button>
                           </div>
@@ -1756,11 +1845,11 @@ export const MasterProfile: React.FC = () => {
       </div>
 
       {isImportModalOpen && (
-        <div className={styles.modalOverlay}>
-          <div className={`${styles.modal} glass`}>
-            <div className={styles.modalHeader}>
+        <div className={cls.modalOverlay}>
+          <div className={`${cls.modal} glass`}>
+            <div className={cls.modalHeader}>
               <h3>Import Data from CV</h3>
-              <button className={styles.closeBtn} onClick={() => {
+              <button className={cls.closeBtn} onClick={() => {
                 setIsImportModalOpen(false);
                 setImportStep(1);
                 setCvText('');
@@ -1773,26 +1862,26 @@ export const MasterProfile: React.FC = () => {
             </div>
 
             {importStep === 1 ? (
-              <div className={styles.wizardStep}>
-                <p className={styles.stepDesc}>
+              <div className={cls.wizardStep}>
+                <p className={cls.stepDesc}>
                   Upload your CV text (.txt) or PDF (.pdf) file or paste your CV raw text details here to trigger automatic AI parsing.
                 </p>
 
                 {parseError && (
-                  <div className={styles.errorAlertBanner}>
-                    <AlertCircle size={18} className={styles.errorAlertIcon} />
-                    <div className={styles.errorAlertContent}>
+                  <div className={cls.errorAlertBanner}>
+                    <AlertCircle size={18} className={cls.errorAlertIcon} />
+                    <div className={cls.errorAlertContent}>
                       <strong>AI Parsing Error</strong>
                       <span>{parseError}</span>
                     </div>
-                    <button className={styles.errorDismissBtn} onClick={() => setParseError(null)}>
+                    <button className={cls.errorDismissBtn} onClick={() => setParseError(null)}>
                       <X size={14} />
                     </button>
                   </div>
                 )}
 
-                <div className={styles.fileInputGroup}>
-                  <label htmlFor="cvUpload" className={styles.fileLabel}>
+                <div className={cls.fileInputGroup}>
+                  <label htmlFor="cvUpload" className={cls.fileLabel}>
                     <Upload size={16} /> {selectedFile ? selectedFile.name : 'Choose text or PDF CV file...'}
                   </label>
                   <input id="cvUpload" type="file" accept=".txt,.json,.pdf" onChange={(e) => {
@@ -1801,7 +1890,7 @@ export const MasterProfile: React.FC = () => {
                   }} style={{ display: 'none' }} />
                 </div>
                 <textarea
-                  className={styles.cvTextarea}
+                  className={cls.cvTextarea}
                   placeholder="Or paste your raw CV text here (Experiences, Education, Skills, etc.)..."
                   value={cvText}
                   onChange={(e) => {
@@ -1810,7 +1899,7 @@ export const MasterProfile: React.FC = () => {
                     if (selectedFile) setSelectedFile(null);
                   }}
                 />
-                <div className={styles.modalFooter}>
+                <div className={cls.modalFooter}>
                   <Button variant="ghost" onClick={() => {
                     setIsImportModalOpen(false);
                     setImportStep(1);
@@ -1825,17 +1914,17 @@ export const MasterProfile: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className={styles.wizardStep}>
-                <p className={styles.stepDesc}>
+              <div className={cls.wizardStep}>
+                <p className={cls.stepDesc}>
                   Select and edit the parsed sections below. Only checked items will be saved to your Master Profile.
                 </p>
 
-                <div className={styles.wizardScroller}>
+                <div className={cls.wizardScroller}>
                   {/* 1. Personal Info */}
                   {parsedData?.personal_info && (
-                    <div className={styles.parsedCard}>
+                    <div className={cls.parsedCard}>
                       <h4>Personal Information</h4>
-                      <div className={styles.formGrid}>
+                      <div className={cls.formGrid}>
                         <InputField
                           label="Full Name"
                           id="parsedName"
@@ -1855,7 +1944,7 @@ export const MasterProfile: React.FC = () => {
                           } : null)}
                         />
                       </div>
-                      <div className={styles.formGrid}>
+                      <div className={cls.formGrid}>
                         <InputField
                           label="Email"
                           id="parsedEmail"
@@ -1880,11 +1969,11 @@ export const MasterProfile: React.FC = () => {
 
                   {/* 2. Experiences */}
                   {parsedData?.work_experiences && parsedData.work_experiences.length > 0 && (
-                    <div className={styles.parsedCard}>
+                    <div className={cls.parsedCard}>
                       <h4>Work Experiences</h4>
                       {parsedData.work_experiences.map((exp, idx) => (
-                        <div key={idx} className={styles.reviewItem}>
-                          <label className={styles.reviewCheckbox}>
+                        <div key={idx} className={cls.reviewItem}>
+                          <label className={cls.reviewCheckbox}>
                             <input
                               type="checkbox"
                               checked={!!selectedExperiences[idx]}
@@ -1894,8 +1983,8 @@ export const MasterProfile: React.FC = () => {
                           </label>
 
                           {selectedExperiences[idx] && (
-                            <div className={styles.reviewFields}>
-                              <div className={styles.formGrid}>
+                            <div className={cls.reviewFields}>
+                              <div className={cls.formGrid}>
                                 <InputField
                                   label="Company"
                                   id={`expCompany_${idx}`}
@@ -1919,7 +2008,7 @@ export const MasterProfile: React.FC = () => {
                                   })}
                                 />
                               </div>
-                              <div className={styles.formGrid}>
+                              <div className={cls.formGrid}>
                                 <InputField
                                   label="Location"
                                   id={`expLoc_${idx}`}
@@ -1949,7 +2038,7 @@ export const MasterProfile: React.FC = () => {
                                 />
                               </div>
                               <textarea
-                                className={styles.bulletsEdit}
+                                className={cls.bulletsEdit}
                                 placeholder="Job Bullets (one per line)..."
                                 value={exp.bullets?.join('\n') || ''}
                                 onChange={(e) => setParsedData(prev => {
@@ -1968,11 +2057,11 @@ export const MasterProfile: React.FC = () => {
 
                   {/* 3. Projects */}
                   {parsedData?.projects && parsedData.projects.length > 0 && (
-                    <div className={styles.parsedCard}>
+                    <div className={cls.parsedCard}>
                       <h4>Projects</h4>
                       {parsedData.projects.map((proj, idx) => (
-                        <div key={idx} className={styles.reviewItem}>
-                          <label className={styles.reviewCheckbox}>
+                        <div key={idx} className={cls.reviewItem}>
+                          <label className={cls.reviewCheckbox}>
                             <input
                               type="checkbox"
                               checked={!!selectedProjects[idx]}
@@ -1982,8 +2071,8 @@ export const MasterProfile: React.FC = () => {
                           </label>
 
                           {selectedProjects[idx] && (
-                            <div className={styles.reviewFields}>
-                              <div className={styles.formGrid}>
+                            <div className={cls.reviewFields}>
+                              <div className={cls.formGrid}>
                                 <InputField
                                   label="Project Title"
                                   id={`projTitle_${idx}`}
@@ -2008,7 +2097,7 @@ export const MasterProfile: React.FC = () => {
                                 />
                               </div>
                               <textarea
-                                className={styles.bulletsEdit}
+                                className={cls.bulletsEdit}
                                 placeholder="Project Bullets (one per line)..."
                                 value={proj.bullets?.join('\n') || ''}
                                 onChange={(e) => setParsedData(prev => {
@@ -2027,11 +2116,11 @@ export const MasterProfile: React.FC = () => {
 
                   {/* 4. Education */}
                   {parsedData?.educations && parsedData.educations.length > 0 && (
-                    <div className={styles.parsedCard}>
+                    <div className={cls.parsedCard}>
                       <h4>Education</h4>
                       {parsedData.educations.map((edu, idx) => (
-                        <div key={idx} className={styles.reviewItem}>
-                          <label className={styles.reviewCheckbox}>
+                        <div key={idx} className={cls.reviewItem}>
+                          <label className={cls.reviewCheckbox}>
                             <input
                               type="checkbox"
                               checked={!!selectedEducations[idx]}
@@ -2041,8 +2130,8 @@ export const MasterProfile: React.FC = () => {
                           </label>
 
                           {selectedEducations[idx] && (
-                            <div className={styles.reviewFields}>
-                              <div className={styles.formGrid}>
+                            <div className={cls.reviewFields}>
+                              <div className={cls.formGrid}>
                                 <InputField
                                   label="Institution"
                                   id={`eduInst_${idx}`}
@@ -2066,7 +2155,7 @@ export const MasterProfile: React.FC = () => {
                                   })}
                                 />
                               </div>
-                              <div className={styles.formGrid}>
+                              <div className={cls.formGrid}>
                                 <InputField
                                   label="Location"
                                   id={`eduLoc_${idx}`}
@@ -2115,11 +2204,11 @@ export const MasterProfile: React.FC = () => {
 
                   {/* 5. Skills */}
                   {parsedData?.skills && parsedData.skills.length > 0 && (
-                    <div className={styles.parsedCard}>
+                    <div className={cls.parsedCard}>
                       <h4>Skills Tags</h4>
-                      <div className={styles.skillsReviewGrid}>
+                      <div className={cls.skillsReviewGrid}>
                         {parsedData.skills.map((skill, idx) => (
-                          <label key={idx} className={styles.skillCheckCard}>
+                          <label key={idx} className={cls.skillCheckCard}>
                             <input
                               type="checkbox"
                               checked={!!selectedSkills[idx]}
@@ -2133,7 +2222,7 @@ export const MasterProfile: React.FC = () => {
                   )}
                 </div>
 
-                <div className={styles.modalFooter}>
+                <div className={cls.modalFooter}>
                   <Button variant="ghost" onClick={() => setImportStep(1)}>Back</Button>
                   <Button onClick={handleConfirmImport} isLoading={isSaving}>
                     Confirm & Save to Profile

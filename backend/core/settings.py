@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'master_profile',
     'resume',
     'applications',
+    'admin_panel',
 ]
 
 MIDDLEWARE = [
