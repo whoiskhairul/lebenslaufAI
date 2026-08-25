@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { RenderableUnit } from './editor/types/editor.types';
-import { formatPhoneNumber } from './editor/utils/phoneUtils';
-import { AutoSizeTextarea, MeasuringContext } from './editor/components/AutoSizeTextarea';
-import { UnitRenderer } from './editor/components/UnitRenderer';
-import ed from './EditorNew.module.css';
+import { RenderableUnit } from '../../../views/editor/types/editor.types';
+import { formatPhoneNumber } from '../../../views/editor/utils/phoneUtils';
+import { AutoSizeTextarea, MeasuringContext } from '../../../views/editor/components/AutoSizeTextarea';
+import { UnitRenderer } from '../../../views/editor/components/UnitRenderer';
+import ed from '../../../views/EditorNew.module.css';
+import { DEFAULT_CUSTOM_STYLES } from '../../editor/state/cvDocumentStore';
+import { DEFAULT_SECTIONS } from '../../editor/hooks/cvDocumentDefaults';
 
 const templateClassMap: { [key: string]: string } = {
   pixel_perfect_pdf: 'pixelPerfectLayout',
@@ -12,32 +14,6 @@ const templateClassMap: { [key: string]: string } = {
   executive_professional: 'executive_professional',
   creative_tech: 'creative_tech'
 };
-
-export const DEFAULT_CUSTOM_STYLES = {
-  fontSize: 13,
-  headingSize: 1.4,
-  lineHeight: 1.4,
-  sectionSpacing: 20,
-  accentColor: '#0f172a',
-  headingSecondaryColor: '#3d7ee6',
-  textColor: '#334155',
-  alignment: 'left',
-  pageMargin: 48,
-  bulletSpacing: 4,
-  personalDetailsOffset: 16,
-  dateFormat: 'MM/YYYY',
-  pageSize: 'A4',
-  fontFamily: '',
-  signatureHeight: 48
-};
-
-export const DEFAULT_SECTIONS: any[] = [
-  { id: 'summary', name: 'Professional Summary', visible: true, type: 'summary' },
-  { id: 'experience', name: 'Work Experience', visible: true, type: 'experience' },
-  { id: 'projects', name: 'Projects', visible: true, type: 'projects' },
-  { id: 'education', name: 'Education', visible: true, type: 'education' },
-  { id: 'skills', name: 'Skills', visible: true, type: 'skills' }
-];
 
 export interface CvDocData {
   template: string;

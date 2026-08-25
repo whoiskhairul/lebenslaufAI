@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
@@ -32,6 +32,9 @@ import { SectionSettingsPopover } from './editor/components/SectionSettingsPopov
 import { UnitRenderer } from './editor/components/UnitRenderer';
 import { SectionDetailEditor } from './editor/components/sidepanel/SectionDetailEditor';
 import { AddCustomSectionModal, CustomSectionFormat } from './editor/components/AddCustomSectionModal';
+import { useCanvasZoom } from '../features/editor/hooks/useCanvasZoom';
+import { useCvPagination } from '../features/editor/hooks/useCvPagination';
+import { useCvDocumentStore } from '../features/editor/state/cvDocumentStore';
 interface ParsedLetter {
   sender_name: string;
   sender_address: string;
@@ -73,7 +76,7 @@ const getParsedLetter = (content: string, editablePersonalInfo: any): ParsedLett
       subject: '',
       salutation: '',
       body: '',
-      closing_salutation: 'Mit freundlichen Grüßen',
+      closing_salutation: 'Mit freundlichen GrÃ¼ÃŸen',
       candidate_name: editablePersonalInfo.full_name || '',
       is_json: false
     };
@@ -114,12 +117,12 @@ const getParsedLetter = (content: string, editablePersonalInfo: any): ParsedLett
     'sincerely',
     'best regards',
     'kind regards',
-    'viele grüße',
-    'freundliche grüße',
+    'viele grÃ¼ÃŸe',
+    'freundliche grÃ¼ÃŸe',
     'hochachtungsvoll',
     'yours truly',
     'mit besten',
-    'grüße'
+    'grÃ¼ÃŸe'
   ];
   for (let i = lines.length - 1; i >= 0; i--) {
     const lineLower = lines[i].toLowerCase().trim();
@@ -159,7 +162,7 @@ const getParsedLetter = (content: string, editablePersonalInfo: any): ParsedLett
     subject: '',
     salutation: '',
     body: bodyText,
-    closing_salutation: closingText || 'Mit freundlichen Grüßen',
+    closing_salutation: closingText || 'Mit freundlichen GrÃ¼ÃŸen',
     candidate_name: nameText || editablePersonalInfo.full_name || '',
     is_json: false
   };
@@ -283,7 +286,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const [jobDescription, setJobDescription] = useState('');
   const [company, setCompany] = useState('');
   const [position, setPosition] = useState('');
-  const [template, setTemplate] = useState('pixel_perfect_pdf');
+  const template = useCvDocumentStore((s) => s.template);
+  const setTemplate = useCvDocumentStore((s) => s.setTemplate);
   const [isLoading, setIsLoading] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<ResumeVersion | null>(null);
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
@@ -312,7 +316,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const [activeStyleSubTab, setActiveStyleSubTab] = useState<'theme' | 'sections'>('sections');
   const [activeDetailSectionId, setActiveDetailSectionId] = useState<string | null>(null);
   const [expandedSectionSettings, setExpandedSectionSettings] = useState<string | null>(null);
-  const [headerStyles, setHeaderStyles] = useState<any>({});
+  const headerStyles = useCvDocumentStore((s) => s.headerStyles);
+  const setHeaderStyles = useCvDocumentStore((s) => s.setHeaderStyles);
   const [activeSectionSettings, setActiveSectionSettings] = useState<string | null>(null);
   const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
   const [editingSectionTitleId, setEditingSectionTitleId] = useState<string | null>(null);
@@ -480,40 +485,9 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     };
   }, [activeSectionSettings]);
 
-  // Global Margins, Colors and Fonts
-  const [customStyles, setCustomStyles] = useState<{
-    fontSize: number;
-    headingSize: number;
-    lineHeight: number;
-    sectionSpacing: number;
-    accentColor: string;
-    textColor: string;
-    alignment: string;
-    pageMargin?: number;
-    bulletSpacing?: number;
-    personalDetailsOffset?: number;
-    headingSecondaryColor?: string;
-    dateFormat: 'MM/YYYY' | 'MMM YYYY' | 'YYYY';
-    pageSize: 'A4';
-    fontFamily?: string;
-    signatureHeight?: number;
-  }>({
-    fontSize: 13,
-    headingSize: 1.4,
-    lineHeight: 1.4,
-    sectionSpacing: 20,
-    accentColor: '#0f172a',
-    headingSecondaryColor: '#3d7ee6',
-    textColor: '#334155',
-    alignment: 'left',
-    pageMargin: 48,
-    bulletSpacing: 4,
-    personalDetailsOffset: 16,
-    dateFormat: 'MM/YYYY',
-    pageSize: 'A4',
-    fontFamily: '',
-    signatureHeight: 48
-  });
+  // Global Margins, Colors and Fonts (document store)
+  const customStyles = useCvDocumentStore((s) => s.customStyles);
+  const setCustomStyles = useCvDocumentStore((s) => s.setCustomStyles);
 
   const [letterStyles, setLetterStyles] = useState<{
     fontSize: number;
@@ -525,80 +499,29 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     fontFamily: ''
   });
 
-  // Section Ordering and Visibility Matrix
-  const [sections, setSections] = useState<Array<{
-    id: string;
-    name: string;
-    visible: boolean;
-    type: 'summary' | 'experience' | 'skills' | 'projects' | 'education' | 'custom';
-    bullets?: string[];
-    customStyles?: {
-      fontSize?: number;
-      spacing?: number;
-      alignment?: string;
-      headingSize?: number;
-      headingColor?: string;
-      headingSecondaryColor?: string;
-      headingWeight?: string;
-      headingStyle?: string;
-      headingAlignment?: string;
-      lineHeight?: number;
-      textColor?: string;
-      fontStyle?: string;
-      fontWeight?: string;
-      itemGap?: number;
-      bulletSpacing?: number;
-    };
-    customFormat?: 'bullets' | 'keyvalue' | 'entries' | 'paragraph';
-    keyValuePairs?: Array<{ key: string; value: string }>;
-    entries?: any[];
-    paragraphText?: string;
-    originalSnapshot?: any;
-    aiSnapshot?: any;
-    activeVersion?: 'original' | 'ai';
-  }>>([
-    { id: 'summary', name: 'Professional Summary', visible: true, type: 'summary' },
-    { id: 'experience', name: 'Work Experience', visible: true, type: 'experience' },
-    { id: 'projects', name: 'Projects', visible: true, type: 'projects' },
-    { id: 'education', name: 'Education', visible: true, type: 'education' },
-    { id: 'skills', name: 'Skills', visible: true, type: 'skills' }
-  ]);
+  // Section Ordering and Visibility Matrix (document store)
+  const sections = useCvDocumentStore((s) => s.sections);
+  const setSections = useCvDocumentStore((s) => s.setSections);
 
-  // Editable CV text grids
-  const [editableSummary, setEditableSummary] = useState('');
-  const [editablePersonalInfo, setEditablePersonalInfo] = useState<{
-    id?: string;
-    full_name: string;
-    title: string;
-    email: string;
-    phone: string;
-    location: string;
-    date_of_birth: string;
-    nationality: string;
-    linkedin: string;
-    github: string;
-    website: string;
-    image_url: string;
-    signature_image?: string;
-  }>({
-    full_name: '',
-    title: '',
-    email: '',
-    phone: '',
-    location: '',
-    date_of_birth: '',
-    nationality: '',
-    linkedin: '',
-    github: '',
-    website: '',
-    image_url: '',
-    signature_image: ''
-  });
-  const [editableExperiences, setEditableExperiences] = useState<Array<{ id: string; bullets: string[]; company?: string; position?: string; location?: string; start_date?: string; end_date?: string }>>([]);
-  const [editableProjects, setEditableProjects] = useState<Array<{ id: string; bullets: string[]; title?: string; role?: string; technologies?: string[] | string; date?: string; link?: string; github_url?: string; demo_url?: string }>>([]);
-  const [editableEducations, setEditableEducations] = useState<Array<{ id: string; institution: string; degree?: string; field_of_study?: string; start_date?: string; end_date?: string; location?: string; bullets?: string[] }>>([]);
-  const [editableSkills, setEditableSkills] = useState<Array<{ id: string; name: string; category: string }>>([]);
+  // Editable CV text grids (document store)
+  const editableSummary = useCvDocumentStore((s) => s.editableSummary);
+  const setEditableSummary = useCvDocumentStore((s) => s.setEditableSummary);
+  const editablePersonalInfo = useCvDocumentStore((s) => s.editablePersonalInfo);
+  const setEditablePersonalInfo = useCvDocumentStore((s) => s.setEditablePersonalInfo);
+  const editableExperiences = useCvDocumentStore((s) => s.editableExperiences);
+  const setEditableExperiences = useCvDocumentStore((s) => s.setEditableExperiences);
+  const editableProjects = useCvDocumentStore((s) => s.editableProjects);
+  const setEditableProjects = useCvDocumentStore((s) => s.setEditableProjects);
+  const editableEducations = useCvDocumentStore((s) => s.editableEducations);
+  const setEditableEducations = useCvDocumentStore((s) => s.setEditableEducations);
+  const editableSkills = useCvDocumentStore((s) => s.editableSkills);
+  const setEditableSkills = useCvDocumentStore((s) => s.setEditableSkills);
   const [expandedProjectCards, setExpandedProjectCards] = useState<Record<string, boolean>>({});
+
+  // Document state lives in a shared store — start every editor visit from clean defaults
+  useEffect(() => {
+    useCvDocumentStore.getState().resetDocument();
+  }, []);
 
   // Dynamic Document Title: "name of the applicant_Lebenslauf"
   useEffect(() => {
@@ -852,9 +775,12 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
 
 
-  const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
-  const [languagesFirst, setLanguagesFirst] = useState(false);
-  const [languagesTitle, setLanguagesTitle] = useState<string>('');
+  const categoryOrder = useCvDocumentStore((s) => s.categoryOrder);
+  const setCategoryOrder = useCvDocumentStore((s) => s.setCategoryOrder);
+  const languagesFirst = useCvDocumentStore((s) => s.languagesFirst);
+  const setLanguagesFirst = useCvDocumentStore((s) => s.setLanguagesFirst);
+  const languagesTitle = useCvDocumentStore((s) => s.languagesTitle);
+  const setLanguagesTitle = useCvDocumentStore((s) => s.setLanguagesTitle);
   const [expandedSkillCats, setExpandedSkillCats] = useState<Record<string, boolean>>({});
 
   // Focus redirection metadata when editing lists dynamically
@@ -983,7 +909,6 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   // Canvas viewport scale settings
   const viewportRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
 
   const MOBILE_BREAKPOINT = 1024;
   const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT);
@@ -1000,7 +925,6 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   // Multi-Page Virtual Matrix state
   const hiddenCanvasRef = useRef<HTMLDivElement>(null);
-  const [pages, setPages] = useState<RenderableUnit[][]>([[]]);
   const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({});
 
   // Sync route param hashes
@@ -1024,53 +948,33 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     });
   }, [editableSkills]);
 
-  // Adjust canvas viewport zoom scale
-  useEffect(() => {
-    const handleResize = () => {
-      if (viewportRef.current) {
-        const viewportWidth = viewportRef.current.clientWidth - 40;
-        if (viewportWidth <= 0) return;
-        const pageWidth = 794;
-        setScale(Math.min(1, viewportWidth / pageWidth));
-      }
-    };
-    window.addEventListener('resize', handleResize);
-    handleResize();
-    const timer = setTimeout(handleResize, 150);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      clearTimeout(timer);
-    };
-  }, [currentVersion, editorTab, customStyles.pageSize, mobileActivePane]);
+  // Virtual page matrix + canvas zoom-to-fit
+  const pages = useCvPagination(
+    hiddenCanvasRef,
+    {
+      template, sections, editableExperiences, editableProjects,
+      editableEducations, editableSkills, customStyles,
+      languagesFirst, categoryOrder,
+    },
+    [
+      editableSummary, editablePersonalInfo, editableExperiences, editableSkills,
+      editableProjects, editableEducations, template, sections, customStyles, headerStyles,
+      languagesFirst, categoryOrder, mobileActivePane
+    ]
+  );
 
-  // Compensate the layout height of the scaled page stack (transform does not affect flow size)
-  const scaledWrapperRef = useRef<HTMLDivElement>(null);
-  const [wrapperHeightCompensation, setWrapperHeightCompensation] = useState(0);
-
-  useEffect(() => {
-    const el = scaledWrapperRef.current;
-    if (!el) return;
-    const measure = () => {
-      const h = el.offsetHeight;
-      setWrapperHeightCompensation(h > 0 ? h * (1 - scale) : 0);
-    };
-    measure();
-    let observer: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      observer = new ResizeObserver(measure);
-      observer.observe(el);
-    }
-    return () => {
-      if (observer) observer.disconnect();
-    };
-  }, [scale, editorTab, pages, customStyles]);
+  const { scale, scaledWrapperRef, wrapperHeightCompensation } = useCanvasZoom(
+    viewportRef,
+    [currentVersion, editorTab, customStyles.pageSize, mobileActivePane],
+    [editorTab, pages, customStyles]
+  );
 
   // Trigger DOM layout engine re-calculation when styling changes
   useEffect(() => {
     window.dispatchEvent(new Event('cv-style-change'));
   }, [customStyles, sections, template]);
 
-  // Re-measure canvas fields when the preview pane becomes visible again on mobile —
+  // Re-measure canvas fields when the preview pane becomes visible again on mobile â€”
   // textareas measured while display:none collapse to zero height
   useEffect(() => {
     if (!isMobileViewport || mobileActivePane !== 'preview') return;
@@ -1438,12 +1342,12 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         const entryId = `entry_${exp.id}`;
         options.push({
           id: entryId,
-          label: `ðŸ¢ Job #${expIdx + 1}: ${exp.position || 'Position'} @ ${exp.company || 'Company'}`
+          label: `Ã°Å¸ÂÂ¢ Job #${expIdx + 1}: ${exp.position || 'Position'} @ ${exp.company || 'Company'}`
         });
         (exp.bullets || []).forEach((bullet, bIdx) => {
           options.push({
             id: `bullet_${exp.id}_${bIdx}`,
-            label: `  ↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+            label: `  â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
           });
         });
       });
@@ -1452,12 +1356,12 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         const entryId = `entry_${proj.id}`;
         options.push({
           id: entryId,
-          label: `ðŸš€ Project #${projIdx + 1}: ${proj.title || 'Project'}`
+          label: `Ã°Å¸Å¡â‚¬ Project #${projIdx + 1}: ${proj.title || 'Project'}`
         });
         (proj.bullets || []).forEach((bullet, bIdx) => {
           options.push({
             id: `bullet_${proj.id}_${bIdx}`,
-            label: `  ↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+            label: `  â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
           });
         });
       });
@@ -1466,12 +1370,12 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         const entryId = `entry_${edu.id}`;
         options.push({
           id: entryId,
-          label: `ðŸŽ“ Education #${eduIdx + 1}: ${edu.degree || 'Degree'} - ${edu.institution || 'Institution'}`
+          label: `Ã°Å¸Å½â€œ Education #${eduIdx + 1}: ${edu.degree || 'Degree'} - ${edu.institution || 'Institution'}`
         });
         (edu.bullets || []).forEach((bullet, bIdx) => {
           options.push({
             id: `bullet_${edu.id}_${bIdx}`,
-            label: `  ↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+            label: `  â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
           });
         });
       });
@@ -1479,7 +1383,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       (targetSec.bullets || []).forEach((bullet, bIdx) => {
         options.push({
           id: `bullet_${targetSec.id}_${bIdx}`,
-          label: `↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
+          label: `â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
         });
       });
     }
@@ -1682,14 +1586,14 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       if (type === 'summary') {
         setEditableSummary(proposed);
       } else if (type === 'custom') {
-        const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+        const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter(Boolean);
         setSections(prev => prev.map(s => s.id === sectionId ? { ...s, bullets } : s));
       } else if (type === 'experience') {
         const blocks = proposed.split('\n\n');
         setEditableExperiences(prev => prev.map((exp, idx) => {
           const block = blocks[idx] || blocks[0];
           if (!block) return exp;
-          const bullets = block.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter((b: string) => b && !b.toLowerCase().includes(' at '));
+          const bullets = block.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter((b: string) => b && !b.toLowerCase().includes(' at '));
           return bullets.length > 0 ? { ...exp, bullets } : exp;
         }));
       } else if (type === 'projects') {
@@ -1697,7 +1601,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         setEditableProjects(prev => prev.map((proj, idx) => {
           const block = blocks[idx] || blocks[0];
           if (!block) return proj;
-          const bullets = block.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter((b: string) => b && !b.includes('('));
+          const bullets = block.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter((b: string) => b && !b.includes('('));
           return bullets.length > 0 ? { ...proj, bullets } : proj;
         }));
       } else if (type === 'education') {
@@ -1705,13 +1609,13 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         setEditableEducations(prev => prev.map((edu, idx) => {
           const block = blocks[idx] || blocks[0];
           if (!block) return edu;
-          const bullets = block.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter((b: string) => b && !b.includes('-'));
+          const bullets = block.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter((b: string) => b && !b.includes('-'));
           return bullets.length > 0 ? { ...edu, bullets } : edu;
         }));
       }
     } else if (scope.startsWith('entry_')) {
       const itemId = scope.replace('entry_', '');
-      const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+      const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter(Boolean);
       if (bullets.length > 0) {
         if (type === 'experience') {
           setEditableExperiences(prev => prev.map(e => e.id === itemId ? { ...e, bullets } : e));
@@ -1725,7 +1629,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       const parts = scope.replace('bullet_', '').split('_');
       const itemId = parts[0];
       const bulletIdx = parseInt(parts[1], 10);
-      const cleanBullet = proposed.trim().replace(/^[-•*]\s*/, '');
+      const cleanBullet = proposed.trim().replace(/^[-â€¢*]\s*/, '');
 
       if (cleanBullet) {
         if (type === 'experience') {
@@ -2086,251 +1990,6 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       }
     }
   };
-
-
-  // ----------------------------------------------------
-  // VIRTUAL PAGE MATRIX PARTITIONING SYSTEM
-  // ----------------------------------------------------
-  useEffect(() => {
-    const measureAndLayout = () => {
-      if (!hiddenCanvasRef.current) return;
-      // Defer measurement while the canvas pane is hidden (mobile Editor mode) — zero-height reads would corrupt pagination
-      if (hiddenCanvasRef.current.getBoundingClientRect().width === 0) return;
-
-      // Create flat elements stream based on sections order and visible elements
-      const unitsList: RenderableUnit[] = [];
-
-      unitsList.push({ type: 'header', id: 'header' });
-
-      // Creative tech sidebar contacts static layout
-      if (template === 'creative_tech') {
-        unitsList.push({ type: 'contacts-static', id: 'contacts-static' });
-      }
-
-      sections.forEach(sec => {
-        if (!sec.visible) return;
-
-        if (sec.type === 'summary') {
-          unitsList.push({ type: 'section-title', id: `title-${sec.id}`, sectionId: sec.id, titleText: sec.name });
-          unitsList.push({ type: 'summary', id: `summary-content`, sectionId: sec.id });
-        } else if (sec.type === 'experience') {
-          unitsList.push({ type: 'section-title', id: `title-${sec.id}`, sectionId: sec.id, titleText: sec.name });
-          editableExperiences.forEach((exp, idx) => {
-            unitsList.push({
-              type: 'experience-item',
-              id: `exp-item-${exp.id}`,
-              sectionId: sec.id,
-              itemIndex: idx,
-              itemData: exp
-            });
-          });
-        } else if (sec.type === 'projects') {
-          unitsList.push({ type: 'section-title', id: `title-${sec.id}`, sectionId: sec.id, titleText: sec.name });
-          editableProjects.forEach((proj, idx) => {
-            unitsList.push({
-              type: 'project-item',
-              id: `proj-item-${proj.id}`,
-              sectionId: sec.id,
-              itemIndex: idx,
-              itemData: proj
-            });
-          });
-        } else if (sec.type === 'education') {
-          unitsList.push({ type: 'section-title', id: `title-${sec.id}`, sectionId: sec.id, titleText: sec.name });
-          editableEducations.forEach((edu, idx) => {
-            unitsList.push({
-              type: 'education-item',
-              id: `edu-item-${edu.id}`,
-              sectionId: sec.id,
-              itemIndex: idx,
-              itemData: edu
-            });
-          });
-        } else if (sec.type === 'skills') {
-          unitsList.push({ type: 'section-title', id: `title-${sec.id}`, sectionId: sec.id, titleText: sec.name });
-
-          const langSkills = editableSkills.filter(s => (s.category || '').toLowerCase().trim() === 'languages');
-          const itSkills = editableSkills.filter(s => (s.category || '').toLowerCase().trim() !== 'languages');
-          const uniqueCats = Array.from(new Set(itSkills.map(s => (s.category || 'technical').toLowerCase().trim())));
-
-          const normalizedOrder = categoryOrder.map(c => c.toLowerCase().trim());
-          const itCategories = normalizedOrder.filter(c => uniqueCats.includes(c));
-          const extraCats = uniqueCats.filter(c => !itCategories.includes(c));
-          const finalCategories = [...itCategories, ...extraCats];
-
-          if (categoryOrder.length === 0) {
-            finalCategories.sort((a, b) => {
-              const getCategoryOrderScore = (cat: string) => {
-                const order = [
-                  'programming languages',
-                  'frameworks & libraries',
-                  'databases',
-                  'cloud & devops',
-                  'development tools',
-                  'testing'
-                ];
-                const idx = order.indexOf(cat.toLowerCase().trim());
-                if (idx !== -1) return idx;
-                if (cat.toLowerCase().trim() === 'languages') return 999;
-                return 100;
-              };
-              return getCategoryOrderScore(a) - getCategoryOrderScore(b);
-            });
-          }
-
-          const addLanguagesUnit = () => {
-            if (langSkills.length > 0) {
-              unitsList.push({ type: 'skills-languages', id: 'skills-languages', sectionId: sec.id, skills: langSkills });
-            }
-          };
-
-          const addITSkillsUnits = () => {
-            finalCategories.forEach((cat) => {
-              const catSkills = itSkills.filter(s => (s.category || 'technical').toLowerCase().trim() === cat);
-              if (catSkills.length > 0) {
-                unitsList.push({
-                  type: 'skills-category',
-                  id: `skills-category-${cat}`,
-                  sectionId: sec.id,
-                  category: cat,
-                  skills: catSkills
-                });
-              }
-            });
-          };
-
-          if (languagesFirst) {
-            addLanguagesUnit();
-            addITSkillsUnits();
-          } else {
-            addITSkillsUnits();
-            addLanguagesUnit();
-          }
-        } else if (sec.type === 'custom') {
-          unitsList.push({ type: 'section-title', id: `title-${sec.id}`, sectionId: sec.id, titleText: sec.name });
-          unitsList.push({
-            type: 'custom-content',
-            id: `custom-content-${sec.id}`,
-            sectionId: sec.id,
-            bullets: sec.bullets || [],
-            itemData: sec
-          });
-        }
-      });
-
-      // Retrieve actual DOM client dimensions of elements inside hidden canvas
-      const measured: Record<string, number> = {};
-      const childElements = hiddenCanvasRef.current.querySelectorAll('[data-measuring-id]');
-      childElements.forEach((el: any) => {
-        const id = el.getAttribute('data-measuring-id');
-        if (id) {
-          const compStyle = window.getComputedStyle(el);
-          const marginTop = parseFloat(compStyle.marginTop) || 0;
-          const marginBottom = parseFloat(compStyle.marginBottom) || 0;
-          measured[id] = el.getBoundingClientRect().height + marginTop + marginBottom;
-        }
-      });
-
-      setMeasuredHeights(measured);
-
-      // Distribute stream across isolated pages
-      const pageHeight = 1123;
-      const pageMargin = customStyles.pageMargin || 48;
-
-      // Usable inner content height for allowedPageContentHeight zone (exact top/bottom margin bounds)
-      const printableContentHeight = pageHeight - 2 * pageMargin;
-      const activeColumnLimit = printableContentHeight;
-
-      // Helper to compute unit effective height directly from true measured DOM height
-      const getUnitEffectiveHeight = (u: RenderableUnit): number => {
-        const baseHeight = measured[u.id] || 0;
-        const unitGap = u.type === 'section-title' ? (customStyles.sectionSpacing || 14) : 4;
-        return baseHeight + unitGap;
-      };
-
-      const newPages: RenderableUnit[][] = [[]];
-
-      // Layout heights tracking (handles split grid column constraints in Creative Tech)
-      let currentMainHeight = 0;
-      let currentSidebarHeight = 0;
-
-      for (let i = 0; i < unitsList.length; i++) {
-        const unit = unitsList[i];
-        const effHeight = getUnitEffectiveHeight(unit);
-
-        // Header resides exclusively on page 1 top bounds
-        if (unit.type === 'header') {
-          newPages[0].push(unit);
-          currentMainHeight += effHeight;
-          currentSidebarHeight += effHeight;
-          continue;
-        }
-
-        // Determine columns division mapping
-        const isSidebarColumn = template === 'creative_tech' && (unit.sectionId === 'skills' || unit.type === 'contacts-static');
-
-        let shouldPushPage = false;
-
-        // Strict Section Atomicity Page Partitioning:
-        // When encountering a section-title, calculate the height of this title PLUS ALL ITS SUBSEQUENT ITEMS in unitsList.
-        if (unit.type === 'section-title') {
-          // Find all units belonging to this section starting from this title
-          let remainingSectionHeight = 0;
-          for (let j = i; j < unitsList.length && unitsList[j].sectionId === unit.sectionId; j++) {
-            remainingSectionHeight += getUnitEffectiveHeight(unitsList[j]);
-          }
-
-          const currentHeight = isSidebarColumn ? currentSidebarHeight : currentMainHeight;
-
-          // If the entire section can fit on a clean blank page (remainingSectionHeight <= activeColumnLimit),
-          // but DOES NOT fit in the current page's remaining space, push the ENTIRE section to the next page!
-          if (remainingSectionHeight <= activeColumnLimit) {
-            if (currentHeight + remainingSectionHeight > activeColumnLimit && currentHeight > 0) {
-              shouldPushPage = true;
-            }
-          } else {
-            // Section itself is larger than 1 full page:
-            // At least ensure title + first content item fit on the current page, otherwise push title to next page.
-            const firstContentUnit = unitsList[i + 1] && unitsList[i + 1].sectionId === unit.sectionId ? unitsList[i + 1] : null;
-            const minHeaderGroupHeight = effHeight + (firstContentUnit ? getUnitEffectiveHeight(firstContentUnit) : 0);
-            if (currentHeight + minHeaderGroupHeight > activeColumnLimit && currentHeight > 0) {
-              shouldPushPage = true;
-            }
-          }
-        } else {
-          // Individual item overflow check
-          const currentHeight = isSidebarColumn ? currentSidebarHeight : currentMainHeight;
-          if (currentHeight + effHeight > activeColumnLimit && currentHeight > 0) {
-            shouldPushPage = true;
-          }
-        }
-
-        if (shouldPushPage) {
-          newPages.push([]);
-          currentMainHeight = 0;
-          currentSidebarHeight = 0;
-        }
-
-        // Allocate unit into current page stack
-        newPages[newPages.length - 1].push(unit);
-        if (isSidebarColumn) {
-          currentSidebarHeight += effHeight;
-        } else {
-          currentMainHeight += effHeight;
-        }
-      }
-
-      setPages(newPages);
-    };
-
-    measureAndLayout();
-    const timer = setTimeout(measureAndLayout, 60);
-    return () => clearTimeout(timer);
-  }, [
-    editableSummary, editablePersonalInfo, editableExperiences, editableSkills,
-    editableProjects, editableEducations, template, sections, customStyles, headerStyles,
-    languagesFirst, categoryOrder, mobileActivePane
-  ]);
 
   // ----------------------------------------------------
   // API INTEGRATIONS & SERVICES
@@ -3090,7 +2749,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                             transition: 'all 0.15s ease'
                           }}
                         >
-                          <span>🇬🇧 English</span>
+                          <span>ðŸ‡¬ðŸ‡§ English</span>
                         </button>
                         <button
                           type="button"
@@ -3111,7 +2770,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                             transition: 'all 0.15s ease'
                           }}
                         >
-                          <span>🇩🇪 Deutsch</span>
+                          <span>ðŸ‡©ðŸ‡ª Deutsch</span>
                         </button>
                       </div>
 
@@ -3136,7 +2795,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                             textAlign: 'center'
                           }}
                         >
-                          <span style={{ fontWeight: 700, fontSize: '12px' }}>🛡️ Standard</span>
+                          <span style={{ fontWeight: 700, fontSize: '12px' }}>ðŸ›¡ï¸ Standard</span>
                           <span style={{ fontSize: '10px', opacity: 0.8 }}>Strict Profile Match</span>
                         </button>
                         <button
@@ -3156,7 +2815,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                             textAlign: 'center'
                           }}
                         >
-                          <span style={{ fontWeight: 700, fontSize: '12px' }}>⚡ Aggressive</span>
+                          <span style={{ fontWeight: 700, fontSize: '12px' }}>âš¡ Aggressive</span>
                           <span style={{ fontSize: '10px', opacity: 0.85 }}>High ATS Optimization</span>
                         </button>
                       </div>
@@ -3173,7 +2832,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                         <span>Include Projects ({masterProjects.length > 0 ? `${selectedProjectIds.length} of ${masterProjects.length} selected` : 'None added in profile'})</span>
                       </div>
                       <span style={{ fontSize: '11px', color: '#6366f1', fontWeight: 600 }}>
-                        {isProjectsCollapsed ? 'Expand ▼' : 'Collapse ▲'}
+                        {isProjectsCollapsed ? 'Expand â–¼' : 'Collapse â–²'}
                       </span>
                     </div>
 
@@ -3229,11 +2888,11 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   {(() => {
                     const infoToCheck = currentVersion ? editablePersonalInfo : (masterProfileInfo || {});
                     const missing: { field: string; label: string; icon: string }[] = [];
-                    if (!infoToCheck.linkedin) missing.push({ field: 'linkedin', label: 'LinkedIn Profile URL', icon: 'ðŸ”—' });
-                    if (!infoToCheck.github) missing.push({ field: 'github', label: 'GitHub Profile URL', icon: 'ðŸ’»' });
-                    if (!infoToCheck.phone) missing.push({ field: 'phone', label: 'Phone Number', icon: 'ðŸ“ž' });
-                    if (!infoToCheck.location) missing.push({ field: 'location', label: 'Location / City', icon: 'ðŸ“' });
-                    if (!infoToCheck.email) missing.push({ field: 'email', label: 'Email Address', icon: 'âœ‰ï¸' });
+                    if (!infoToCheck.linkedin) missing.push({ field: 'linkedin', label: 'LinkedIn Profile URL', icon: 'Ã°Å¸â€â€”' });
+                    if (!infoToCheck.github) missing.push({ field: 'github', label: 'GitHub Profile URL', icon: 'Ã°Å¸â€™Â»' });
+                    if (!infoToCheck.phone) missing.push({ field: 'phone', label: 'Phone Number', icon: 'Ã°Å¸â€œÅ¾' });
+                    if (!infoToCheck.location) missing.push({ field: 'location', label: 'Location / City', icon: 'Ã°Å¸â€œÂ' });
+                    if (!infoToCheck.email) missing.push({ field: 'email', label: 'Email Address', icon: 'Ã¢Å“â€°Ã¯Â¸Â' });
 
                     if (missing.length === 0) return null;
 
@@ -3293,7 +2952,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   <div className={styles.trackingSection} style={{ marginTop: '16px', padding: '12px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.2)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main, #1e293b)' }}>
-                        {applicationTracked ? 'âœ“ Tracking this Application' : 'Track this job application?'}
+                        {applicationTracked ? 'Ã¢Å“â€œ Tracking this Application' : 'Track this job application?'}
                       </div>
                     </div>
                     {!applicationTracked ? (
@@ -3433,7 +3092,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                         {notes.requirements_emphasized && notes.requirements_emphasized.length > 0 && (
                           <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '3.5px solid #6366f1', border: '1px solid #e2e8f0', borderLeftWidth: '3.5px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>ðŸŽ¯</span>
+                              <span style={{ fontSize: '14px' }}>Ã°Å¸Å½Â¯</span>
                               <strong style={{ fontSize: '12px', color: '#1e293b' }}>Emphasized Requirements</strong>
                             </div>
                             <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -3447,7 +3106,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                         {notes.resume_evidence_used && notes.resume_evidence_used.length > 0 && (
                           <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '3.5px solid #10b981', border: '1px solid #e2e8f0', borderLeftWidth: '3.5px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>ðŸ“„</span>
+                              <span style={{ fontSize: '14px' }}>Ã°Å¸â€œâ€ž</span>
                               <strong style={{ fontSize: '12px', color: '#1e293b' }}>Evidence Used from CV</strong>
                             </div>
                             <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -3461,7 +3120,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                         {notes.placeholders && notes.placeholders.length > 0 && (
                           <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#fffbeb', borderLeft: '3.5px solid #f59e0b', border: '1px solid #fef3c7', borderLeftWidth: '3.5px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>âš ï¸</span>
+                              <span style={{ fontSize: '14px' }}>Ã¢Å¡Â Ã¯Â¸Â</span>
                               <strong style={{ fontSize: '12px', color: '#b45309' }}>Missing Facts / Placeholders</strong>
                             </div>
                             <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#78350f', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -3475,7 +3134,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                         {notes.confirmation_needed && notes.confirmation_needed.length > 0 && (
                           <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#fef2f2', borderLeft: '3.5px solid #ef4444', border: '1px solid #fee2e2', borderLeftWidth: '3.5px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>ðŸ”</span>
+                              <span style={{ fontSize: '14px' }}>Ã°Å¸â€Â</span>
                               <strong style={{ fontSize: '12px', color: '#b91c1c' }}>Confirmation Required</strong>
                             </div>
                             <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#991b1b', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -3785,7 +3444,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                               <span>Personal Info & Header</span>
                             </div>
                             <div className={styles.sectionCardSubtitle}>
-                              {editablePersonalInfo.full_name || 'Your name'} • {editablePersonalInfo.title || 'Headline & Contact'}
+                              {editablePersonalInfo.full_name || 'Your name'} â€¢ {editablePersonalInfo.title || 'Headline & Contact'}
                             </div>
                           </div>
                         </div>
@@ -3859,7 +3518,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                 icon: <Globe size={16} />,
                                 iconBg: 'rgba(236, 72, 153, 0.12)',
                                 iconColor: '#ec4899',
-                                subtitle: `${itCount} skills • ${langCount} languages`
+                                subtitle: `${itCount} skills â€¢ ${langCount} languages`
                               };
                             }
                             const count = secItem.customFormat === 'keyvalue' ? (secItem.keyValuePairs?.length || 0) : (secItem.bullets?.length || 0);
@@ -3972,7 +3631,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                     }}
                                     title="Move Up"
                                   >
-                                    ▲
+                                    â–²
                                   </button>
                                   <button
                                     type="button"
@@ -3987,7 +3646,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                     }}
                                     title="Move Down"
                                   >
-                                    ▼
+                                    â–¼
                                   </button>
                                 </div>
                               </div>
@@ -4081,7 +3740,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                         boxSizing: 'border-box'
                       }}
                     >
-                      A4 (210mm × 297mm)
+                      A4 (210mm Ã— 297mm)
                     </div>
                   </div>
 
@@ -4119,7 +3778,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                 <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '16px', paddingTop: '16px' }}>
                   <h3 style={{ fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                    âœï¸ Signature Settings
+                    Ã¢Å“ÂÃ¯Â¸Â Signature Settings
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>

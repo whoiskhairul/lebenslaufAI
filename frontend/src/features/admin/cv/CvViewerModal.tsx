@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import api from '../services/api';
+import api from '../../../services/api';
 import { Printer, X, Loader2 } from 'lucide-react';
 import { AdminCvDocument, prepareCvData } from './AdminCvDocument';
-import cs from './AdminCvPreview.module.css';
+import cs from './CvViewerModal.module.css';
 
 interface CvViewerModalProps {
   resumeId: string | null;

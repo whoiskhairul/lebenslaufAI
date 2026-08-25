@@ -6,7 +6,7 @@ import { Dashboard } from './views/Dashboard';
 import { MasterProfile } from './views/MasterProfile';
 import { Editor } from './views/EditorNew';
 import { Settings } from './views/Settings';
-import { AdminPanel } from './views/AdminPanel';
+import { AdminPanel } from './features/admin/AdminPanel';
 import { LoginPage } from './views/auth/LoginPage';
 import { RegisterPage } from './views/auth/RegisterPage';
 import { AccountSecurityPage } from './views/auth/AccountSecurityPage';
