@@ -3,7 +3,7 @@ import { RenderableUnit } from '../../../views/editor/types/editor.types';
 import { formatPhoneNumber } from '../../../views/editor/utils/phoneUtils';
 import { AutoSizeTextarea, MeasuringContext } from '../../../views/editor/components/AutoSizeTextarea';
 import { UnitRenderer } from '../../../views/editor/components/UnitRenderer';
-import ed from '../../../views/EditorNew.module.css';
+import ed from '../../../views/editorStyles';
 import { DEFAULT_CUSTOM_STYLES } from '../../editor/state/cvDocumentStore';
 import { DEFAULT_SECTIONS } from '../../editor/hooks/cvDocumentDefaults';
 
@@ -672,18 +672,27 @@ export const AdminCvDocument: React.FC<AdminCvDocumentProps> = ({ data }) => {
       <MeasuringContext.Provider value={false}>
         <div ref={viewportRef} className="w-full">
           {pages.length > 0 && (() => {
-            const totalUnscaled = pages.length * 1123 + Math.max(0, pages.length - 1) * 24;
+            const pageW = 794; // 210mm @96dpi
+            const pageH = 1123; // 297mm @96dpi
+            const totalUnscaled = pages.length * pageH + Math.max(0, pages.length - 1) * 24;
             return (
+              <div
+                style={{
+                  width: pageW * scale,
+                  height: totalUnscaled * scale,
+                  margin: '0 auto',
+                  overflow: 'visible'
+                }}
+              >
               <div
                 className={ed.pagesScaledWrapper}
                 style={{
                   transform: `scale(${scale})`,
-                  transformOrigin: 'top center',
+                  transformOrigin: 'top left',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '24px',
-                  width: '210mm',
-                  marginBottom: `-${totalUnscaled * (1 - scale)}px`
+                  width: '210mm'
                 }}
               >
               {pages.map((pageUnits, pageIdx) => {
@@ -731,6 +740,7 @@ export const AdminCvDocument: React.FC<AdminCvDocumentProps> = ({ data }) => {
                   </div>
                 );
               })}
+              </div>
               </div>
             );
           })()}

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { RenderableUnit } from '../types/editor.types';
-import styles from '../../EditorNew.module.css';
+import styles from '../../editorStyles';
 import { formatPhoneNumber } from '../utils/phoneUtils';
 import type { UnitRendererProps } from './UnitRendererProps';
 import { UnitContext } from './unitRenderers/shared';

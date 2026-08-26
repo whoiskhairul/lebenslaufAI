@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
@@ -6,7 +6,7 @@ import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Toast } from '../components/Toast';
 import { Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Brain, Save, RefreshCw, Trash, Plus, Settings, Minimize2, LayoutGrid, Layers, Sliders, User, Briefcase, Code, GraduationCap, Globe, Eye, EyeOff, RotateCcw } from 'lucide-react';
-import styles from './EditorNew.module.css';
+import styles from './editorStyles';
 
 import { ATSDashboard, ATSReport, Proposal } from '../components/ATSDashboard';
 import { Snapshot } from '../components/VersionSnapshotDrawer';
@@ -35,139 +35,10 @@ import { AddCustomSectionModal, CustomSectionFormat } from './editor/components/
 import { useCanvasZoom } from '../features/editor/hooks/useCanvasZoom';
 import { useCvPagination } from '../features/editor/hooks/useCvPagination';
 import { useCvDocumentStore } from '../features/editor/state/cvDocumentStore';
-interface ParsedLetter {
-  sender_name: string;
-  sender_address: string;
-  sender_phone: string;
-  sender_email: string;
-  recipient_contact: string;
-  recipient_company: string;
-  recipient_department: string;
-  recipient_address: string;
-  location: string;
-  date: string;
-  subject: string;
-  salutation: string;
-  body: string;
-  closing_salutation: string;
-  candidate_name: string;
-  verification_notes?: {
-    requirements_emphasized?: string[];
-    resume_evidence_used?: string[];
-    placeholders?: string[];
-    confirmation_needed?: string[];
-  };
-  is_json: boolean;
-}
-
-const getParsedLetter = (content: string, editablePersonalInfo: any): ParsedLetter => {
-  if (!content) {
-    return {
-      sender_name: editablePersonalInfo.full_name || '',
-      sender_address: editablePersonalInfo.location || '',
-      sender_phone: editablePersonalInfo.phone || '',
-      sender_email: editablePersonalInfo.email || '',
-      recipient_contact: '',
-      recipient_company: '',
-      recipient_department: '',
-      recipient_address: '',
-      location: editablePersonalInfo.location?.split(',')?.[0]?.trim() || '',
-      date: new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }),
-      subject: '',
-      salutation: '',
-      body: '',
-      closing_salutation: 'Mit freundlichen GrÃ¼ÃŸen',
-      candidate_name: editablePersonalInfo.full_name || '',
-      is_json: false
-    };
-  }
-
-  try {
-    const parsed = JSON.parse(content);
-    if (parsed && typeof parsed === 'object') {
-      return {
-        sender_name: parsed.sender_name || '',
-        sender_address: parsed.sender_address || '',
-        sender_phone: parsed.sender_phone || '',
-        sender_email: parsed.sender_email || '',
-        recipient_contact: parsed.recipient_contact || '',
-        recipient_company: parsed.recipient_company || '',
-        recipient_department: parsed.recipient_department || '',
-        recipient_address: parsed.recipient_address || '',
-        location: parsed.location || '',
-        date: parsed.date || '',
-        subject: parsed.subject || '',
-        salutation: parsed.salutation || '',
-        body: parsed.body || '',
-        closing_salutation: parsed.closing_salutation || '',
-        candidate_name: parsed.candidate_name || '',
-        verification_notes: parsed.verification_notes,
-        is_json: true
-      };
-    }
-  } catch (e) {
-    // Not JSON
-  }
-
-  // Legacy plain text parser fallback
-  const lines = content.split('\n');
-  let closingIndex = -1;
-  const triggers = [
-    'mit freundlichen',
-    'sincerely',
-    'best regards',
-    'kind regards',
-    'viele grÃ¼ÃŸe',
-    'freundliche grÃ¼ÃŸe',
-    'hochachtungsvoll',
-    'yours truly',
-    'mit besten',
-    'grÃ¼ÃŸe'
-  ];
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const lineLower = lines[i].toLowerCase().trim();
-    if (triggers.some(t => lineLower.includes(t))) {
-      closingIndex = i;
-      break;
-    }
-  }
-
-  let bodyText = '';
-  let closingText = '';
-  let nameText = '';
-
-  if (closingIndex !== -1) {
-    bodyText = lines.slice(0, closingIndex).join('\n');
-    closingText = lines[closingIndex];
-    nameText = lines.slice(closingIndex + 1).join('\n');
-  } else if (lines.length > 2) {
-    bodyText = lines.slice(0, lines.length - 2).join('\n');
-    closingText = lines[lines.length - 2];
-    nameText = lines[lines.length - 1];
-  } else {
-    bodyText = content;
-  }
-
-  return {
-    sender_name: editablePersonalInfo.full_name || '',
-    sender_address: editablePersonalInfo.location || '',
-    sender_phone: editablePersonalInfo.phone || '',
-    sender_email: editablePersonalInfo.email || '',
-    recipient_contact: '',
-    recipient_company: '',
-    recipient_department: '',
-    recipient_address: '',
-    location: editablePersonalInfo.location?.split(',')?.[0]?.trim() || '',
-    date: new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }),
-    subject: '',
-    salutation: '',
-    body: bodyText,
-    closing_salutation: closingText || 'Mit freundlichen GrÃ¼ÃŸen',
-    candidate_name: nameText || editablePersonalInfo.full_name || '',
-    is_json: false
-  };
-};
-
+import { StyleControlsPanel } from '../features/editor/panels/StyleControlsPanel';
+import { TailorPanel } from '../features/editor/panels/TailorPanel';
+import { useSectionOps } from '../features/editor/hooks/useSectionOps';
+import { getParsedLetter, ParsedLetter, normalizeLetterDate } from '../features/editor/utils/parsedLetter';
 const ResizableSignature: React.FC<{ src: string; height: number; onChange: (h: number) => void }> = ({ src, height, onChange }) => {
   const [isSelected, setIsSelected] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -175,32 +46,35 @@ const ResizableSignature: React.FC<{ src: string; height: number; onChange: (h: 
   const startYRef = useRef(0);
   const startHeightRef = useRef(0);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleResizeStart = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(true);
     startYRef.current = e.clientY;
     startHeightRef.current = height;
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   };
 
   useEffect(() => {
     if (!isResizing) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       const deltaY = e.clientY - startYRef.current;
       const newHeight = Math.max(20, Math.min(150, startHeightRef.current + deltaY));
       onChange(newHeight);
     };
 
-    const handleMouseUp = () => {
+    const handlePointerUp = () => {
       setIsResizing(false);
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
     };
   }, [isResizing, onChange]);
 
@@ -258,19 +132,20 @@ const ResizableSignature: React.FC<{ src: string; height: number; onChange: (h: 
           />
           <div
             className="no-print"
-            onMouseDown={handleMouseDown}
+            onPointerDown={handleResizeStart}
             style={{
               position: 'absolute',
               bottom: '-4px',
               right: '-4px',
-              width: '10px',
-              height: '10px',
+              width: '18px',
+              height: '18px',
               background: '#4f46e5',
               border: '1.5px solid white',
               borderRadius: '50%',
               cursor: 'se-resize',
               boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-              zIndex: 10
+              zIndex: 10,
+              touchAction: 'none'
             }}
           />
         </>
@@ -366,41 +241,6 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         setAnimatingShowSectionId(null);
       }, 360);
     }
-  };
-
-  const handleCreateCustomSection = (title: string, format: CustomSectionFormat) => {
-    const newSecId = `custom_${Date.now()}`;
-    const newSec: any = {
-      id: newSecId,
-      name: title,
-      visible: true,
-      type: 'custom',
-      customFormat: format
-    };
-
-    if (format === 'keyvalue') {
-      newSec.keyValuePairs = [
-        { key: 'Category / Key', value: 'Tools, proficiencies, or relevant details' }
-      ];
-    } else if (format === 'entries') {
-      newSec.entries = [
-        {
-          id: `entry_${Date.now()}`,
-          title: `${title} Contributor / Role`,
-          subtitle: 'Organization or Project',
-          location: 'City, Country',
-          date: '2023 - Present',
-          bullets: ['Spearheaded key project initiative and delivered measurable performance outcomes.']
-        }
-      ];
-    } else if (format === 'paragraph') {
-      newSec.paragraphText = 'Experienced professional committed to delivering high-impact solutions, optimizing system performance, and driving core project objectives.';
-    } else {
-      newSec.bullets = ['Earned credential / accomplishment with distinguished outcome.'];
-    }
-
-    setSections(prev => [...prev, newSec]);
-    handleOpenSectionDetail(newSecId);
   };
 
   // Resizable Control Panel State
@@ -1286,712 +1126,88 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   // ----------------------------------------------------
 
   // Section Reordering Handler
-  const handleMoveSection = (sectionId: string, direction: 'up' | 'down') => {
-    setSections(prev => {
-      const idx = prev.findIndex(s => s.id === sectionId);
-      if (idx === -1) return prev;
-      if (direction === 'up' && idx === 0) return prev;
-      if (direction === 'down' && idx === prev.length - 1) return prev;
-
-      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-      const nextList = [...prev];
-      const temp = nextList[idx];
-      nextList[idx] = nextList[targetIdx];
-      nextList[targetIdx] = temp;
-      return nextList;
-    });
-  };
-
-  // Quick Add Item Handler for Section Header Action Bar
-  const handleQuickAddSectionItem = (secId: string) => {
-    const targetSec = sections.find(s => s.id === secId);
-    if (!targetSec) return;
-
-    if (targetSec.type === 'summary') {
-      setEditableSummary(prev => prev ? `${prev}\n- Driven professional with expertise in technical execution and business impact.` : '- Driven professional with expertise in technical execution and business impact.');
-    } else if (targetSec.type === 'experience') {
-      handleAddExperience();
-    } else if (targetSec.type === 'projects') {
-      handleAddProject();
-    } else if (targetSec.type === 'education') {
-      handleAddEducation();
-    } else if (targetSec.type === 'skills') {
-      const newSkill = {
-        id: `skill_${Date.now()}`,
-        name: 'New Skill',
-        category: 'Technical Skills'
-      };
-      setEditableSkills(prev => [...prev, newSkill]);
-    } else if (targetSec.type === 'custom') {
-      handleAddCustomBullet(secId);
-    }
-  };
-
-  // AI Section Polish with Side-by-Side Comparison Generator
-  // Section AI Scope Options Generator (Section, Item, or Bullet)
-  const getSectionAiScopeOptions = (sectionId: string) => {
-    const targetSec = sections.find(s => s.id === sectionId);
-    if (!targetSec) return [{ id: 'all', label: 'Entire Section (All Content)' }];
-
-    const options: Array<{ id: string; label: string }> = [
-      { id: 'all', label: `Entire ${targetSec.name} Section` }
-    ];
-
-    if (targetSec.type === 'experience') {
-      editableExperiences.forEach((exp, expIdx) => {
-        const entryId = `entry_${exp.id}`;
-        options.push({
-          id: entryId,
-          label: `Ã°Å¸ÂÂ¢ Job #${expIdx + 1}: ${exp.position || 'Position'} @ ${exp.company || 'Company'}`
-        });
-        (exp.bullets || []).forEach((bullet, bIdx) => {
-          options.push({
-            id: `bullet_${exp.id}_${bIdx}`,
-            label: `  â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
-          });
-        });
-      });
-    } else if (targetSec.type === 'projects') {
-      editableProjects.forEach((proj, projIdx) => {
-        const entryId = `entry_${proj.id}`;
-        options.push({
-          id: entryId,
-          label: `Ã°Å¸Å¡â‚¬ Project #${projIdx + 1}: ${proj.title || 'Project'}`
-        });
-        (proj.bullets || []).forEach((bullet, bIdx) => {
-          options.push({
-            id: `bullet_${proj.id}_${bIdx}`,
-            label: `  â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
-          });
-        });
-      });
-    } else if (targetSec.type === 'education') {
-      editableEducations.forEach((edu, eduIdx) => {
-        const entryId = `entry_${edu.id}`;
-        options.push({
-          id: entryId,
-          label: `Ã°Å¸Å½â€œ Education #${eduIdx + 1}: ${edu.degree || 'Degree'} - ${edu.institution || 'Institution'}`
-        });
-        (edu.bullets || []).forEach((bullet, bIdx) => {
-          options.push({
-            id: `bullet_${edu.id}_${bIdx}`,
-            label: `  â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
-          });
-        });
-      });
-    } else if (targetSec.type === 'custom') {
-      (targetSec.bullets || []).forEach((bullet, bIdx) => {
-        options.push({
-          id: `bullet_${targetSec.id}_${bIdx}`,
-          label: `â†³ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
-        });
-      });
-    }
-
-    return options;
-  };
-
-  const extractContentForScope = (sectionId: string, scope: string): string => {
-    const targetSec = sections.find(s => s.id === sectionId);
-    if (!targetSec) return '';
-
-    if (scope === 'all') {
-      if (targetSec.type === 'summary') return editableSummary;
-      if (targetSec.type === 'experience') {
-        return editableExperiences.map(e => `${e.position || 'Position'} at ${e.company || 'Company'}\n${(e.bullets || []).join('\n')}`).join('\n\n');
-      }
-      if (targetSec.type === 'projects') {
-        return editableProjects.map(p => `${p.title || 'Project'}\n${(p.bullets || []).join('\n')}`).join('\n\n');
-      }
-      if (targetSec.type === 'education') {
-        return editableEducations.map(e => `${e.degree || 'Degree'} - ${e.institution || 'School'}\n${(e.bullets || []).join('\n')}`).join('\n\n');
-      }
-      if (targetSec.type === 'skills') {
-        return editableSkills.map(s => `${s.category}: ${s.name}`).join('\n');
-      }
-      if (targetSec.type === 'custom') {
-        return (targetSec.bullets || []).join('\n');
-      }
-    }
-
-    if (scope.startsWith('entry_')) {
-      const itemId = scope.replace('entry_', '');
-      if (targetSec.type === 'experience') {
-        const exp = editableExperiences.find(e => e.id === itemId);
-        return exp ? (exp.bullets || []).join('\n') : '';
-      }
-      if (targetSec.type === 'projects') {
-        const proj = editableProjects.find(p => p.id === itemId);
-        return proj ? (proj.bullets || []).join('\n') : '';
-      }
-      if (targetSec.type === 'education') {
-        const edu = editableEducations.find(e => e.id === itemId);
-        return edu ? (edu.bullets || []).join('\n') : '';
-      }
-    }
-
-    if (scope.startsWith('bullet_')) {
-      const parts = scope.replace('bullet_', '').split('_');
-      const itemId = parts[0];
-      const bulletIdx = parseInt(parts[1], 10);
-
-      if (targetSec.type === 'experience') {
-        const exp = editableExperiences.find(e => e.id === itemId);
-        return exp && exp.bullets ? (exp.bullets[bulletIdx] || '') : '';
-      }
-      if (targetSec.type === 'projects') {
-        const proj = editableProjects.find(p => p.id === itemId);
-        return proj && proj.bullets ? (proj.bullets[bulletIdx] || '') : '';
-      }
-      if (targetSec.type === 'education') {
-        const edu = editableEducations.find(e => e.id === itemId);
-        return edu && edu.bullets ? (edu.bullets[bulletIdx] || '') : '';
-      }
-      if (targetSec.type === 'custom') {
-        return targetSec.bullets ? (targetSec.bullets[bulletIdx] || '') : '';
-      }
-    }
-
-    return '';
-  };
-
-  // AI Section/Entry/Bullet Polish Generator
-  const handleGenerateSectionAi = async (sectionId: string, customInstruction?: string, scopeOverride?: string) => {
-    const targetSec = sections.find(s => s.id === sectionId);
-    if (!targetSec) return;
-
-    const activeScope = scopeOverride || sectionAiScope || 'all';
-    const contentToRewrite = extractContentForScope(sectionId, activeScope);
-
-    if (!contentToRewrite.trim()) return;
-
-    setIsGeneratingSectionAi(true);
-
-    try {
-      const instruction = customInstruction || sectionAiPrompt || 'Enhance impact with strong action verbs, professional tone, and ATS keyword relevance.';
-
-      const res = await api.post('/resume/rephrase', {
-        text: contentToRewrite,
-        instruction: instruction
-      });
-
-      const proposed = res.data?.rephrased || res.data?.rewritten_text || res.data?.result || res.data?.text || contentToRewrite;
-
-      setSectionAiProposal({
-        sectionId,
-        originalText: contentToRewrite,
-        proposedText: proposed,
-        payload: { sectionId, type: targetSec.type, scope: activeScope, proposed }
-      });
-    } catch (err) {
-      console.error('Section AI polish failed:', err);
-    } finally {
-      setIsGeneratingSectionAi(false);
-    }
-  };
-
-  const handleResetSectionToMasterProfile = (sectionId: string) => {
-    if (!masterProfileData) return;
-    if (sectionId === 'header') {
-      if (masterProfileData.personal_info) {
-        setEditablePersonalInfo(JSON.parse(JSON.stringify(masterProfileData.personal_info)));
-      }
-      return;
-    }
-    const sec = sections.find(s => s.id === sectionId);
-    if (!sec) return;
-
-    if (sec.type === 'summary') {
-      if (masterProfileData.personal_info?.summary) {
-        setEditableSummary(masterProfileData.personal_info.summary);
-      }
-    } else if (sec.type === 'experience') {
-      if (masterProfileData.work_experiences) {
-        setEditableExperiences(JSON.parse(JSON.stringify(masterProfileData.work_experiences)));
-      }
-    } else if (sec.type === 'projects') {
-      if (masterProfileData.projects) {
-        setEditableProjects(JSON.parse(JSON.stringify(masterProfileData.projects)));
-      }
-    } else if (sec.type === 'education') {
-      if (masterProfileData.educations) {
-        setEditableEducations(JSON.parse(JSON.stringify(masterProfileData.educations)));
-      }
-    } else if (sec.type === 'skills') {
-      if (masterProfileData.skills) {
-        setEditableSkills(JSON.parse(JSON.stringify(masterProfileData.skills)));
-      }
-    }
-  };
-
-  const handleToggleSectionVersion = (sectionId: string) => {
-    const sec = sections.find(s => s.id === sectionId);
-    if (!sec || !sec.originalSnapshot) return;
-
-    const isCurrentlyAi = sec.activeVersion !== 'original';
-    const nextVersion = isCurrentlyAi ? 'original' : 'ai';
-    const snapshot = isCurrentlyAi ? sec.originalSnapshot : sec.aiSnapshot;
-    if (!snapshot) return;
-
-    if (sec.type === 'summary') {
-      if (snapshot.summary !== undefined) setEditableSummary(snapshot.summary);
-    } else if (sec.type === 'experience') {
-      if (snapshot.experiences) setEditableExperiences(snapshot.experiences);
-    } else if (sec.type === 'projects') {
-      if (snapshot.projects) setEditableProjects(snapshot.projects);
-    } else if (sec.type === 'education') {
-      if (snapshot.educations) setEditableEducations(snapshot.educations);
-    }
-
-    setSections(prev => prev.map(s => {
-      if (s.id !== sectionId) return s;
-      return {
-        ...s,
-        activeVersion: nextVersion,
-        ...(s.type === 'custom' ? snapshot : {})
-      };
-    }));
-  };
-
-  const handleApplySectionAiProposal = () => {
-    if (!sectionAiProposal) return;
-    const { sectionId, type, scope, proposed } = sectionAiProposal.payload;
-
-    // 1. Capture original snapshot before applying AI changes
-    const targetSec = sections.find(s => s.id === sectionId);
-    if (targetSec && !targetSec.originalSnapshot) {
-      let origSnapshot: any = {};
-      if (targetSec.type === 'summary') {
-        origSnapshot = { summary: editableSummary };
-      } else if (targetSec.type === 'experience') {
-        origSnapshot = { experiences: JSON.parse(JSON.stringify(editableExperiences)) };
-      } else if (targetSec.type === 'projects') {
-        origSnapshot = { projects: JSON.parse(JSON.stringify(editableProjects)) };
-      } else if (targetSec.type === 'education') {
-        origSnapshot = { educations: JSON.parse(JSON.stringify(editableEducations)) };
-      } else if (targetSec.type === 'custom') {
-        origSnapshot = {
-          bullets: targetSec.bullets ? [...targetSec.bullets] : undefined,
-          keyValuePairs: targetSec.keyValuePairs ? JSON.parse(JSON.stringify(targetSec.keyValuePairs)) : undefined,
-          entries: targetSec.entries ? JSON.parse(JSON.stringify(targetSec.entries)) : undefined,
-          paragraphText: targetSec.paragraphText
-        };
-      }
-
-      setSections(prev => prev.map(s => s.id === sectionId ? { ...s, originalSnapshot: origSnapshot, activeVersion: 'ai' } : s));
-    }
-
-    // 2. Apply proposed AI content
-    if (scope === 'all') {
-      if (type === 'summary') {
-        setEditableSummary(proposed);
-      } else if (type === 'custom') {
-        const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter(Boolean);
-        setSections(prev => prev.map(s => s.id === sectionId ? { ...s, bullets } : s));
-      } else if (type === 'experience') {
-        const blocks = proposed.split('\n\n');
-        setEditableExperiences(prev => prev.map((exp, idx) => {
-          const block = blocks[idx] || blocks[0];
-          if (!block) return exp;
-          const bullets = block.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter((b: string) => b && !b.toLowerCase().includes(' at '));
-          return bullets.length > 0 ? { ...exp, bullets } : exp;
-        }));
-      } else if (type === 'projects') {
-        const blocks = proposed.split('\n\n');
-        setEditableProjects(prev => prev.map((proj, idx) => {
-          const block = blocks[idx] || blocks[0];
-          if (!block) return proj;
-          const bullets = block.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter((b: string) => b && !b.includes('('));
-          return bullets.length > 0 ? { ...proj, bullets } : proj;
-        }));
-      } else if (type === 'education') {
-        const blocks = proposed.split('\n\n');
-        setEditableEducations(prev => prev.map((edu, idx) => {
-          const block = blocks[idx] || blocks[0];
-          if (!block) return edu;
-          const bullets = block.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter((b: string) => b && !b.includes('-'));
-          return bullets.length > 0 ? { ...edu, bullets } : edu;
-        }));
-      }
-    } else if (scope.startsWith('entry_')) {
-      const itemId = scope.replace('entry_', '');
-      const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-â€¢*]\s*/, '').trim()).filter(Boolean);
-      if (bullets.length > 0) {
-        if (type === 'experience') {
-          setEditableExperiences(prev => prev.map(e => e.id === itemId ? { ...e, bullets } : e));
-        } else if (type === 'projects') {
-          setEditableProjects(prev => prev.map(p => p.id === itemId ? { ...p, bullets } : p));
-        } else if (type === 'education') {
-          setEditableEducations(prev => prev.map(e => e.id === itemId ? { ...e, bullets } : e));
-        }
-      }
-    } else if (scope.startsWith('bullet_')) {
-      const parts = scope.replace('bullet_', '').split('_');
-      const itemId = parts[0];
-      const bulletIdx = parseInt(parts[1], 10);
-      const cleanBullet = proposed.trim().replace(/^[-â€¢*]\s*/, '');
-
-      if (cleanBullet) {
-        if (type === 'experience') {
-          setEditableExperiences(prev => prev.map(exp => {
-            if (exp.id !== itemId) return exp;
-            const updated = [...exp.bullets];
-            updated[bulletIdx] = cleanBullet;
-            return { ...exp, bullets: updated };
-          }));
-        } else if (type === 'projects') {
-          setEditableProjects(prev => prev.map(proj => {
-            if (proj.id !== itemId) return proj;
-            const updated = [...proj.bullets];
-            updated[bulletIdx] = cleanBullet;
-            return { ...proj, bullets: updated };
-          }));
-        } else if (type === 'education') {
-          setEditableEducations(prev => prev.map(edu => {
-            if (edu.id !== itemId) return edu;
-            const updated = [...(edu.bullets || [])];
-            updated[bulletIdx] = cleanBullet;
-            return { ...edu, bullets: updated };
-          }));
-        } else if (type === 'custom') {
-          setSections(prev => prev.map(s => {
-            if (s.id !== sectionId) return s;
-            const updated = [...(s.bullets || [])];
-            updated[bulletIdx] = cleanBullet;
-            return { ...s, bullets: updated };
-          }));
-        }
-      }
-    }
-
-    // 3. Save AI snapshot for future toggle
-    setTimeout(() => {
-      setSections(prev => prev.map(s => {
-        if (s.id !== sectionId) return s;
-        let aiSnap: any = {};
-        if (s.type === 'summary') {
-          aiSnap = { summary: editableSummary };
-        } else if (s.type === 'experience') {
-          aiSnap = { experiences: JSON.parse(JSON.stringify(editableExperiences)) };
-        } else if (s.type === 'projects') {
-          aiSnap = { projects: JSON.parse(JSON.stringify(editableProjects)) };
-        } else if (s.type === 'education') {
-          aiSnap = { educations: JSON.parse(JSON.stringify(editableEducations)) };
-        } else if (s.type === 'custom') {
-          aiSnap = {
-            bullets: s.bullets ? [...s.bullets] : undefined,
-            keyValuePairs: s.keyValuePairs ? JSON.parse(JSON.stringify(s.keyValuePairs)) : undefined,
-            entries: s.entries ? JSON.parse(JSON.stringify(s.entries)) : undefined,
-            paragraphText: s.paragraphText
-          };
-        }
-        return { ...s, aiSnapshot: aiSnap, activeVersion: 'ai' };
-      }));
-    }, 60);
-
-    setSectionAiProposal(null);
-    setOpenSectionAiModalId(null);
-    setSectionAiPrompt('');
-  };
-
-  // Work Experience Operations
-  const handleAddExperience = () => {
-    const newId = `exp_${Date.now()}`;
-    const newExp = {
-      id: newId,
-      company: 'New Company',
-      position: 'Job Title',
-      location: 'City, Country',
-      start_date: '01/2026',
-      end_date: 'Present',
-      bullets: ['Describe your major contribution...']
-    };
-    setEditableExperiences(prev => [...prev, newExp]);
-  };
-
-  const handleMoveExperience = (idx: number, direction: 'up' | 'down') => {
-    if (direction === 'up' && idx === 0) return;
-    if (direction === 'down' && idx === editableExperiences.length - 1) return;
-    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-    const nextList = [...editableExperiences];
-    const temp = nextList[idx];
-    nextList[idx] = nextList[targetIdx];
-    nextList[targetIdx] = temp;
-    setEditableExperiences(nextList);
-  };
-
-  const getLocalizedCategoryName = (catName: string): string => {
-    const norm = (catName || '').toLowerCase().trim();
-    if (targetLanguage === 'de') {
-      if (norm === 'languages' || norm === 'languages & dialects' || norm === 'sprachen') return 'Sprachen';
-      if (norm === 'programming languages' || norm === 'technical' || norm === 'technologies' || norm === 'programmiersprachen') return 'Programmiersprachen & Kenntnisse';
-      if (norm === 'frameworks' || norm === 'frameworks & libraries' || norm === 'frameworks & bibliotheken') return 'Frameworks & Bibliotheken';
-      if (norm === 'databases' || norm === 'datenbanken') return 'Datenbanken';
-      if (norm === 'cloud' || norm === 'cloud & devops' || norm === 'devops' || norm === 'cloud & infrastructure') return 'Cloud & Infrastructure';
-      if (norm === 'tools' || norm === 'development tools' || norm === 'werkzeuge & tools') return 'Werkzeuge & Tools';
-      if (norm === 'soft_skills' || norm === 'soft skills') return 'Methodische & Soziale Kompetenzen';
-    }
-    return catName.charAt(0).toUpperCase() + catName.slice(1).replace(/_/g, ' ');
-  };
-
-  const handleMoveSkillInCategory = (skillId: string, direction: 'up' | 'down') => {
-    setEditableSkills(prev => {
-      const targetSkill = prev.find(s => s.id === skillId);
-      if (!targetSkill) return prev;
-
-      const catNormalized = (targetSkill.category || '').toLowerCase().trim();
-      const categorySkills = prev.filter(s => (s.category || '').toLowerCase().trim() === catNormalized);
-      const idx = categorySkills.findIndex(s => s.id === skillId);
-
-      if (direction === 'up' && idx === 0) return prev;
-      if (direction === 'down' && idx === categorySkills.length - 1) return prev;
-
-      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-      const itemToSwap = categorySkills[targetIdx];
-
-      const realIdx1 = prev.findIndex(s => s.id === skillId);
-      const realIdx2 = prev.findIndex(s => s.id === itemToSwap.id);
-
-      const updated = [...prev];
-      const temp = updated[realIdx1];
-      updated[realIdx1] = updated[realIdx2];
-      updated[realIdx2] = temp;
-      return updated;
-    });
-  };
-
-  const handleMoveSkillCategory = (catName: string, direction: 'up' | 'down') => {
-    const itSkills = editableSkills.filter(sk => (sk.category || '').toLowerCase().trim() !== 'languages');
-    const uniqueCats = Array.from(new Set(itSkills.map(sk => (sk.category || 'technical').toLowerCase().trim())));
-
-    const normalizedOrder = categoryOrder.map(c => c.toLowerCase().trim());
-    const currentItCats = normalizedOrder.filter(c => uniqueCats.includes(c));
-    const extraCats = uniqueCats.filter(c => !currentItCats.includes(c));
-    let currentList = [...currentItCats, ...extraCats];
-
-    if (categoryOrder.length === 0) {
-      const defaultOrder = ['programming languages', 'frameworks & libraries', 'databases', 'cloud & devops', 'development tools', 'testing'];
-      currentList.sort((a, b) => {
-        const idxA = defaultOrder.indexOf(a);
-        const idxB = defaultOrder.indexOf(b);
-        return (idxA !== -1 ? idxA : 100) - (idxB !== -1 ? idxB : 100);
-      });
-    }
-
-    const targetCat = catName.toLowerCase().trim();
-    const idx = currentList.indexOf(targetCat);
-    if (idx === -1) return;
-
-    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (newIdx < 0 || newIdx >= currentList.length) return;
-
-    const updatedList = [...currentList];
-    const temp = updatedList[idx];
-    updatedList[idx] = updatedList[newIdx];
-    updatedList[newIdx] = temp;
-
-    setCategoryOrder(updatedList);
-  };
-
-  const handleAddExperienceBullet = (expIdx: number, bulletIdx: number = -1) => {
-    setEditableExperiences(prev => prev.map((exp, i) => {
-      if (i === expIdx) {
-        const bullets = [...exp.bullets];
-        const insertAt = bulletIdx === -1 ? bullets.length : bulletIdx + 1;
-        bullets.splice(insertAt, 0, '');
-        // Trigger focus placement on new bullet
-        setFocusedBulletInfo({ type: 'experience', itemId: exp.id, bulletIdx: insertAt });
-        return { ...exp, bullets };
-      }
-      return exp;
-    }));
-  };
-
-  const handleRemoveExperienceBullet = (expIdx: number, bulletIdx: number) => {
-    const exp = editableExperiences[expIdx];
-    // Focus previous bullet if deleting current
-    if (bulletIdx > 0) {
-      setFocusedBulletInfo({ type: 'experience', itemId: exp.id, bulletIdx: bulletIdx - 1 });
-    }
-    setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? {
-      ...e,
-      bullets: e.bullets.filter((_, bIdx) => bIdx !== bulletIdx)
-    } : e));
-  };
-
-  // Projects Operations
-  const handleAddProject = () => {
-    const newId = `proj_${Date.now()}`;
-    const newProj = {
-      id: newId,
-      title: 'Project Title',
-      role: 'Your Role / Core Technologies',
-      date: '2026',
-      bullets: ['Describe project milestone deliverables...']
-    };
-    setEditableProjects(prev => [...prev, newProj]);
-  };
-
-  const handleMoveProject = (idx: number, direction: 'up' | 'down') => {
-    if (direction === 'up' && idx === 0) return;
-    if (direction === 'down' && idx === editableProjects.length - 1) return;
-    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-    const nextList = [...editableProjects];
-    const temp = nextList[idx];
-    nextList[idx] = nextList[targetIdx];
-    nextList[targetIdx] = temp;
-    setEditableProjects(nextList);
-  };
-
-  const handleAddProjectBullet = (projIdx: number, bulletIdx: number = -1) => {
-    setEditableProjects(prev => prev.map((proj, i) => {
-      if (i === projIdx) {
-        const bullets = [...proj.bullets];
-        const insertAt = bulletIdx === -1 ? bullets.length : bulletIdx + 1;
-        bullets.splice(insertAt, 0, '');
-        setFocusedBulletInfo({ type: 'project', itemId: proj.id, bulletIdx: insertAt });
-        return { ...proj, bullets };
-      }
-      return proj;
-    }));
-  };
-
-  const handleRemoveProjectBullet = (projIdx: number, bulletIdx: number) => {
-    const proj = editableProjects[projIdx];
-    if (bulletIdx > 0) {
-      setFocusedBulletInfo({ type: 'project', itemId: proj.id, bulletIdx: bulletIdx - 1 });
-    }
-    setEditableProjects(prev => prev.map((p, i) => i === projIdx ? {
-      ...p,
-      bullets: p.bullets.filter((_, bIdx) => bIdx !== bulletIdx)
-    } : p));
-  };
-
-  // Education Operations
-  const handleAddEducation = () => {
-    const newId = `edu_${Date.now()}`;
-    const newEdu = {
-      id: newId,
-      institution: 'Institution Name',
-      degree: 'Degree / Academic Title',
-      field_of_study: 'Field of Study',
-      start_date: '2022',
-      end_date: '2026',
-      location: 'City, Country'
-    };
-    setEditableEducations(prev => [...prev, newEdu]);
-  };
-
-  const handleMoveEducation = (idx: number, direction: 'up' | 'down') => {
-    if (direction === 'up' && idx === 0) return;
-    if (direction === 'down' && idx === editableEducations.length - 1) return;
-    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-    const nextList = [...editableEducations];
-    const temp = nextList[idx];
-    nextList[idx] = nextList[targetIdx];
-    nextList[targetIdx] = temp;
-    setEditableEducations(nextList);
-  };
-
-  const handleAddEducationBullet = (eduIdx: number, bulletIdx: number = -1) => {
-    setEditableEducations(prev => prev.map((edu, i) => {
-      if (i === eduIdx) {
-        const bullets = [...(edu.bullets || [])];
-        const insertAt = bulletIdx === -1 ? bullets.length : bulletIdx + 1;
-        bullets.splice(insertAt, 0, '');
-        setFocusedBulletInfo({ type: 'education', itemId: edu.id, bulletIdx: insertAt });
-        return { ...edu, bullets };
-      }
-      return edu;
-    }));
-  };
-
-  const handleRemoveEducationBullet = (eduIdx: number, bulletIdx: number) => {
-    const edu = editableEducations[eduIdx];
-    if (bulletIdx > 0) {
-      setFocusedBulletInfo({ type: 'education', itemId: edu.id, bulletIdx: bulletIdx - 1 });
-    }
-    setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? {
-      ...e,
-      bullets: (e.bullets || []).filter((_, bIdx) => bIdx !== bulletIdx)
-    } : e));
-  };
-
-  const handleOpenSectionDetail = (secId: string) => {
-    setActiveDetailSectionId(secId);
-    setTimeout(() => {
-      const secEl = document.querySelector(`[data-section-id="${secId}"]`);
-      if (secEl) {
-        secEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 100);
-  };
-
-  const handlePolishInlineText = (text: string, onAccept: (newText: string) => void) => {
-    if (!text || !text.trim()) return;
-    setPolishModalInfo({ text, onAccept });
-  };
-
-  // Custom Sections Item Operations
-  const handleAddCustomBullet = (secId: string, bulletIdx: number = -1) => {
-    setSections(prev => prev.map(s => {
-      if (s.id === secId) {
-        const bullets = [...(s.bullets || [])];
-        const insertAt = bulletIdx === -1 ? bullets.length : bulletIdx + 1;
-        bullets.splice(insertAt, 0, '');
-        setFocusedBulletInfo({ type: 'custom', itemId: secId, bulletIdx: insertAt });
-        return { ...s, bullets };
-      }
-      return s;
-    }));
-  };
-
-  const handleRemoveCustomBullet = (secId: string, bulletIdx: number) => {
-    if (bulletIdx > 0) {
-      setFocusedBulletInfo({ type: 'custom', itemId: secId, bulletIdx: bulletIdx - 1 });
-    }
-    setSections(prev => prev.map(s => s.id === secId ? {
-      ...s,
-      bullets: (s.bullets || []).filter((_, bI) => bI !== bulletIdx)
-    } : s));
-  };
-
-  // Keyboard List Navigation Handlers (Enter and Backspace listeners)
-  const handleBulletKeyDown = (
-    e: React.KeyboardEvent<HTMLTextAreaElement>,
-    type: 'experience' | 'project' | 'education' | 'custom',
-    itemId: string,
-    itemIdx: number,
-    bulletIdx: number,
-    bulletsArray: string[]
-  ) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (type === 'experience') {
-        handleAddExperienceBullet(itemIdx, bulletIdx);
-      } else if (type === 'project') {
-        handleAddProjectBullet(itemIdx, bulletIdx);
-      } else if (type === 'education') {
-        handleAddEducationBullet(itemIdx, bulletIdx);
-      } else if (type === 'custom') {
-        handleAddCustomBullet(itemId, bulletIdx);
-      }
-    } else if (e.key === 'Backspace' && bulletsArray[bulletIdx] === '') {
-      e.preventDefault();
-      if (bulletsArray.length <= 1) return; // Maintain at least 1 bullet point
-      if (type === 'experience') {
-        handleRemoveExperienceBullet(itemIdx, bulletIdx);
-      } else if (type === 'project') {
-        handleRemoveProjectBullet(itemIdx, bulletIdx);
-      } else if (type === 'education') {
-        handleRemoveEducationBullet(itemIdx, bulletIdx);
-      } else if (type === 'custom') {
-        handleRemoveCustomBullet(itemId, bulletIdx);
-      }
-    }
-  };
-
   // ----------------------------------------------------
+  // SECTION OPERATIONS (logic lives in useSectionOps hook)
+  // ----------------------------------------------------
+  const {
+    handleMoveSection,
+    handleQuickAddSectionItem,
+    getSectionAiScopeOptions,
+    extractContentForScope,
+    handleGenerateSectionAi,
+    handleResetSectionToMasterProfile,
+    handleToggleSectionVersion,
+    handleApplySectionAiProposal,
+    handleAddExperience,
+    handleMoveExperience,
+    getLocalizedCategoryName,
+    handleMoveSkillInCategory,
+    handleMoveSkillCategory,
+    handleAddExperienceBullet,
+    handleRemoveExperienceBullet,
+    handleAddProject,
+    handleMoveProject,
+    handleAddProjectBullet,
+    handleRemoveProjectBullet,
+    handleAddEducation,
+    handleMoveEducation,
+    handleAddEducationBullet,
+    handleRemoveEducationBullet,
+    handleOpenSectionDetail,
+    handlePolishInlineText,
+    handleAddCustomBullet,
+    handleRemoveCustomBullet,
+    handleBulletKeyDown
+  } = useSectionOps({
+    masterProfileData,
+    targetLanguage,
+    sectionAiScope,
+    sectionAiPrompt,
+    sectionAiProposal,
+    focusedBulletInfo,
+    setFocusedBulletInfo,
+    setSectionAiProposal,
+    setIsGeneratingSectionAi,
+    setOpenSectionAiModalId,
+    setSectionAiPrompt,
+    setActiveDetailSectionId,
+    setPolishModalInfo
+  });
+
+  const handleCreateCustomSection = (title: string, format: CustomSectionFormat) => {
+    const newSecId = `custom_${Date.now()}`;
+    const newSec: any = {
+      id: newSecId,
+      name: title,
+      visible: true,
+      type: 'custom',
+      customFormat: format
+    };
+
+    if (format === 'keyvalue') {
+      newSec.keyValuePairs = [
+        { key: 'Category / Key', value: 'Tools, proficiencies, or relevant details' }
+      ];
+    } else if (format === 'entries') {
+      newSec.entries = [
+        {
+          id: `entry_${Date.now()}`,
+          title: `${title} Contributor / Role`,
+          subtitle: 'Organization or Project',
+          location: 'City, Country',
+          date: '2023 - Present',
+          bullets: ['Spearheaded key project initiative and delivered measurable performance outcomes.']
+        }
+      ];
+    } else if (format === 'paragraph') {
+      newSec.paragraphText = 'Experienced professional committed to delivering high-impact solutions, optimizing system performance, and driving core project objectives.';
+    } else {
+      newSec.bullets = ['Earned credential / accomplishment with distinguished outcome.'];
+    }
+
+    setSections(prev => [...prev, newSec]);
+    handleOpenSectionDetail(newSecId);
+  };
   // API INTEGRATIONS & SERVICES
   // ----------------------------------------------------
 
@@ -2089,7 +1305,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         cv_details: activeCvDetails
       });
       if (res.data && res.data.success) {
-        setLetterContent(res.data.content || res.data.data?.content || '');
+        setLetterContent(normalizeLetterDate(res.data.content || res.data.data?.content || ''));
         // On mobile, bring the fresh letter into view immediately
         if (isMobileViewport && mobileActivePane === 'editor') {
           setMobileActivePane('preview');
@@ -2686,470 +1902,43 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
 
           {activeControlTab === 'tailor' && (
-            editorTab === 'resume' ? (
-              // CV Tailoring UI
-              <>
-                <form onSubmit={handleTailor} className={`${styles.form} glass-card`}>
-                  <h3>Job Listing Details</h3>
-                  <div className={styles.formGrid}>
-                    <InputField
-                      label="Company Name"
-                      id="editorCompany"
-                      placeholder="e.g. Stripe"
-                      value={company}
-                      onChange={(e) => setCompany(e.target.value)}
-                    />
-                    <InputField
-                      label="Target Position"
-                      id="editorRole"
-                      placeholder="e.g. Lead Frontend Engineer"
-                      value={position}
-                      onChange={(e) => setPosition(e.target.value)}
-                    />
-                  </div>
-                  <InputField
-                    label="Job Description Text *"
-                    id="editorDesc"
-                    type="textarea"
-                    placeholder="Paste responsibilities and key requirements..."
-                    value={jobDescription}
-                    onChange={(e) => setJobDescription(e.target.value)}
-                    required
-                  />
-
-                  <div className={styles.selectGroup}>
-                    <label htmlFor="editorTemplate">Layout Template</label>
-                    <select id="editorTemplate" value={template} onChange={(e) => setTemplate(e.target.value)}>
-                      <option value="pixel_perfect_pdf">German Styled Template </option>
-                      <option value="modern_minimalist" disabled>More templates Coming soon</option>
-                    </select>
-
-                    {/* 1. Language & ATS Strategy Options */}
-                    <div className={styles.selectGroup} style={{ marginBottom: '16px' }}>
-                      <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main, #1e293b)', marginBottom: '6px', display: 'block' }}>
-                        Target Output Language
-                      </label>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
-                        <button
-                          type="button"
-                          onClick={() => setTargetLanguage('en')}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            border: targetLanguage === 'en' ? '2px solid #6366f1' : '1px solid #cbd5e1',
-                            background: targetLanguage === 'en' ? 'rgba(99, 102, 241, 0.1)' : '#ffffff',
-                            fontWeight: targetLanguage === 'en' ? 700 : 500,
-                            color: targetLanguage === 'en' ? '#4f46e5' : '#475569',
-                            cursor: 'pointer',
-                            fontSize: '13px',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          <span>ðŸ‡¬ðŸ‡§ English</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTargetLanguage('de')}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            border: targetLanguage === 'de' ? '2px solid #6366f1' : '1px solid #cbd5e1',
-                            background: targetLanguage === 'de' ? 'rgba(99, 102, 241, 0.1)' : '#ffffff',
-                            fontWeight: targetLanguage === 'de' ? 700 : 500,
-                            color: targetLanguage === 'de' ? '#4f46e5' : '#475569',
-                            cursor: 'pointer',
-                            fontSize: '13px',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          <span>ðŸ‡©ðŸ‡ª Deutsch</span>
-                        </button>
-                      </div>
-
-                      <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main, #1e293b)', marginBottom: '6px', display: 'block' }}>
-                        ATS Keyword Strategy
-                      </label>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                        <button
-                          type="button"
-                          onClick={() => setAggressiveMode(false)}
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '2px',
-                            padding: '8px 10px',
-                            borderRadius: '8px',
-                            border: !aggressiveMode ? '2px solid #6366f1' : '1px solid #cbd5e1',
-                            background: !aggressiveMode ? 'rgba(99, 102, 241, 0.08)' : '#ffffff',
-                            color: !aggressiveMode ? '#4f46e5' : '#475569',
-                            cursor: 'pointer',
-                            textAlign: 'center'
-                          }}
-                        >
-                          <span style={{ fontWeight: 700, fontSize: '12px' }}>ðŸ›¡ï¸ Standard</span>
-                          <span style={{ fontSize: '10px', opacity: 0.8 }}>Strict Profile Match</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setAggressiveMode(true)}
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '2px',
-                            padding: '8px 10px',
-                            borderRadius: '8px',
-                            border: aggressiveMode ? '2px solid #6366f1' : '1px solid #cbd5e1',
-                            background: aggressiveMode ? 'rgba(99, 102, 241, 0.12)' : '#ffffff',
-                            color: aggressiveMode ? '#6d28d9' : '#475569',
-                            cursor: 'pointer',
-                            textAlign: 'center'
-                          }}
-                        >
-                          <span style={{ fontWeight: 700, fontSize: '12px' }}>âš¡ Aggressive</span>
-                          <span style={{ fontSize: '10px', opacity: 0.85 }}>High ATS Optimization</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 2. Selective Projects List in Side Panel */}
-                  <div style={{ marginBottom: '16px', background: 'rgba(248, 250, 252, 0.8)', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px' }}>
-                    <div
-                      onClick={() => setIsProjectsCollapsed(!isProjectsCollapsed)}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>Include Projects ({masterProjects.length > 0 ? `${selectedProjectIds.length} of ${masterProjects.length} selected` : 'None added in profile'})</span>
-                      </div>
-                      <span style={{ fontSize: '11px', color: '#6366f1', fontWeight: 600 }}>
-                        {isProjectsCollapsed ? 'Expand â–¼' : 'Collapse â–²'}
-                      </span>
-                    </div>
-
-                    {!isProjectsCollapsed && (
-                      <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
-                        {masterProjects.length > 0 ? (
-                          masterProjects.map(proj => {
-                            const isChecked = selectedProjectIds.includes(proj.id);
-                            return (
-                              <label
-                                key={proj.id}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  padding: '6px 8px',
-                                  borderRadius: '6px',
-                                  background: isChecked ? '#ffffff' : 'transparent',
-                                  border: isChecked ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent',
-                                  cursor: 'pointer',
-                                  fontSize: '12px'
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setSelectedProjectIds(prev => [...prev, proj.id]);
-                                    } else {
-                                      setSelectedProjectIds(prev => prev.filter(id => id !== proj.id));
-                                    }
-                                  }}
-                                  style={{ accentColor: '#6366f1' }}
-                                />
-                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  <strong style={{ color: '#1e293b', display: 'block', lineHeight: '1.2' }}>{proj.title}</strong>
-                                  {proj.role && <span style={{ fontSize: '10.5px', color: '#64748b' }}>{proj.role}</span>}
-                                </div>
-                              </label>
-                            );
-                          })
-                        ) : (
-                          <div style={{ fontSize: '11.5px', color: '#94a3b8', padding: '6px 4px', fontStyle: 'italic' }}>
-                            No projects found in Master Profile. Add projects in your profile settings to filter them here.
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 3. Missing Profile Details Diagnostic Widget in Side Panel */}
-                  {(() => {
-                    const infoToCheck = currentVersion ? editablePersonalInfo : (masterProfileInfo || {});
-                    const missing: { field: string; label: string; icon: string }[] = [];
-                    if (!infoToCheck.linkedin) missing.push({ field: 'linkedin', label: 'LinkedIn Profile URL', icon: 'Ã°Å¸â€â€”' });
-                    if (!infoToCheck.github) missing.push({ field: 'github', label: 'GitHub Profile URL', icon: 'Ã°Å¸â€™Â»' });
-                    if (!infoToCheck.phone) missing.push({ field: 'phone', label: 'Phone Number', icon: 'Ã°Å¸â€œÅ¾' });
-                    if (!infoToCheck.location) missing.push({ field: 'location', label: 'Location / City', icon: 'Ã°Å¸â€œÂ' });
-                    if (!infoToCheck.email) missing.push({ field: 'email', label: 'Email Address', icon: 'Ã¢Å“â€°Ã¯Â¸Â' });
-
-                    if (missing.length === 0) return null;
-
-                    return (
-                      <div style={{ marginBottom: '16px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '8px', padding: '12px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#d48806', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                          <ShieldAlert size={14} />
-                          <span>Missing Profile Details ({missing.length})</span>
-                        </div>
-                        <p style={{ fontSize: '11px', color: '#8c6b00', marginBottom: '8px', lineHeight: '1.4' }}>
-                          {currentVersion
-                            ? "The following optional details are missing from your active canvas and won't appear on your CV:"
-                            : "The following optional details are missing from your Master Profile:"}
-                        </p>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                          {missing.map((item, idx) => (
-                            <span
-                              key={idx}
-                              style={{
-                                fontSize: '10.5px',
-                                background: '#fff',
-                                border: '1px solid #ffe58f',
-                                padding: '3px 8px',
-                                borderRadius: '12px',
-                                color: '#ad6800',
-                                fontWeight: 500
-                              }}
-                            >
-                              {item.icon} {item.label}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                    <input
-                      type="checkbox"
-                      id="saveAutomatically"
-                      checked={saveAutomatically}
-                      onChange={(e) => setSaveAutomatically(e.target.checked)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <label htmlFor="saveAutomatically" style={{ fontSize: '13px', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main, #1e293b)' }}>
-                      Save tailored copy automatically
-                    </label>
-                  </div>
-
-                  <Button type="submit" isLoading={isLoading} className={styles.tailorBtn}>
-                    <Wand2 size={16} />
-                    <span>Analyze & Tailor</span>
-                  </Button>
-                </form>
-
-                {currentVersion && (
-                  <div className={styles.trackingSection} style={{ marginTop: '16px', padding: '12px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.2)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main, #1e293b)' }}>
-                        {applicationTracked ? 'Ã¢Å“â€œ Tracking this Application' : 'Track this job application?'}
-                      </div>
-                    </div>
-                    {!applicationTracked ? (
-                      <Button onClick={handleTrackApplication} isLoading={isTrackingLoading} style={{ width: '100%' }}>
-                        Add to Application Tracking
-                      </Button>
-                    ) : (
-                      <div style={{ fontSize: '12px', color: '#475569' }}>
-                        This CV is linked to an active job tracking card.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            ) : (
-              // Cover Letter Tailoring UI
-              <>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleGenerateLetter(company, position);
-                  }}
-                  className={`${styles.form} glass-card`}
-                >
-                  <h3>Cover Letter Tailoring</h3>
-                  <div className={styles.formGrid}>
-                    <InputField
-                      label="Company Name"
-                      id="letterCompany"
-                      placeholder="e.g. Stripe"
-                      value={company}
-                      onChange={(e) => setCompany(e.target.value)}
-                    />
-                    <InputField
-                      label="Target Position"
-                      id="letterRole"
-                      placeholder="e.g. Lead Frontend Engineer"
-                      value={position}
-                      onChange={(e) => setPosition(e.target.value)}
-                    />
-                  </div>
-                  <InputField
-                    label="Job Description Text *"
-                    id="letterDesc"
-                    type="textarea"
-                    placeholder="Paste job details to tailor your cover letter..."
-                    value={jobDescription}
-                    onChange={(e) => setJobDescription(e.target.value)}
-                    required
-                  />
-
-                  <div className={styles.formGrid} style={{ marginBottom: '16px' }}>
-                    <div className={styles.selectGroup}>
-                      <label htmlFor="letterTone">Writing Tone</label>
-                      <select
-                        id="letterTone"
-                        value={letterTone}
-                        onChange={(e) => setLetterTone(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '10px 14px',
-                          borderRadius: '8px',
-                          border: '1px solid var(--card-border, #cbd5e1)',
-                          background: 'white',
-                          fontSize: '13px',
-                          outline: 'none',
-                          color: 'var(--text-main, #1e293b)'
-                        }}
-                      >
-                        <option value="professional">Professional & Direct (Recommended)</option>
-                        <option value="enthusiastic">Enthusiastic & Passionate</option>
-                        <option value="creative">Creative & Narrative</option>
-                        <option value="executive">Executive & Formal</option>
-                        <option value="direct">Short & Conversational</option>
-                      </select>
-                    </div>
-
-                    <div className={styles.selectGroup}>
-                      <label htmlFor="letterLanguageSelect">Cover Letter Language</label>
-                      <select
-                        id="letterLanguageSelect"
-                        value={letterLanguage}
-                        onChange={(e) => setLetterLanguage(e.target.value as any)}
-                        style={{
-                          width: '100%',
-                          padding: '10px 14px',
-                          borderRadius: '8px',
-                          border: '1px solid var(--card-border, #cbd5e1)',
-                          background: 'white',
-                          fontSize: '13px',
-                          outline: 'none',
-                          color: 'var(--text-main, #1e293b)'
-                        }}
-                      >
-                        <option value="auto">Auto (Match Resume Language)</option>
-                        <option value="en">English</option>
-                        <option value="de">German</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <Button type="submit" isLoading={isLetterLoading} className={styles.tailorBtn}>
-                    <Sparkles size={16} />
-                    <span>Generate & Tailor Cover Letter</span>
-                  </Button>
-                </form>
-
-                <div className={`${styles.atsCard} glass-card`}>
-                  <h3>Cover Letter Guidelines</h3>
-                  <div style={{ fontSize: '13px', lineHeight: '1.6', color: 'var(--muted, #64748b)', display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-                    <p>
-                      <strong>1. Premium Structure:</strong> A cover letter should be kept to a single, impactful page. It includes contact details, greeting, hook opening, value body paragraphs, and professional closing.
-                    </p>
-                    <p>
-                      <strong>2. Adaptive Tone:</strong> Startups value enthusiastic/conversational tones, whereas traditional businesses require a professional/executive tone. Match the writing tone above accordingly.
-                    </p>
-                  </div>
-                </div>
-
-                {(() => {
-                  const letter = getParsedLetter(letterContent, editablePersonalInfo);
-                  const notes = letter.verification_notes;
-                  if (!notes || (!notes.requirements_emphasized?.length && !notes.resume_evidence_used?.length && !notes.placeholders?.length && !notes.confirmation_needed?.length)) {
-                    return null;
-                  }
-                  return (
-                    <div className={`${styles.atsCard} glass-card`} style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
-                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e293b', fontSize: '14px', fontWeight: 700, margin: 0 }}>
-                          <Sparkles size={16} style={{ color: '#6366f1' }} />
-                          AI Generation Audit
-                        </h3>
-                        <span style={{ fontSize: '10px', background: '#e0e7ff', color: '#4f46e5', padding: '3px 8px', borderRadius: '12px', fontWeight: 600 }}>Active Audit</span>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {notes.requirements_emphasized && notes.requirements_emphasized.length > 0 && (
-                          <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '3.5px solid #6366f1', border: '1px solid #e2e8f0', borderLeftWidth: '3.5px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>Ã°Å¸Å½Â¯</span>
-                              <strong style={{ fontSize: '12px', color: '#1e293b' }}>Emphasized Requirements</strong>
-                            </div>
-                            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              {notes.requirements_emphasized.map((req, idx) => (
-                                <li key={idx} style={{ lineHeight: '1.4' }}>{req}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {notes.resume_evidence_used && notes.resume_evidence_used.length > 0 && (
-                          <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '3.5px solid #10b981', border: '1px solid #e2e8f0', borderLeftWidth: '3.5px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>Ã°Å¸â€œâ€ž</span>
-                              <strong style={{ fontSize: '12px', color: '#1e293b' }}>Evidence Used from CV</strong>
-                            </div>
-                            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              {notes.resume_evidence_used.map((ev, idx) => (
-                                <li key={idx} style={{ lineHeight: '1.4' }}>{ev}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {notes.placeholders && notes.placeholders.length > 0 && (
-                          <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#fffbeb', borderLeft: '3.5px solid #f59e0b', border: '1px solid #fef3c7', borderLeftWidth: '3.5px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>Ã¢Å¡Â Ã¯Â¸Â</span>
-                              <strong style={{ fontSize: '12px', color: '#b45309' }}>Missing Facts / Placeholders</strong>
-                            </div>
-                            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#78350f', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              {notes.placeholders.map((pl, idx) => (
-                                <li key={idx} style={{ lineHeight: '1.4' }}>{pl}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {notes.confirmation_needed && notes.confirmation_needed.length > 0 && (
-                          <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#fef2f2', borderLeft: '3.5px solid #ef4444', border: '1px solid #fee2e2', borderLeftWidth: '3.5px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>Ã°Å¸â€Â</span>
-                              <strong style={{ fontSize: '12px', color: '#b91c1c' }}>Confirmation Required</strong>
-                            </div>
-                            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#991b1b', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              {notes.confirmation_needed.map((conf, idx) => (
-                                <li key={idx} style={{ lineHeight: '1.4' }}>{conf}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </>
-            )
+            <TailorPanel
+              editorTabIsResume={editorTab === 'resume'}
+              company={company}
+              setCompany={setCompany}
+              position={position}
+              setPosition={setPosition}
+              jobDescription={jobDescription}
+              setJobDescription={setJobDescription}
+              template={template}
+              setTemplate={setTemplate}
+              targetLanguage={targetLanguage}
+              setTargetLanguage={setTargetLanguage}
+              aggressiveMode={aggressiveMode}
+              setAggressiveMode={setAggressiveMode}
+              masterProjects={masterProjects}
+              selectedProjectIds={selectedProjectIds}
+              setSelectedProjectIds={setSelectedProjectIds}
+              isProjectsCollapsed={isProjectsCollapsed}
+              setIsProjectsCollapsed={setIsProjectsCollapsed}
+              masterProfileInfo={masterProfileInfo}
+              editablePersonalInfo={editablePersonalInfo}
+              currentVersion={currentVersion}
+              saveAutomatically={saveAutomatically}
+              setSaveAutomatically={setSaveAutomatically}
+              isLoading={isLoading}
+              applicationTracked={applicationTracked}
+              isTrackingLoading={isTrackingLoading}
+              onTailor={handleTailor}
+              onTrackApplication={handleTrackApplication}
+              letterTone={letterTone}
+              setLetterTone={setLetterTone}
+              letterLanguage={letterLanguage}
+              setLetterLanguage={(v) => setLetterLanguage(v as any)}
+              isLetterLoading={isLetterLoading}
+              letterContent={letterContent}
+              onGenerateLetter={handleGenerateLetter}
+            />
           )}
 
           {activeControlTab === 'ats' && (
@@ -3166,507 +1955,27 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             // Design and Typography Customizers
             editorTab === 'resume' ? (
               // CV Design & Layout Options
-              <div className={`${styles.styleControlsForm} glass-card`}>
-                {/* Sub-Tab Navigation Bar: Theme vs Sections */}
-                <div className={styles.subTabContainer}>
-                  <button
-                    type="button"
-                    className={`${styles.subTabBtn} ${activeStyleSubTab === 'sections' ? styles.activeSubTab : ''}`}
-                    onClick={() => setActiveStyleSubTab('sections')}
-                  >
-                    <Layers size={13} />
-                    <span>Sections & Content</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.subTabBtn} ${activeStyleSubTab === 'theme' ? styles.activeSubTab : ''}`}
-                    onClick={() => setActiveStyleSubTab('theme')}
-                  >
-                    <Sliders size={13} />
-                    <span>Theme & Typography</span>
-                  </button>
-                </div>
 
-                {/* Sub-Tab 1: Theme & Typography */}
-                {activeStyleSubTab === 'theme' && (
-                  <>
-                    <h3>Typography & Layout Presets</h3>
-
-                    <div className={styles.presetCard}>
-                      <div className={styles.presetHeader}>
-                        <label className={styles.presetLabel}>
-                          <Sliders size={16} style={{ color: 'var(--primary, #6366f1)' }} />
-                          <span>Quick Spacing & Density Presets</span>
-                        </label>
-                      </div>
-                      <div className={styles.presetGrid}>
-                        {[
-                          {
-                            id: 'standard',
-                            title: 'Standard',
-                            subtitle: 'Default balance',
-                            icon: LayoutGrid,
-                            config: { fontSize: 13, headingSize: 1.4, lineHeight: 1.4, sectionSpacing: 20, bulletSpacing: 4 }
-                          },
-                          {
-                            id: 'tight',
-                            title: 'Tight',
-                            subtitle: 'Fit ~15% more',
-                            icon: Minimize2,
-                            config: { fontSize: 12, headingSize: 1.3, lineHeight: 1.3, sectionSpacing: 14, bulletSpacing: 3 }
-                          },
-                          {
-                            id: 'ultra',
-                            title: 'Ultra Tight',
-                            subtitle: 'Max density',
-                            icon: Layers,
-                            config: { fontSize: 11, headingSize: 1.2, lineHeight: 1.2, sectionSpacing: 10, bulletSpacing: 2 }
-                          }
-                        ].map(preset => {
-                          const IconComponent = preset.icon;
-                          const isActive =
-                            customStyles.fontSize === preset.config.fontSize &&
-                            customStyles.sectionSpacing === preset.config.sectionSpacing;
-
-                          return (
-                            <button
-                              key={preset.id}
-                              type="button"
-                              className={`${styles.presetTile} ${isActive ? styles.presetTileActive : ''}`}
-                              onClick={() => setCustomStyles(s => ({ ...s, ...preset.config }))}
-                            >
-                              <div className={styles.presetTileTop}>
-                                <IconComponent size={14} className={styles.presetIcon} />
-                                {isActive && (
-                                  <span className={styles.presetCheck}>
-                                    <Check size={10} />
-                                  </span>
-                                )}
-                              </div>
-                              <div>
-                                <div className={styles.presetTitle}>{preset.title}</div>
-                                <div className={styles.presetSubtitle}>{preset.subtitle}</div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className={styles.slidersTwinGrid}>
-                      <div className={styles.sliderGroup}>
-                        <label>Base Font Size: <strong>{customStyles.fontSize}px</strong></label>
-                        <input
-                          type="range"
-                          min="10"
-                          max="18"
-                          step="0.1"
-                          value={customStyles.fontSize}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, fontSize: parseFloat(e.target.value) }))}
-                        />
-                      </div>
-
-                      <div className={styles.sliderGroup}>
-                        <label>Heading Multiplier: <strong>x{customStyles.headingSize}</strong></label>
-                        <input
-                          type="range"
-                          min="1.0"
-                          max="2.2"
-                          step="0.05"
-                          value={customStyles.headingSize}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, headingSize: parseFloat(e.target.value) }))}
-                        />
-                      </div>
-                    </div>
-
-                    <div className={styles.slidersTwinGrid}>
-                      <div className={styles.sliderGroup}>
-                        <label>Line Height: <strong>{customStyles.lineHeight}</strong></label>
-                        <input
-                          type="range"
-                          min="1.0"
-                          max="2.0"
-                          step="0.05"
-                          value={customStyles.lineHeight}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, lineHeight: parseFloat(e.target.value) }))}
-                        />
-                      </div>
-
-                      <div className={styles.sliderGroup}>
-                        <label>Section Spacing: <strong>{customStyles.sectionSpacing}px</strong></label>
-                        <input
-                          type="range"
-                          min="10"
-                          max="45"
-                          step="0.5"
-                          value={customStyles.sectionSpacing}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, sectionSpacing: parseFloat(e.target.value) }))}
-                        />
-                      </div>
-                    </div>
-
-                    <div className={styles.slidersTwinGrid}>
-                      <div className={styles.sliderGroup}>
-                        <label>Bullet Point Spacing: <strong>{customStyles.bulletSpacing !== undefined ? customStyles.bulletSpacing : 4}px</strong></label>
-                        <input
-                          type="range"
-                          min="0"
-                          max="15"
-                          step="0.5"
-                          value={customStyles.bulletSpacing !== undefined ? customStyles.bulletSpacing : 4}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, bulletSpacing: parseFloat(e.target.value) }))}
-                        />
-                      </div>
-
-                      <div className={styles.sliderGroup}>
-                        <label>Page Margin: <strong>{customStyles.pageMargin || 48}px</strong></label>
-                        <input
-                          type="range"
-                          min="15"
-                          max="90"
-                          step="0.5"
-                          value={customStyles.pageMargin || 48}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, pageMargin: parseFloat(e.target.value) }))}
-                        />
-                      </div>
-                    </div>
-
-                    <div className={styles.colorPickers}>
-                      <div className={styles.colorPickerGroup}>
-                        <label>Accent Color</label>
-                        <input
-                          type="color"
-                          value={customStyles.accentColor}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, accentColor: e.target.value }))}
-                        />
-                      </div>
-                      <div className={styles.colorPickerGroup}>
-                        <label>Title 2nd Word Color</label>
-                        <input
-                          type="color"
-                          value={customStyles.headingSecondaryColor || '#3d7ee6'}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, headingSecondaryColor: e.target.value }))}
-                        />
-                      </div>
-                      <div className={styles.colorPickerGroup}>
-                        <label>Text Color</label>
-                        <input
-                          type="color"
-                          value={customStyles.textColor}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, textColor: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-
-                    <div className={styles.selectGroup} style={{ marginTop: '12px' }}>
-                      <label htmlFor="globalFontFamily">Font Family</label>
-                      <select
-                        id="globalFontFamily"
-                        value={customStyles.fontFamily || ''}
-                        onChange={(e) => setCustomStyles(s => ({ ...s, fontFamily: e.target.value }))}
-                        style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--card-border)', background: 'var(--card-bg)', color: 'var(--foreground)' }}
-                      >
-                        <option value="">Template Default</option>
-                        <option value="'Aptos', 'Calibri', sans-serif">Aptos</option>
-                        <option value="'Inter', sans-serif">Inter</option>
-                        <option value="'Calibri', 'Segoe UI', sans-serif">Calibri</option>
-                        <option value="'Helvetica Neue', 'Helvetica', 'Arial', sans-serif">Helvetica</option>
-                        <option value="'Source Sans 3', 'Source Sans Pro', sans-serif">Source Sans 3</option>
-                        <option value="'IBM Plex Sans', sans-serif">IBM Plex Sans</option>
-                        <option value="'Arial', sans-serif">Arial</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-
-                {/* Sub-Tab 2: Sections & Content */}
-                {activeStyleSubTab === 'sections' && (
-                  activeDetailSectionId ? (
-                    /* Master-Detail Full Section Editor */
-                    <SectionDetailEditor
-                      sectionId={activeDetailSectionId}
-                      sections={sections}
-                      setSections={setSections}
-                      onBack={() => setActiveDetailSectionId(null)}
-                      onSelectSection={(newSecId) => handleOpenSectionDetail(newSecId)}
-                      personalInfo={editablePersonalInfo}
-                      setPersonalInfo={setEditablePersonalInfo}
-                      summary={editableSummary}
-                      setSummary={setEditableSummary}
-                      experiences={editableExperiences}
-                      setExperiences={setEditableExperiences}
-                      onAddExperience={handleAddExperience}
-                      projects={editableProjects}
-                      setProjects={setEditableProjects}
-                      onAddProject={handleAddProject}
-                      educations={editableEducations}
-                      setEducations={setEditableEducations}
-                      onAddEducation={handleAddEducation}
-                      skills={editableSkills}
-                      setSkills={setEditableSkills}
-                      categoryOrder={categoryOrder}
-                      onMoveSkillCategory={handleMoveSkillCategory}
-                      getLocalizedCategoryName={getLocalizedCategoryName}
-                      languagesTitle={languagesTitle}
-                      setLanguagesTitle={setLanguagesTitle}
-                      targetLanguage={targetLanguage}
-                      onOpenAiPolishModal={(secId) => setOpenSectionAiModalId(secId)}
-                      onPolishBullet={handlePolishInlineText}
-                      toggleSectionVisibility={toggleSectionVisibility}
-                      animatingHideSectionId={animatingHideSectionId}
-                      onToggleSectionVersion={handleToggleSectionVersion}
-                      onResetToMasterProfile={handleResetSectionToMasterProfile}
-                    />
-                  ) : (
-                    /* Section Control Overview Matrix */
-                    <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <h3 style={{ margin: 0 }}>Sections Control Panel</h3>
-                        <span style={{ fontSize: '11px', color: 'var(--muted, #64748b)', fontWeight: 600 }}>
-                          {sections.filter(s => s.visible).length} visible / {sections.length + 1} total
-                        </span>
-                      </div>
-
-                      {/* Header / Personal Info Card */}
-                      <div className={`${styles.sectionCardItem} ${styles.sectionCardHeaderItem}`} style={{ marginBottom: '8px' }}>
-                        <div
-                          className={styles.sectionCardLeft}
-                          onClick={() => handleOpenSectionDetail('header')}
-                        >
-                          <div
-                            className={styles.sectionIconBadge}
-                            style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#4f46e5' }}
-                          >
-                            <User size={16} />
-                          </div>
-                          <div className={styles.sectionCardInfo}>
-                            <div className={styles.sectionCardTitle}>
-                              <span>Personal Info & Header</span>
-                            </div>
-                            <div className={styles.sectionCardSubtitle}>
-                              {editablePersonalInfo.full_name || 'Your name'} â€¢ {editablePersonalInfo.title || 'Headline & Contact'}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className={styles.sectionCardRight}>
-                          <button
-                            type="button"
-                            className={styles.sectionAiCardBtn}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleResetSectionToMasterProfile('header');
-                            }}
-                            title="Reset Personal Info & Header to Master Profile Original"
-                            style={{ marginRight: '4px' }}
-                          >
-                            <RotateCcw size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.sectionEditCardBtn}
-                            onClick={() => handleOpenSectionDetail('header')}
-                            title="Edit Personal Information"
-                          >
-                            <span>Edit</span>
-                            <Settings size={12} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Dynamic CV Sections Cards */}
-                      <div className={styles.sectionsList}>
-                        {sections.map((secItem, idx) => {
-                          const meta = (() => {
-                            if (secItem.type === 'summary' || secItem.id === 'summary') {
-                              const words = editableSummary ? editableSummary.trim().split(/\s+/).filter(Boolean).length : 0;
-                              return {
-                                icon: <FileText size={16} />,
-                                iconBg: 'rgba(99, 102, 241, 0.12)',
-                                iconColor: '#6366f1',
-                                subtitle: words > 0 ? `${words} words pitch` : 'Summary not set'
-                              };
-                            }
-                            if (secItem.type === 'experience' || secItem.id === 'experience') {
-                              return {
-                                icon: <Briefcase size={16} />,
-                                iconBg: 'rgba(59, 130, 246, 0.12)',
-                                iconColor: '#3b82f6',
-                                subtitle: `${editableExperiences.length} position${editableExperiences.length === 1 ? '' : 's'}`
-                              };
-                            }
-                            if (secItem.type === 'projects' || secItem.id === 'projects') {
-                              return {
-                                icon: <Code size={16} />,
-                                iconBg: 'rgba(16, 185, 129, 0.12)',
-                                iconColor: '#10b981',
-                                subtitle: `${editableProjects.length} project${editableProjects.length === 1 ? '' : 's'}`
-                              };
-                            }
-                            if (secItem.type === 'education' || secItem.id === 'education') {
-                              return {
-                                icon: <GraduationCap size={16} />,
-                                iconBg: 'rgba(245, 158, 11, 0.12)',
-                                iconColor: '#f59e0b',
-                                subtitle: `${editableEducations.length} degree${editableEducations.length === 1 ? '' : 's'}`
-                              };
-                            }
-                            if (secItem.type === 'skills' || secItem.id === 'skills') {
-                              const langCount = editableSkills.filter(s => (s.category || '').toLowerCase().trim() === 'languages').length;
-                              const itCount = editableSkills.length - langCount;
-                              return {
-                                icon: <Globe size={16} />,
-                                iconBg: 'rgba(236, 72, 153, 0.12)',
-                                iconColor: '#ec4899',
-                                subtitle: `${itCount} skills â€¢ ${langCount} languages`
-                              };
-                            }
-                            const count = secItem.customFormat === 'keyvalue' ? (secItem.keyValuePairs?.length || 0) : (secItem.bullets?.length || 0);
-                            return {
-                              icon: <Layers size={16} />,
-                              iconBg: 'rgba(99, 102, 241, 0.12)',
-                              iconColor: '#6366f1',
-                              subtitle: `${count} custom item${count === 1 ? '' : 's'}`
-                            };
-                          })();
-
-                          return (
-                            <div
-                              key={secItem.id}
-                              className={`${styles.sectionCardItem} ${!secItem.visible ? styles.sectionCardDisabled : ''}`}
-                            >
-                              <div
-                                className={styles.sectionCardLeft}
-                                onClick={() => handleOpenSectionDetail(secItem.id)}
-                              >
-                                <div
-                                  className={styles.sectionIconBadge}
-                                  style={{ background: meta.iconBg, color: meta.iconColor }}
-                                >
-                                  {meta.icon}
-                                </div>
-                                <div className={styles.sectionCardInfo}>
-                                  <div className={styles.sectionCardTitle}>
-                                    <span>{secItem.name}</span>
-                                    {!secItem.visible && (
-                                      <span className={styles.sectionHiddenBadge}>Hidden</span>
-                                    )}
-                                  </div>
-                                  <div className={styles.sectionCardSubtitle}>
-                                    {meta.subtitle}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className={styles.sectionCardRight}>
-                                <button
-                                  type="button"
-                                  className={`${styles.sectionVisibilityBtn} ${secItem.visible && animatingHideSectionId !== secItem.id ? styles.sectionVisibilityBtnActive : ''}`}
-                                  onClick={() => toggleSectionVisibility(secItem.id)}
-                                  title={secItem.visible && animatingHideSectionId !== secItem.id ? 'Hide section from CV' : 'Show section on CV'}
-                                >
-                                  {secItem.visible && animatingHideSectionId !== secItem.id ? <Eye size={13} /> : <EyeOff size={13} />}
-                                </button>
-
-                                <button
-                                  type="button"
-                                  className={styles.sectionAiCardBtn}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenSectionAiModalId(secItem.id);
-                                  }}
-                                  title={`AI Polish & Tailor ${secItem.name}`}
-                                >
-                                  <Sparkles size={13} />
-                                </button>
-
-                                <button
-                                  type="button"
-                                  className={styles.sectionAiCardBtn}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleResetSectionToMasterProfile(secItem.id);
-                                  }}
-                                  title={`Reset ${secItem.name} to Master Profile Original`}
-                                >
-                                  <RotateCcw size={13} />
-                                </button>
-
-                                <button
-                                  type="button"
-                                  className={styles.sectionEditCardBtn}
-                                  onClick={() => handleOpenSectionDetail(secItem.id)}
-                                  title={`Edit ${secItem.name}`}
-                                >
-                                  <span>Edit</span>
-                                  <Settings size={11} />
-                                </button>
-
-                                {secItem.id.startsWith('custom_') && (
-                                  <button
-                                    type="button"
-                                    className={styles.sectionDeleteBtn}
-                                    onClick={() => {
-                                      if (window.confirm(`Delete section "${secItem.name}"?`)) {
-                                        setSections(prev => prev.filter(s => s.id !== secItem.id));
-                                      }
-                                    }}
-                                    title="Delete Custom Section"
-                                  >
-                                    <Trash size={12} />
-                                  </button>
-                                )}
-
-                                <div className={styles.sectionSortGroup}>
-                                  <button
-                                    type="button"
-                                    className={styles.sectionSortBtn}
-                                    disabled={idx === 0}
-                                    onClick={() => {
-                                      const reordered = [...sections];
-                                      const temp = reordered[idx];
-                                      reordered[idx] = reordered[idx - 1];
-                                      reordered[idx - 1] = temp;
-                                      setSections(reordered);
-                                    }}
-                                    title="Move Up"
-                                  >
-                                    â–²
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={styles.sectionSortBtn}
-                                    disabled={idx === sections.length - 1}
-                                    onClick={() => {
-                                      const reordered = [...sections];
-                                      const temp = reordered[idx];
-                                      reordered[idx] = reordered[idx + 1];
-                                      reordered[idx + 1] = temp;
-                                      setSections(reordered);
-                                    }}
-                                    title="Move Down"
-                                  >
-                                    â–¼
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      <button
-                        type="button"
-                        className={styles.addCustomSectionCard}
-                        onClick={() => setIsAddCustomSectionOpen(true)}
-                      >
-                        <Plus size={15} />
-                        <span>Add Custom Section (Certifications, Awards, etc.)</span>
-                      </button>
-                    </>
-                  )
-                )}
-              </div>
+            <StyleControlsPanel
+              activeStyleSubTab={activeStyleSubTab}
+              setActiveStyleSubTab={setActiveStyleSubTab}
+              activeDetailSectionId={activeDetailSectionId}
+              targetLanguage={targetLanguage}
+              animatingHideSectionId={animatingHideSectionId}
+              onOpenSectionDetail={handleOpenSectionDetail}
+              onCloseSectionDetail={() => setActiveDetailSectionId(null)}
+              onAddExperience={handleAddExperience}
+              onAddProject={handleAddProject}
+              onAddEducation={handleAddEducation}
+              onMoveSkillCategory={handleMoveSkillCategory}
+              getLocalizedCategoryName={getLocalizedCategoryName}
+              onPolishBullet={handlePolishInlineText}
+              onToggleSectionVersion={handleToggleSectionVersion}
+              onResetToMasterProfile={handleResetSectionToMasterProfile}
+              toggleSectionVisibility={toggleSectionVisibility}
+              onOpenAiModal={setOpenSectionAiModalId}
+              onOpenAddCustomSection={() => setIsAddCustomSectionOpen(true)}
+            />
             ) : (
               // Cover Letter Design Options
               <div className={`${styles.styleControlsForm} glass-card`}>
@@ -3740,7 +2049,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                         boxSizing: 'border-box'
                       }}
                     >
-                      A4 (210mm Ã— 297mm)
+                      A4 (210mm × 297mm)
                     </div>
                   </div>
 
@@ -3778,7 +2087,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                 <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '16px', paddingTop: '16px' }}>
                   <h3 style={{ fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                    Ã¢Å“ÂÃ¯Â¸Â Signature Settings
+                    âœï¸ Signature Settings
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>

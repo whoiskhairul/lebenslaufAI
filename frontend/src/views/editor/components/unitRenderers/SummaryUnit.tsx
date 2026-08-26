@@ -1,5 +1,5 @@
-﻿import React from 'react';
-import styles from '../../../EditorNew.module.css';
+import React from 'react';
+import styles from '../../../../views/editorStyles';
 import { AutoSizeTextarea } from '../AutoSizeTextarea';
 import type { UnitRendererProps } from '../UnitRendererProps';
 import type { UnitContext } from './shared';

@@ -1,6 +1,6 @@
-﻿import React from 'react';
+import React from 'react';
 import { ChevronUp, ChevronDown, Plus, Sparkles, EyeOff, RotateCcw, Settings } from 'lucide-react';
-import styles from '../../../EditorNew.module.css';
+import styles from '../../../../views/editorStyles';
 import { AutoSizeTextarea } from '../AutoSizeTextarea';
 import { SectionSettingsPopover } from '../SectionSettingsPopover';
 import { renderFormattedTitle } from '../../utils/titleUtils';

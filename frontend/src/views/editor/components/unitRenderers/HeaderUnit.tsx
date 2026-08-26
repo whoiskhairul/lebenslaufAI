@@ -1,6 +1,6 @@
-﻿import React from 'react';
+import React from 'react';
 import { Settings } from 'lucide-react';
-import styles from '../../../EditorNew.module.css';
+import styles from '../../../../views/editorStyles';
 import { AutoSizeTextarea } from '../AutoSizeTextarea';
 import { HeaderSettingsPopover } from '../HeaderSettingsPopover';
 import { formatPhoneNumber } from '../../utils/phoneUtils';

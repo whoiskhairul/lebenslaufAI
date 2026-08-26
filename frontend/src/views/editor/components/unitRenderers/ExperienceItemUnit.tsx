@@ -1,6 +1,6 @@
-﻿import React from 'react';
+import React from 'react';
 import { X } from 'lucide-react';
-import styles from '../../../EditorNew.module.css';
+import styles from '../../../../views/editorStyles';
 import { AutoSizeTextarea } from '../AutoSizeTextarea';
 import type { UnitRendererProps } from '../UnitRendererProps';
 import type { UnitContext } from './shared';
