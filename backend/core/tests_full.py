@@ -429,6 +429,9 @@ class ResumeFlowTests(AIServiceMixin, AuthTestBase):
         self.assertEqual(version.target_company, 'Stripe')
         self.assertIn('original_profile', version.tailored_details)
         self.assertGreater(version.ats_score, 0)
+        self.assertIsNotNone(version.application)
+        self.assertEqual(version.application.company, 'Stripe')
+        self.assertEqual(version.application.status, 'preparing')
 
     def test_versions_list_patch_delete(self):
         c, user = self.auth_client('vl@test.dev')

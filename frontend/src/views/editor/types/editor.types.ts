@@ -17,6 +17,7 @@ export interface ResumeVersion {
       missing_keywords: string[];
       suggestions: string[];
     };
+    deep_analysis?: DeepAnalysis;
     original_profile: {
       personal_info: {
         id?: string;
@@ -82,6 +83,7 @@ export interface ResumeVersion {
       languagesFirst?: boolean;
       languagesTitle?: string;
       letterStyles?: any;
+      dismissed_ats?: string[];
     };
   };
   explanations: Array<{
@@ -102,8 +104,35 @@ export interface ResumeVersion {
   application?: string;
 }
 
+export interface DeepAnalysis {
+  section_scores?: Array<{ section: string; score: number; feedback?: string }>;
+  weak_bullets?: Array<{
+    id: string;
+    type: 'experience' | 'project';
+    bullet_index: number;
+    improved: string;
+    reason?: string;
+  }>;
+  recommended_keywords?: Array<{
+    name: string;
+    category: 'hard_skills' | 'tools' | 'soft_skills' | string;
+    reason?: string;
+  }>;
+  recruiter_impression?: {
+    first_impression?: string;
+    strengths?: string[];
+    concerns?: string[];
+    verdict?: string;
+  };
+  fit_report?: {
+    seniority_match?: 'below' | 'at' | 'above' | string;
+    domain_overlap?: number;
+    gaps?: Array<{ gap: string; cover_letter_tip?: string }>;
+  };
+}
+
 export interface EditorProps {
-  initialJobParams?: { company?: string; position?: string; desc?: string; application_id?: string; tab?: string };
+  initialJobParams?: { company?: string; position?: string; desc?: string; application_id?: string; tab?: string; version_id?: string };
 }
 
 export interface RenderableUnit {

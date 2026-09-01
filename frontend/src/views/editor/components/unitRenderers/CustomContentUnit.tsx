@@ -155,7 +155,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                   <ul className={styles.bulletsList}>
                     {(entry.bullets || []).map((bullet: string, bIdx: number) => (
                       <li key={bIdx} className={styles.bulletItem}>
-                        <span className={styles.bulletDot}>â€¢</span>
+                        <span className={styles.bulletDot}>•</span>
                         <div className={styles.bulletContent}>
                           <AutoSizeTextarea
                             value={bullet}
@@ -249,7 +249,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                 <ul className={styles.bulletsList}>
                   {(entry.bullets || []).map((bullet: string, bIdx: number) => (
                     <li key={bIdx} className={styles.bulletItem}>
-                      <span className={styles.bulletDot}>â€¢</span>
+                      <span className={styles.bulletDot}>•</span>
                       <div className={styles.bulletContent}>
                         <AutoSizeTextarea
                           value={bullet}
@@ -311,7 +311,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
       <ul className={styles.bulletsList}>
         {bullets.map((bullet: string, bulletIdx: number) => (
           <li key={bulletIdx} className={styles.bulletItem} style={{ position: 'relative' }}>
-            <span className={styles.bulletDot}>â€¢</span>
+            <span className={styles.bulletDot}>•</span>
             <div className={styles.bulletContent}>
               <AutoSizeTextarea
                 value={bullet}

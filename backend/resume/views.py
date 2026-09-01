@@ -129,11 +129,14 @@ class ResumeTailorView(APIView):
         validation_alerts = AIService.validate_hallucinations(
             profile_serialized,
             tailored_result.get('tailored_summary', ''),
-            tailored_result.get('tailored_experiences', [])
+            tailored_result.get('tailored_experiences', []),
+            tailored_projects=tailored_result.get('tailored_projects', []),
+            target_language=target_language
         )
 
         # Make JSON fields completely serializable by stringifying any nested UUID/datetime objects
         import json
+        deep_analysis = tailored_result.get('deep_analysis') or ats_report.get('deep_analysis', {})
         details_safe = json.loads(json.dumps({
             "experiences": tailored_result.get('tailored_experiences', []),
             "skills": tailored_result.get('tailored_skills', profile_serialized.get('skills', [])),
@@ -141,6 +144,8 @@ class ResumeTailorView(APIView):
             "educations": tailored_result.get('tailored_educations', []),
             "personal_info": tailored_result.get('tailored_personal_info', {}),
             "ats_report": ats_report,
+            "deep_analysis": deep_analysis,
+            "target_language": target_language,
             "original_profile": profile_serialized
         }, default=str))
         explanations_safe = json.loads(json.dumps(
@@ -152,40 +157,34 @@ class ResumeTailorView(APIView):
 
         # 5. Save or update the single resume version for this application
         if save_version:
-            if application:
-                resume_version, created = ResumeVersion.objects.update_or_create(
+            if not application:
+                application = Application.objects.create(
                     user=user,
-                    application=application,
-                    defaults={
-                        "title": f"Resume for {position} at {company}",
-                        "target_company": company,
-                        "target_role": position,
-                        "ats_score": ats_report.get('score', 70),
-                        "tailored_summary": tailored_result.get('tailored_summary', ''),
-                        "tailored_details": details_safe,
-                        "explanations": explanations_safe,
-                        "validation_alerts": validation_alerts,
-                        "template": template
-                    }
+                    company=company,
+                    position=position,
+                    status='preparing',
+                    job_description=job_description
                 )
-            else:
-                resume_version = ResumeVersion.objects.create(
-                    user=user,
-                    application=application,
-                    title=f"Resume for {position} at {company}",
-                    target_company=company,
-                    target_role=position,
-                    ats_score=ats_report.get('score', 70),
-                    tailored_summary=tailored_result.get('tailored_summary', ''),
-                    tailored_details=details_safe,
-                    explanations=explanations_safe,
-                    validation_alerts=validation_alerts,
-                    template=template
-                )
+
+            resume_version, created = ResumeVersion.objects.update_or_create(
+                user=user,
+                application=application,
+                defaults={
+                    "title": f"Resume for {position} at {company}",
+                    "target_company": company,
+                    "target_role": position,
+                    "ats_score": ats_report.get('score', 70),
+                    "tailored_summary": tailored_result.get('tailored_summary', ''),
+                    "tailored_details": details_safe,
+                    "explanations": explanations_safe,
+                    "validation_alerts": validation_alerts,
+                    "template": template
+                }
+            )
             return Response({
                 "success": True,
                 "data": ResumeVersionSerializer(resume_version).data
-            }, status=status.HTTP_200_OK if application else status.HTTP_201_CREATED)
+            }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
         else:
             from datetime import datetime
             temp_version = ResumeVersion(

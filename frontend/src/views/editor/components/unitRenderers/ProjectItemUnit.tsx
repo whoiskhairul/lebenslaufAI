@@ -130,7 +130,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
                 const key = `proj-bullet-${projIdx}-${bulletIdx}`;
                 return (
                   <li key={bulletIdx} className={`${isPP ? styles.ppBulletItem : styles.germanBulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                    <span className={styles.bulletDot}>â€¢</span>
+                    <span className={styles.bulletDot}>•</span>
                     {renderHoverAiControls(key, bullet, [
                       { label: "Action Verbs", prompt: "Make it punchier with strong active verbs" },
                       { label: "Tech Stack", prompt: "Highlight modern tech stack & system architecture" },
@@ -268,7 +268,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
               const key = `proj-bullet-${projIdx}-${bulletIdx}`;
               return (
                 <li key={bulletIdx} onClick={handleContainerClickToFocus} className={`${styles.bulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                  <span className={styles.bulletDot}>â€¢</span>
+                  <span className={styles.bulletDot}>•</span>
                   {renderHoverAiControls(key, bullet, [
                     { label: "Action Verbs", prompt: "Make it punchier with strong active verbs" },
                     { label: "Tech Stack", prompt: "Highlight modern tech stack & system architecture" },

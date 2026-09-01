@@ -8,7 +8,9 @@ import { Toast } from '../components/Toast';
 import { Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Brain, Save, RefreshCw, Trash, Plus, Settings, Minimize2, LayoutGrid, Layers, Sliders, User, Briefcase, Code, GraduationCap, Globe, Eye, EyeOff, RotateCcw } from 'lucide-react';
 import styles from './editorStyles';
 
-import { ATSDashboard, ATSReport, Proposal } from '../components/ATSDashboard';
+import { ATSDashboard, ATSReport, Proposal, WeakBulletWithOriginal, RecommendedKeyword } from '../components/ATSDashboard';
+import { DeepAnalysis } from './editor/types/editor.types';
+import { computeReadinessChecklist, buildOptimizationMarkdown, downloadMarkdown } from '../features/editor/utils/atsLocal';
 import { Snapshot } from '../components/VersionSnapshotDrawer';
 
 const templateClassMap: { [key: string]: string } = {
@@ -612,6 +614,132 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   const activeAtsScore = liveAtsReport?.score ?? (currentVersion?.ats_score || 85);
 
+  // ---- Deep ATS analysis (single combined AI call, persisted in tailored_details) ----
+  const [dismissedAts, setDismissedAts] = useState<string[]>(
+    (currentVersion?.tailored_details as any)?.customization?.dismissed_ats || []
+  );
+
+  const deepAnalysis: DeepAnalysis | null = React.useMemo(() => {
+    const td: any = (currentVersion?.tailored_details ?? {}) as any;
+    const d = td.deep_analysis || td.ats_report?.deep_analysis || (atsReport as any)?.deep_analysis;
+    if (!d || typeof d !== 'object') return null;
+    return {
+      section_scores: Array.isArray(d.section_scores) ? d.section_scores : [],
+      weak_bullets: Array.isArray(d.weak_bullets) ? d.weak_bullets : [],
+      recommended_keywords: Array.isArray(d.recommended_keywords) ? d.recommended_keywords : [],
+      recruiter_impression: d.recruiter_impression || {},
+      fit_report: d.fit_report || {}
+    };
+  }, [currentVersion, atsReport]);
+
+  const handleDismissAtsItem = (id: string) => {
+    setDismissedAts(prev => (prev.includes(id) ? prev : [...prev, id]));
+  };
+
+  const handleApplyBulletFix = (wb: WeakBulletWithOriginal) => {
+    createSnapshot(`Before apply bullet fix (${wb.contextLabel})`);
+    if (wb.type === 'project') {
+      setEditableProjects(prev => prev.map(proj => {
+        if (!proj.id || proj.id !== wb.id) return proj;
+        const bullets = [...(proj.bullets || [])];
+        if (bullets.length > wb.bullet_index) bullets[wb.bullet_index] = wb.improved;
+        return { ...proj, bullets };
+      }));
+    } else {
+      setEditableExperiences(prev => prev.map(exp => {
+        if (exp.id !== wb.id) return exp;
+        const bullets = [...(exp.bullets || [])];
+        if (bullets.length > wb.bullet_index) bullets[wb.bullet_index] = wb.improved;
+        return { ...exp, bullets };
+      }));
+    }
+    handleDismissAtsItem(`bullet:${wb.id}:${wb.bullet_index}`);
+  };
+
+  const recommendedKeywords: RecommendedKeyword[] = React.useMemo(() => {
+    const kw = deepAnalysis?.recommended_keywords || [];
+    return kw.map(k => ({
+      name: k.name,
+      category: k.category || 'hard_skills',
+      reason: k.reason,
+      applied: editableSkills.some(s => s.name.toLowerCase() === k.name.toLowerCase())
+    }));
+  }, [deepAnalysis, editableSkills]);
+
+  const weakBullets: WeakBulletWithOriginal[] = React.useMemo(() => {
+    const list = deepAnalysis?.weak_bullets || [];
+    return list.map(wb => {
+      let original = '';
+      let contextLabel = '';
+      if (wb.type === 'project') {
+        const proj = editableProjects.find(p => p.id === wb.id);
+        original = proj?.bullets?.[wb.bullet_index] || '';
+        contextLabel = proj?.title || 'Project';
+      } else {
+        const exp = editableExperiences.find(e => e.id === wb.id);
+        original = exp?.bullets?.[wb.bullet_index] || '';
+        contextLabel = exp ? `${exp.position || 'Role'}${exp.company ? ` @ ${exp.company}` : ''}` : 'Experience';
+      }
+      return { ...wb, original, contextLabel };
+    }).filter(wb => wb.original || wb.improved);
+  }, [deepAnalysis, editableExperiences, editableProjects]);
+
+  const atsChecklist = React.useMemo(() => computeReadinessChecklist({
+    personalInfo: editablePersonalInfo,
+    summary: editableSummary,
+    experiences: editableExperiences,
+    projects: editableProjects,
+    skills: editableSkills,
+    educations: editableEducations,
+    sections
+  }), [editablePersonalInfo, editableSummary, editableExperiences, editableProjects, editableSkills, editableEducations, sections]);
+
+  const atsCoverage = React.useMemo(() => {
+    if (!liveAtsReport) return null;
+    const matched = liveAtsReport.all_matched.length;
+    const total = matched + liveAtsReport.all_missing.length;
+    return { matched, total, percent: total > 0 ? Math.round((matched / total) * 100) : 0 };
+  }, [liveAtsReport]);
+
+  const beforeAfter = React.useMemo(() => {
+    const orig = currentVersion?.tailored_details?.original_profile;
+    if (!orig) return null;
+    const origBullets = [
+      ...(orig.work_experiences || []).flatMap(e => e.bullets || []),
+      ...(orig.projects || []).flatMap(p => p.bullets || []),
+    ].filter(b => b && b.trim());
+    const curBullets = [
+      ...editableExperiences.flatMap(e => e.bullets || []),
+      ...editableProjects.flatMap(p => p.bullets || []),
+    ].filter(b => b && b.trim());
+    const origSet = new Set(origBullets.map(b => b.trim()));
+    const changedCount = curBullets.filter(b => !origSet.has(b.trim())).length;
+    return {
+      originalSummary: orig.personal_info?.summary || '',
+      currentSummary: editableSummary,
+      changedBullets: changedCount,
+      totalBullets: curBullets.length,
+      originalSkillCount: (orig.skills || []).length,
+      currentSkillCount: editableSkills.length
+    };
+  }, [currentVersion, editableSummary, editableExperiences, editableProjects, editableSkills]);
+
+  const handleExportAtsReport = () => {
+    if (!liveAtsReport) return;
+    const md = buildOptimizationMarkdown({
+      targetRole: currentVersion?.target_role || position || '',
+      targetCompany: currentVersion?.target_company || company || '',
+      report: liveAtsReport,
+      coverage: atsCoverage,
+      checklist: atsChecklist,
+      deep: deepAnalysis
+    });
+    downloadMarkdown(
+      `ats-report-${(currentVersion?.target_company || 'resume').toLowerCase().replace(/\s+/g, '-')}.md`,
+      md
+    );
+  };
+
 
 
 
@@ -814,7 +942,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     window.dispatchEvent(new Event('cv-style-change'));
   }, [customStyles, sections, template]);
 
-  // Re-measure canvas fields when the preview pane becomes visible again on mobile â€”
+  // Re-measure canvas fields when the preview pane becomes visible again on mobile —
   // textareas measured while display:none collapse to zero height
   useEffect(() => {
     if (!isMobileViewport || mobileActivePane !== 'preview') return;
@@ -925,6 +1053,26 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     }
 
     const fetchExistingVersion = async () => {
+      // Chrome-extension deep link: /editor?versionId=<uuid>
+      if (initialJobParams?.version_id) {
+        try {
+          const res = await api.get('/resume/versions');
+          const ver = (res.data as any[]).find((v: any) => v.id === initialJobParams.version_id);
+          if (ver) {
+            setCompany(ver.target_company || '');
+            setPosition(ver.target_role || '');
+            setCurrentVersion(ver);
+            initializeVersionFields(ver);
+          } else {
+            setToast({ message: 'Linked CV version was not found.', type: 'error' });
+          }
+        } catch (err) {
+          console.error('Failed to load linked version:', err);
+          setToast({ message: 'Failed to load the CV generated by the extension.', type: 'error' });
+        }
+        return;
+      }
+
       if (initialJobParams?.application_id) {
         try {
           const appRes = await api.get(`/applications/${initialJobParams.application_id}`);
@@ -1024,13 +1172,13 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       });
       setEditableSkills(remappedSkills);
       const detailsAny = ver.tailored_details as any;
-      const tailoredProjects = detailsAny.tailored_projects || detailsAny.projects || profile.projects || [];
-      const mappedProjects = (profile.projects || tailoredProjects).map((p: any) => {
-        const tailoredP = (detailsAny.tailored_projects || []).find((tp: any) => tp.id === p.id);
+      const tailoredProjectsList = detailsAny.projects || detailsAny.tailored_projects || [];
+      const mappedProjects = (profile.projects || []).map((p: any) => {
+        const tailoredP = tailoredProjectsList.find((tp: any) => String(tp.id) === String(p.id));
         return {
           id: p.id || `proj_${Math.random()}`,
-          bullets: tailoredP?.bullets || p.bullets || [],
-          title: tailoredP?.title || p.title || p.title || '',
+          bullets: (tailoredP && tailoredP.bullets && tailoredP.bullets.length > 0) ? tailoredP.bullets : (p.bullets || []),
+          title: tailoredP?.title || p.title || '',
           role: tailoredP?.role || p.role || '',
           technologies: p.technologies || p.tech_stack || tailoredP?.technologies || [],
           date: p.date || '',
@@ -1058,6 +1206,22 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
     // Load styles config
     const customData = ver.tailored_details.customization;
+    // Restore resume language so German-tailored CVs get localized labels
+    // (section names, date formats, category headers like 'Sprachen').
+    {
+      const savedLang = String((ver.tailored_details as any)?.target_language || '').toLowerCase();
+      if (savedLang) {
+        setTargetLanguage(['de', 'deutsch', 'german'].includes(savedLang) ? 'de' : 'en');
+      } else {
+        // Legacy versions: heuristic detection from tailored content
+        const sample = [
+          ver.tailored_summary || '',
+          ...((ver.tailored_details?.experiences || []) as any[]).flatMap(e => e.bullets || [])
+        ].join(' ');
+        const germanHits = (sample.match(/\b(und|für|über|durch|bereich|entwicklung|verantwortlich|projekte|team)\b/gi) || []).length;
+        setTargetLanguage(germanHits >= 3 ? 'de' : 'en');
+      }
+    }
     if (customData) {
       if (customData.sections) setSections(customData.sections);
       if (customData.customStyles) {
@@ -1349,12 +1513,14 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         };
         const cleanMatched = parseKws(newReport.matched_keywords);
         const cleanMissing = parseKws(newReport.missing_keywords);
+        const newDeep: DeepAnalysis | undefined = (newReport as any)?.deep_analysis || undefined;
 
         setCurrentVersion(prev => prev ? {
           ...prev,
           ats_score: newReport.score ?? prev.ats_score,
           tailored_details: {
             ...prev.tailored_details,
+            deep_analysis: newDeep ?? prev.tailored_details.deep_analysis,
             ats_report: {
               ...newReport,
               matched_keywords: cleanMatched,
@@ -1491,7 +1657,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           categoryOrder,
           languagesFirst,
           languagesTitle,
-          letterStyles
+          letterStyles,
+          dismissed_ats: dismissedAts
         }
       };
 
@@ -1531,8 +1698,9 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       }
 
       if (letterContent) {
+        const targetAppId = initialJobParams?.application_id || savedVersion.application || currentVersion.application;
         const letterRes = await api.get('/resume/letters');
-        const matchedLetter = letterRes.data.find((l: any) => l.application === initialJobParams?.application_id || l.target_company === savedVersion.target_company);
+        const matchedLetter = letterRes.data.find((l: any) => (targetAppId && l.application === targetAppId) || l.target_company === savedVersion.target_company);
         if (matchedLetter) {
           await api.patch(`/resume/letters/${matchedLetter.id}`, {
             content: letterContent,
@@ -1540,7 +1708,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           });
         } else {
           await api.post('/resume/letters', {
-            application: initialJobParams?.application_id,
+            application: targetAppId || null,
             target_company: savedVersion.target_company,
             target_role: savedVersion.target_role,
             content: letterContent,
@@ -1948,6 +2116,18 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               onInjectSkill={handleInjectSkill}
               onRemoveSkill={handleRemoveSkill}
               existingCategories={Array.from(new Set(editableSkills.map(s => (s.category || 'technical').toLowerCase().trim())))}
+              deepAnalysis={deepAnalysis}
+              checklist={atsChecklist}
+              dismissedIds={dismissedAts}
+              onDismiss={handleDismissAtsItem}
+              onApplyBulletFix={handleApplyBulletFix}
+              onExportReport={handleExportAtsReport}
+              isRefreshing={isAtsChecking}
+              coverage={atsCoverage}
+              recommendedKeywords={recommendedKeywords}
+              weakBullets={weakBullets}
+              jobDescription={jobDescription || ''}
+              beforeAfter={beforeAfter}
             />
           )}
 
@@ -2087,7 +2267,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                 <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '16px', paddingTop: '16px' }}>
                   <h3 style={{ fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                    âœï¸ Signature Settings
+                    ✍️ Signature Settings
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>

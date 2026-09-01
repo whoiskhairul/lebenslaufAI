@@ -354,6 +354,16 @@ cd frontend && npm run build
 
 ---
 
+## Chrome Extension (Job Tailorer)
+
+A companion **Chrome extension** lives in [`extension/`](extension/) — it extracts the job posting you are viewing on **LinkedIn, Xing or Indeed** (JSON-LD `JobPosting` parsing with CSS-selector fallbacks), generates a tailored CV + cover letter through your backend, and opens the finished CV in the web-app editor via `/editor?versionId=<id>`.
+
+```bash
+# load it: chrome://extensions → Developer mode → Load unpacked → select extension/
+```
+
+See [`extension/README.md`](extension/README.md) for setup, architecture and publishing notes.
+
 ## Known Debt / Roadmap
 
 - [ ] `views/EditorNew.tsx` (~3.3k lines): Cover Letter page editor, AI-polish modals and panel-resizing logic are still inline — same extraction pattern as the existing panels applies

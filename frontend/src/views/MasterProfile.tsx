@@ -479,6 +479,8 @@ export const MasterProfile: React.FC = () => {
   const [inlineSkillName, setInlineSkillName] = useState('');
   const [localSkills, setLocalSkills] = useState<Skill[]>([]);
   const [deletedSkillIds, setDeletedSkillIds] = useState<string[]>([]);
+  const [dragSkillId, setDragSkillId] = useState<string | null>(null);
+  const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
   const [animatingSkillId, setAnimatingSkillId] = useState<string | null>(null);
   const [animatingPartnerSkillId, setAnimatingPartnerSkillId] = useState<string | null>(null);
   const [animationDirection, setAnimationDirection] = useState<'left' | 'right' | null>(null);
@@ -667,6 +669,34 @@ export const MasterProfile: React.FC = () => {
   };
 
   // CRUD handlers for Skills
+  // NOTE: every skill operation persists IMMEDIATELY (matching the
+  // Experience/Projects tabs) so edits are never silently lost.
+  const persistSkill = async (skill: Skill): Promise<Skill> => {
+    const payload = {
+      name: skill.name,
+      category: skill.category,
+      level: skill.level || '',
+      order: skill.order || 0
+    };
+    if (skill.id && !skill.id.startsWith('temp_')) {
+      const res = await api.patch(`/master-profile/skills/${skill.id}`, payload);
+      return { ...skill, ...res.data };
+    }
+    const res = await api.post('/master-profile/skills', payload);
+    return { ...skill, ...res.data };
+  };
+
+  const persistCategoryOrders = (categoryName: string, skills: Skill[]) => {
+    const catSkills = skills.filter(s => s.category === categoryName);
+    catSkills.forEach((s, idx) => {
+      if (s.id && !s.id.startsWith('temp_') && (s.order || 0) !== idx) {
+        api.patch(`/master-profile/skills/${s.id}`, { order: idx }).catch(err =>
+          console.error('Failed to persist skill order:', err)
+        );
+      }
+    });
+  };
+
   const handleMoveSkill = (skillId: string, direction: 'left' | 'right') => {
     const skillToMove = localSkills.find(s => s.id === skillId);
     if (!skillToMove) return;
@@ -689,6 +719,7 @@ export const MasterProfile: React.FC = () => {
 
     // Wait for the fade-out to complete before updating state
     setTimeout(() => {
+      let updatedSkills: Skill[] = [];
       setLocalSkills(prev => {
         const updated = prev.map(s => {
           if (s.id === skillId) {
@@ -704,9 +735,12 @@ export const MasterProfile: React.FC = () => {
           }
           return s;
         });
-
+        updatedSkills = updated;
         return updated;
       });
+
+      // Persist new ordering immediately
+      setTimeout(() => persistCategoryOrders(skillToMove.category, updatedSkills), 0);
 
       // Clear animation states (fades back in)
       setAnimatingSkillId(null);
@@ -714,62 +748,83 @@ export const MasterProfile: React.FC = () => {
     }, 120);
   };
 
-  const handleSaveInlineSkill = (categoryName: string) => {
+  const handleSaveInlineSkill = async (categoryName: string) => {
     if (!inlineSkillName.trim()) return;
     const catSkills = localSkills.filter(s => s.category === categoryName);
     const newSkill: Skill = {
       id: `temp_${Date.now()}_${Math.random()}`,
       name: inlineSkillName.trim(),
       category: categoryName,
-      level: '',
+      level: categoryName.toLowerCase() === 'languages' ? '' : 'intermediate',
       order: catSkills.length
     };
-    setLocalSkills(prev => [...prev, newSkill]);
     setInlineSkillName('');
     setInlineCategoryInput(null);
+    try {
+      const saved = await persistSkill(newSkill);
+      setLocalSkills(prev => prev.map(s => (s.id === newSkill.id ? saved : s)));
+    } catch (err) {
+      console.error('Failed to save skill:', err);
+      setToast({ message: 'Failed to save skill.', type: 'error' });
+      setLocalSkills(prev => prev.filter(s => s.id !== newSkill.id));
+    }
   };
 
-  const handleAddSkill = (e: React.FormEvent) => {
+  const handleAddSkill = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!skillName || !skillCategory) return;
 
-    if (editingId) {
-      setLocalSkills(prev => prev.map(s => {
-        if (s.id === editingId) {
-          return { ...s, name: skillName.trim(), category: skillCategory };
-        }
-        return s;
-      }));
-    } else {
-      const catSkills = localSkills.filter(s => s.category === skillCategory);
-      const newSkill: Skill = {
-        id: `temp_${Date.now()}_${Math.random()}`,
-        name: skillName.trim(),
-        category: skillCategory,
-        level: '',
-        order: catSkills.length
-      };
-      setLocalSkills(prev => [...prev, newSkill]);
-    }
+    const isEdit = Boolean(editingId);
+    const catSkills = localSkills.filter(s => s.category === skillCategory);
+    const targetSkill: Skill = isEdit
+      ? { ...(localSkills.find(s => s.id === editingId) || { id: editingId! }), name: skillName.trim(), category: skillCategory }
+      : { id: `temp_${Date.now()}_${Math.random()}`, name: skillName.trim(), category: skillCategory, level: skillCategory.toLowerCase() === 'languages' ? '' : skillLevel, order: catSkills.length };
+
+    // Optimistically update local state
+    setLocalSkills(prev => isEdit
+      ? prev.map(s => (s.id === editingId ? { ...s, name: targetSkill.name, category: targetSkill.category } : s))
+      : [...prev, targetSkill]
+    );
 
     setIsAdding(false);
     setEditingId(null);
     setSkillName('');
     setSkillCategory('');
+
+    try {
+      const saved = await persistSkill(targetSkill);
+      setLocalSkills(prev => prev.map(s => (s.id === targetSkill.id ? saved : s)));
+    } catch (err) {
+      console.error('Failed to save skill:', err);
+      setToast({ message: 'Failed to save skill.', type: 'error' });
+      // Revert optimistic update on failure
+      setLocalSkills(prev => isEdit ? prev : prev.filter(s => s.id !== targetSkill.id));
+    }
   };
 
   const handleStartEditSkill = (skill: Skill) => {
     setSkillName(skill.name);
     setSkillCategory(skill.category);
+    if ((skill.category || '').toLowerCase() === 'languages') {
+      setSkillLevel('B2');
+    }
     setEditingId(skill.id!);
     setIsAdding(true);
   };
 
-  const handleDeleteSkill = (id: string) => {
-    if (id && !id.startsWith('temp_')) {
-      setDeletedSkillIds(prev => [...prev, id]);
-    }
+  const handleDeleteSkill = async (id: string) => {
+    // Remove locally first for instant feedback
+    const removed = localSkills.find(s => s.id === id);
     setLocalSkills(prev => prev.filter(s => s.id !== id));
+    if (id && !id.startsWith('temp_')) {
+      try {
+        await api.delete(`/master-profile/skills/${id}`);
+      } catch (err) {
+        console.error('Failed to delete skill:', err);
+        setToast({ message: 'Failed to delete skill.', type: 'error' });
+        if (removed) setLocalSkills(prev => [...prev, removed]);
+      }
+    }
   };
 
   const handleRenameCategory = (oldCategoryName: string) => {
@@ -778,59 +833,61 @@ export const MasterProfile: React.FC = () => {
       title: 'Rename Category',
       description: `Enter a new name for the category "${oldCategoryName}":`,
       defaultValue: oldCategoryName,
-      onConfirm: (newName) => {
+      onConfirm: async (newName) => {
         if (!newName.trim() || newName.trim() === oldCategoryName) return;
-        setLocalSkills(prev => prev.map(s => {
-          if (s.category === oldCategoryName) {
-            return { ...s, category: newName.trim() };
+        const affected = localSkills.filter(s => s.category === oldCategoryName);
+        // Optimistic rename
+        setLocalSkills(prev => prev.map(s => (s.category === oldCategoryName ? { ...s, category: newName.trim() } : s)));
+        try {
+          for (const s of affected) {
+            if (s.id && !s.id.startsWith('temp_')) {
+              await api.patch(`/master-profile/skills/${s.id}`, { category: newName.trim() });
+            }
           }
-          return s;
-        }));
+        } catch (err) {
+          console.error('Failed to rename category:', err);
+          setToast({ message: 'Failed to rename category on server.', type: 'error' });
+        }
       }
     });
   };
 
-  const handleSaveSkills = async () => {
-    setIsSaving(true);
-    setMsg({ type: '', text: '' });
+  // Drag & drop: move a skill into a different category
+  const handleDropSkillToCategory = async (skillId: string | null, newCategory: string) => {
+    setDragOverCategory(null);
+    if (!skillId) return;
+    const skill = localSkills.find(s => s.id === skillId);
+    if (!skill || skill.category === newCategory) return;
+
+    const catSkills = localSkills.filter(s => s.category === newCategory && s.id !== skillId);
+    const updatedSkill: Skill = { ...skill, category: newCategory, order: catSkills.length };
+
+    // Optimistic move
+    setLocalSkills(prev => prev.map(s => (s.id === skillId ? { ...s, category: newCategory, order: catSkills.length } : s)));
+    // Renumber the source category so no gaps remain
+    const sourceCat = skill.category;
+    setTimeout(() => {
+      setLocalSkills(prev => {
+        const renumbered = prev.map(s => {
+          if (s.category === sourceCat) {
+            const siblings = prev.filter(x => x.category === sourceCat);
+            const idx = siblings.findIndex(x => x.id === s.id);
+            return { ...s, order: idx };
+          }
+          return s;
+        });
+        persistCategoryOrders(sourceCat, renumbered);
+        return renumbered;
+      });
+    }, 0);
+
     try {
-      // 1. Delete removed skills
-      for (const id of deletedSkillIds) {
-        try {
-          await api.delete(`/master-profile/skills/${id}`);
-        } catch (err) {
-          console.error(`Failed to delete skill ${id}:`, err);
-        }
-      }
-
-      // 2. Add or Update skills
-      for (const skill of localSkills) {
-        if (skill.id && skill.id.startsWith('temp_')) {
-          const payload = {
-            name: skill.name,
-            category: skill.category,
-            level: skill.level || '',
-            order: skill.order || 0
-          };
-          await api.post('/master-profile/skills', payload);
-        } else {
-          const payload = {
-            name: skill.name,
-            category: skill.category,
-            order: skill.order || 0
-          };
-          await api.patch(`/master-profile/skills/${skill.id}`, payload);
-        }
-      }
-
-      setDeletedSkillIds([]);
-      setMsg({ type: 'success', text: 'Skills saved successfully!' });
-      await fetchProfile();
+      await persistSkill(updatedSkill);
+      setToast({ message: `'${skill.name}' moved to ${newCategory}.`, type: 'success' });
     } catch (err) {
-      console.error('Failed to save skills:', err);
-      setMsg({ type: 'error', text: 'Failed to save skills registry.' });
-    } finally {
-      setIsSaving(false);
+      console.error('Failed to move skill:', err);
+      setToast({ message: 'Failed to move skill to the new category.', type: 'error' });
+      setLocalSkills(prev => prev.map(s => (s.id === skillId ? { ...skill } : s)));
     }
   };
 
@@ -1659,8 +1716,27 @@ export const MasterProfile: React.FC = () => {
                       })
                       .map(([category, skills]) => {
                         const sortedSkills = [...skills].sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
+                        const isDropTarget = dragOverCategory === category && dragSkillId !== null;
                         return (
-                          <div key={category} className={cls.skillCategoryBlock}>
+                          <div
+                            key={category}
+                            className={cls.skillCategoryBlock}
+                            style={isDropTarget ? { outline: '2px dashed var(--primary-color, #4f46e5)', outlineOffset: '4px', borderRadius: '8px', background: 'rgba(99, 102, 241, 0.04)' } : undefined}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = 'move';
+                              if (dragOverCategory !== category) setDragOverCategory(category);
+                            }}
+                            onDragLeave={(e) => {
+                              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                                setDragOverCategory(null);
+                              }
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              handleDropSkillToCategory(dragSkillId, category);
+                            }}
+                          >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                               <h4 className={cls.categoryTitle} style={{ marginBottom: 0 }}>{category}</h4>
                               <button
@@ -1678,7 +1754,22 @@ export const MasterProfile: React.FC = () => {
                                 const animationClass = isAnimating ? cls.animateFadeOut : '';
 
                                 return (
-                                  <div key={s.id} className={`${cls.skillTagCard} ${animationClass}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                  <div
+                                    key={s.id}
+                                    className={`${cls.skillTagCard} ${animationClass}`}
+                                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', opacity: dragSkillId === s.id ? 0.4 : 1, transition: 'opacity 0.15s ease' }}
+                                    draggable
+                                    onDragStart={(e) => {
+                                      setDragSkillId(s.id!);
+                                      e.dataTransfer.effectAllowed = 'move';
+                                      e.dataTransfer.setData('text/plain', s.id || '');
+                                    }}
+                                    onDragEnd={() => {
+                                      setDragSkillId(null);
+                                      setDragOverCategory(null);
+                                    }}
+                                    title="Drag to another category"
+                                  >
                                     <span>{s.name}</span>
                                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                     {idx > 0 && (
@@ -1754,12 +1845,6 @@ export const MasterProfile: React.FC = () => {
                         </div>
                       );
                       })}
-                  </div>
-                  
-                  <div style={{ marginTop: '24px' }}>
-                    <Button onClick={handleSaveSkills} isLoading={isSaving} className={cls.saveBtn}>
-                      Save Skills
-                    </Button>
                   </div>
                 </div>
               )}

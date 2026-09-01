@@ -342,7 +342,7 @@ export const StyleControlsPanel: React.FC<StyleControlsPanelProps> = ({
                     <span>Personal Info & Header</span>
                   </div>
                   <div className={styles.sectionCardSubtitle}>
-                    {editablePersonalInfo.full_name || 'Your name'} â€¢ {editablePersonalInfo.title || 'Headline & Contact'}
+                    {editablePersonalInfo.full_name || 'Your name'} • {editablePersonalInfo.title || 'Headline & Contact'}
                   </div>
                 </div>
               </div>
@@ -416,7 +416,7 @@ export const StyleControlsPanel: React.FC<StyleControlsPanelProps> = ({
                       icon: <Globe size={16} />,
                       iconBg: 'rgba(236, 72, 153, 0.12)',
                       iconColor: '#ec4899',
-                      subtitle: `${itCount} skills â€¢ ${langCount} languages`
+                      subtitle: `${itCount} skills • ${langCount} languages`
                     };
                   }
                   const count = secItem.customFormat === 'keyvalue' ? (secItem.keyValuePairs?.length || 0) : (secItem.bullets?.length || 0);

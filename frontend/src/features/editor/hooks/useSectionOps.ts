@@ -483,9 +483,11 @@ export function useSectionOps(deps: SectionOpsDeps) {
       if (norm === 'programming languages' || norm === 'technical' || norm === 'technologies' || norm === 'programmiersprachen') return 'Programmiersprachen & Kenntnisse';
       if (norm === 'frameworks' || norm === 'frameworks & libraries' || norm === 'frameworks & bibliotheken') return 'Frameworks & Bibliotheken';
       if (norm === 'databases' || norm === 'datenbanken') return 'Datenbanken';
-      if (norm === 'cloud' || norm === 'cloud & devops' || norm === 'devops' || norm === 'cloud & infrastructure') return 'Cloud & Infrastructure';
-      if (norm === 'tools' || norm === 'development tools' || norm === 'werkzeuge & tools') return 'Werkzeuge & Tools';
+      if (norm === 'cloud' || norm === 'cloud & devops' || norm === 'devops' || norm === 'cloud & infrastructure') return 'Cloud & DevOps';
+      if (norm === 'tools' || norm === 'development tools' || norm === 'werkzeuge & tools' || norm === 'entwicklungswerkzeuge') return 'Werkzeuge & Tools';
+      if (norm === 'testing' || norm === 'testen' || norm === 'quality assurance') return 'Testing & Qualitätssicherung';
       if (norm === 'soft_skills' || norm === 'soft skills') return 'Methodische & Soziale Kompetenzen';
+      if (norm === 'other' || norm === 'sonstige' || norm === 'weitere') return 'Weitere Kenntnisse';
     }
     return catName.charAt(0).toUpperCase() + catName.slice(1).replace(/_/g, ' ');
   };

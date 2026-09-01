@@ -12,21 +12,31 @@ function walk(dir, acc = []) {
   return acc;
 }
 
-// Matches runs that look like UTF-8 bytes mis-decoded as CP1252:
-// lead chars in the Ã/Â/â€Š range followed by CP1252 continuation chars.
-const MOJIBAKE_RUN = /[\u00c2-\u00c5][\u0080-\u00bf\u2019\u201c\u201d\u2022\u2013\u2014\u02c6\u2030\u0160\u2039\u0152\u017d\u2018\u201a\u201e\u2020\u2021\u02dc\u203a\u0153\u017e\u0178\u00a0-\u00ff]*/g;
+const DICT = {
+  '\u00e2\u20ac\u00a2': '•',
+  '\u00e2\u20ac\u201c': '–',
+  '\u00e2\u20ac\u201d': '—',
+  '\u00e2\u20ac\u02dc': '‘',
+  '\u00e2\u20ac\u2122': '’',
+  '\u00e2\u20ac\u0153': '“',
+  '\u00e2\u20ac\u009d': '”',
+  '\u00e2\u201e\u00a2': '™',
+  '\u00c3\u00a9': 'é',
+  '\u00c3\u00bc': 'ü',
+  '\u00c3\u00b6': 'ö',
+  '\u00c3\u00a4': 'ä',
+  '\u00c3\u0178': 'ß',
+  '\u00c3\u009c': 'Ü',
+  '\u00c3\u2013': 'Ö',
+  '\u00c3\u201e': 'Ä',
+};
 
 function fixMojibake(text) {
-  return text.replace(MOJIBAKE_RUN, (frag) => {
-    try {
-      const bytes = Buffer.from(frag, 'latin1');
-      const fixed = bytes.toString('utf8');
-      if (!fixed.includes('\uFFFD') && /[\u00a0-\u02ff\u2000-\u330f\ufe0f]/.test(fixed)) {
-        return fixed;
-      }
-    } catch (_) { /* keep original */ }
-    return frag;
-  });
+  let res = text;
+  for (const [bad, good] of Object.entries(DICT)) {
+    res = res.split(bad).join(good);
+  }
+  return res;
 }
 
 let touched = 0;

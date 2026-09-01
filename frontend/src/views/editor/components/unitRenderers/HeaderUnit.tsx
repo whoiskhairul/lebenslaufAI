@@ -345,7 +345,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
         )}
         {editablePersonalInfo.email && (
           <>
-            {editablePersonalInfo.location && <span>â€¢</span>}
+            {editablePersonalInfo.location && <span>•</span>}
             <a href={`mailto:${editablePersonalInfo.email}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'inline-block', verticalAlign: 'baseline' }}>
               <AutoSizeTextarea
                 singleLine
@@ -357,7 +357,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
         )}
         {editablePersonalInfo.website && (
           <>
-            {(editablePersonalInfo.location || editablePersonalInfo.email) && <span>â€¢</span>}
+            {(editablePersonalInfo.location || editablePersonalInfo.email) && <span>•</span>}
             <a href={ensureAbsoluteUrl(editablePersonalInfo.website)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'inline-block', verticalAlign: 'baseline' }}>
               <AutoSizeTextarea
                 singleLine
@@ -369,7 +369,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
         )}
         {editablePersonalInfo.phone && (
           <>
-            {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website) && <span>â€¢</span>}
+            {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website) && <span>•</span>}
             <a href={`tel:${editablePersonalInfo.phone}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'inline-block', verticalAlign: 'baseline' }}>
               <AutoSizeTextarea
                 singleLine
@@ -382,7 +382,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
         )}
         {editablePersonalInfo.linkedin && (
           <>
-            {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website || editablePersonalInfo.phone) && <span>â€¢</span>}
+            {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website || editablePersonalInfo.phone) && <span>•</span>}
             <a href={ensureAbsoluteUrl(editablePersonalInfo.linkedin)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'inline-block', verticalAlign: 'baseline' }}>
               <AutoSizeTextarea
                 singleLine
@@ -394,7 +394,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
         )}
         {editablePersonalInfo.github && (
           <>
-            {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website || editablePersonalInfo.phone || editablePersonalInfo.linkedin) && <span>â€¢</span>}
+            {(editablePersonalInfo.location || editablePersonalInfo.email || editablePersonalInfo.website || editablePersonalInfo.phone || editablePersonalInfo.linkedin) && <span>•</span>}
             <a href={ensureAbsoluteUrl(editablePersonalInfo.github)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'inline-block', verticalAlign: 'baseline' }}>
               <AutoSizeTextarea
                 singleLine

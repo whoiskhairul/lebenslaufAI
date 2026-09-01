@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>LebenslaufAI — Settings</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <div class="logo">L</div>
+      <h1>LebenslaufAI Job Tailorer</h1>
+    </div>
+
+    <section>
+      <h2>Server</h2>
+      <label>
+        API base URL
+        <input id="apiBase" type="url" placeholder="http://localhost:8000/api/v1" />
+      </label>
+      <label>
+        Web app URL (where generated CVs open)
+        <input id="appUrl" type="url" placeholder="http://localhost:5173" />
+      </label>
+      <button id="saveServer" class="btn">Save URLs</button>
+      <p id="serverMsg" class="note hidden"></p>
+    </section>
+
+    <section>
+      <h2>Account</h2>
+
+      <div id="signedInAs" class="hidden">
+        <p class="ok">✓ Connected as <strong id="whoami"></strong></p>
+        <div class="row">
+          <button id="connectNowBtn" class="btn">Re-connect to website session</button>
+          <button id="logoutBtn" class="btn danger">Sign out of extension</button>
+        </div>
+      </div>
+
+      <div id="notConnected">
+        <p class="muted">
+          No password needed here. Click below — the website's own login page opens
+          (email/password or Google), and this extension picks up the session automatically.
+        </p>
+        <button id="websiteLoginBtn" class="btn primary">🌐 Sign in via Website</button>
+        <button id="connectNowAlt" class="btn">Already signed in on a tab? Connect now</button>
+      </div>
+      <p id="authMsg" class="note"></p>
+    </section>
+
+    <section class="mutedbox">
+      <h2>How it works</h2>
+      <ol>
+        <li>Open a job posting on LinkedIn, Xing or Indeed.</li>
+        <li>Click the floating <strong>⚡ Tailor this job</strong> button.</li>
+        <li>The job text goes to your LebenslaufAI backend, which generates a tailored CV (+ cover letter) and opens it in the web-app editor.</li>
+      </ol>
+    </section>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>

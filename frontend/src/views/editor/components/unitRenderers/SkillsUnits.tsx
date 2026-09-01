@@ -34,7 +34,7 @@ export const SkillsLanguagesUnit: React.FC<{ p: UnitRendererProps; ctx: UnitCont
       </div>
 
       <div style={{ display: 'flex', alignItems: 'flex-start', paddingLeft: '24px', width: '100%' }}>
-        <span className={styles.bulletDot}>â€¢</span>
+        <span className={styles.bulletDot}>•</span>
         <div style={{ flex: 1 }}>
           {(() => {
             const rawLangs = skillsList.map(s => s.name).join(', ');
@@ -91,7 +91,7 @@ export const SkillsCategoryUnit: React.FC<{ p: UnitRendererProps; ctx: UnitConte
       onMouseLeave={() => setHoveredSectionId(null)}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', paddingLeft: '24px', width: '100%' }}>
-        <span className={styles.bulletDot}>â€¢</span>
+        <span className={styles.bulletDot}>•</span>
         <strong style={{ fontWeight: 700, marginRight: '5px', color: 'var(--text-color, #1e293b)' }}>
           {catLabel}:
         </strong>

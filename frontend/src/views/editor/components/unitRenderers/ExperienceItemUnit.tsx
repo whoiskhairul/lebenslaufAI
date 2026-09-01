@@ -83,7 +83,7 @@ export const ExperienceItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitConte
                   const key = `exp-bullet-${expIdx}-${bulletIdx}`;
                   return (
                     <li key={bulletIdx} onClick={handleContainerClickToFocus} className={`${isPP ? styles.ppBulletItem : styles.germanBulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                      <span className={styles.bulletDot}>â€¢</span>
+                      <span className={styles.bulletDot}>•</span>
                       {renderHoverAiControls(key, bullet, [
                         { label: "Action Verbs", prompt: "Make it punchier starting with strong active verbs" },
                         { label: "Metrics & ROI", prompt: "Highlight quantifiable metrics, percentage gains, or ROI" },
@@ -176,7 +176,7 @@ export const ExperienceItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitConte
                 const key = `exp-bullet-${expIdx}-${bulletIdx}`;
                 return (
                   <li key={bulletIdx} className={`${styles.bulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                    <span className={styles.bulletDot}>â€¢</span>
+                    <span className={styles.bulletDot}>•</span>
                     {renderHoverAiControls(key, bullet, [
                       { label: "Action Verbs", prompt: "Make it punchier starting with strong active verbs" },
                       { label: "Metrics & ROI", prompt: "Highlight quantifiable metrics, percentage gains, or ROI" },

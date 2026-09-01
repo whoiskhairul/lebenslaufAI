@@ -1,0 +1,61 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: #F1F5F9;
+  padding: 32px 16px;
+  color: #0F172A;
+}
+
+.card {
+  max-width: 520px; margin: 0 auto;
+  background: #fff; border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(15,23,42,.08);
+  padding: 28px;
+}
+
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+.logo {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: linear-gradient(135deg, #6366F1, #4338CA);
+  color: #fff; font-size: 24px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+h1 { font-size: 18px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #64748B; margin-bottom: 12px; }
+
+section { margin-bottom: 26px; }
+
+label {
+  display: block; font-size: 12.5px; font-weight: 600;
+  color: #334155; margin: 10px 0 4px;
+}
+
+input {
+  width: 100%; padding: 9px 12px;
+  border: 1px solid #CBD5E1; border-radius: 8px;
+  font-family: inherit; font-size: 13.5px;
+  background: #F8FAFC;
+}
+input:focus { outline: none; border-color: #6366F1; background: #fff; }
+
+.btn {
+  margin-top: 12px; padding: 9px 16px;
+  border-radius: 8px; border: 1px solid #CBD5E1;
+  background: #F8FAFC; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 600; color: #0F172A;
+}
+.btn:hover { filter: brightness(.97); }
+.btn.primary { background: linear-gradient(135deg, #6366F1, #4F46E5); border: none; color: #fff; }
+.btn.danger { border-color: rgba(239,68,68,.4); color: #DC2626; background: #FEF2F2; }
+
+.note { margin-top: 10px; font-size: 12.5px; line-height: 1.5; color: #475569; }
+.note.err { color: #B91C1C; }
+.ok { color: #047857; font-size: 13px; margin-bottom: 8px; }
+.hidden { display: none; }
+
+.muted ol { padding-left: 18px; }
+.muted li { font-size: 12.5px; color: #475569; line-height: 1.7; }
+.mutedbox { background: #F8FAFC; border-radius: 10px; padding: 14px 16px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.muted { font-size: 12.5px; color: #475569; line-height: 1.55; margin-bottom: 10px; }

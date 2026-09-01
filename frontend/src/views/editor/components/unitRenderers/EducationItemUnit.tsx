@@ -78,7 +78,7 @@ export const EducationItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                 const key = `edu-bullet-${eduIdx}-${bulletIdx}`;
                 return (
                   <li key={bulletIdx} className={`${isPP ? styles.ppBulletItem : styles.germanBulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                    <span className={styles.bulletDot}>â€¢</span>
+                    <span className={styles.bulletDot}>•</span>
                     {renderHoverAiControls(key, bullet, [
                       { label: "Concise", prompt: "Make concise and academic" },
                       { label: "Coursework", prompt: "Highlight key relevant technical coursework & projects" },
@@ -168,7 +168,7 @@ export const EducationItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
               const key = `edu-bullet-${eduIdx}-${bulletIdx}`;
               return (
                 <li key={bulletIdx} className={`${styles.bulletItem} ${styles.canvasHoverBlock}`} style={{ position: 'relative' }}>
-                  <span className={styles.bulletDot}>â€¢</span>
+                  <span className={styles.bulletDot}>•</span>
                   {renderHoverAiControls(key, bullet, [
                     { label: "Concise", prompt: "Make concise and academic" },
                     { label: "Coursework", prompt: "Highlight key relevant technical coursework & projects" },

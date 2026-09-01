@@ -17,6 +17,7 @@ frontend/.svelte-kit
 frontend/.next/
 frontend/out/
 *.log
+fix-mojibake.cjs
 
 # Python / Django
 __pycache__/
