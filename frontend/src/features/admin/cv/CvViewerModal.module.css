@@ -1,0 +1,104 @@
+.chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--card-border);
+  background: var(--card-bg);
+  border-radius: 20px 20px 0 0;
+}
+
+.chromeTitle {
+  font-family: var(--font-headers);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--foreground);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chromeSub {
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chromeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.chromeBtn:hover:not(:disabled) {
+  color: var(--foreground);
+  border-color: var(--primary);
+}
+
+.chromeBtn:disabled {
+  opacity: 0.5;
+}
+
+.canvas {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 24px 12px 48px;
+  position: relative;
+}
+
+@media (max-width: 640px) {
+  .chrome {
+    border-radius: 16px 16px 0 0;
+    padding: 10px 12px;
+  }
+
+  .canvas {
+    padding: 12px 4px 32px;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .printRoot,
+  .printRoot * {
+    visibility: visible;
+  }
+
+  .printRoot {
+    position: absolute !important;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .printRoot > div:first-child {
+    display: none !important;
+  }
+}

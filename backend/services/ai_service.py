@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import requests
 from django.conf import settings
@@ -14,18 +15,18 @@ class AIService:
         return os.environ.get('DEEPSEEK_API_KEY', '').strip()
 
     @staticmethod
-    def call_deepseek(system_prompt, user_content, response_format=None, api_key=None):
+    def call_deepseek(system_prompt, user_content, response_format=None, api_key=None, temperature=0.3, timeout=None, max_tokens=None):
         provider = os.environ.get('ACTIVE_AI_PROVIDER', 'deepseek').lower().strip()
         key = AIService._get_api_key(api_key)
         if not key:
             print(f"AI Service Error: API key missing for provider '{provider}'")
             return None
-        
+
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {key}"
         }
-        
+
         if provider == 'gemini':
             model = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
             base_url = os.environ.get('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai/').rstrip('/')
@@ -44,14 +45,17 @@ class AIService:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}
             ],
-            "temperature": 0.3
+            "temperature": temperature
         }
-        
+
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
+
         if response_format:
             payload["response_format"] = response_format
-            
-        timeout_sec = int(os.environ.get('DEEPSEEK_TIMEOUT', '60'))
-        
+
+        timeout_sec = int(timeout or os.environ.get('DEEPSEEK_TIMEOUT', '60'))
+
         try:
             response = requests.post(
                 url,
@@ -84,6 +88,96 @@ class AIService:
             print(f"AI HTTP request failed ({provider}): {e}")
             return None
 
+    # ================= SHARED HELPERS (JSON integrity, payload hygiene) =================
+
+    @staticmethod
+    def _strip_json_fences(text):
+        """Remove markdown code fences (```json ... ```) that models sometimes wrap around JSON."""
+        if not text:
+            return text
+        t = text.strip()
+        if t.startswith("```"):
+            first_newline = t.find('\n')
+            t = t[first_newline + 1:] if first_newline != -1 else t[3:]
+            t = t.rstrip()
+            if t.endswith("```"):
+                t = t[:-3]
+        return t.strip()
+
+    @classmethod
+    def _parse_json_result(cls, result_text):
+        """Parse an AI response as JSON, tolerating markdown fences. Returns None on failure."""
+        if not result_text:
+            return None
+        try:
+            return json.loads(cls._strip_json_fences(result_text))
+        except ValueError:
+            return None
+
+    @classmethod
+    def _call_json(cls, system_prompt, user_content, api_key=None, temperature=0.1, timeout=None):
+        """
+        Deterministic JSON call: low temperature, fence-tolerant parsing,
+        and ONE automatic retry demanding raw JSON if the first parse fails.
+        Returns parsed dict/list or None.
+        """
+        result_text = cls.call_deepseek(
+            system_prompt, user_content, {"type": "json_object"},
+            api_key, temperature=temperature, timeout=timeout
+        )
+        parsed = cls._parse_json_result(result_text)
+        if parsed is not None:
+            return parsed
+
+        retry_system = (
+            f"{system_prompt}\n\n"
+            "STRICT OUTPUT REQUIREMENT: Respond with ONLY a single valid raw JSON object. "
+            "No markdown code fences, no explanations, no trailing commas."
+        )
+        retry_content = (
+            f"{user_content}\n\n"
+            "IMPORTANT: The previous response was not valid JSON. "
+            "Return ONLY a valid raw JSON object matching the requested schema."
+        )
+        result_text = cls.call_deepseek(
+            retry_system, retry_content, {"type": "json_object"},
+            api_key, temperature=temperature, timeout=timeout
+        )
+        return cls._parse_json_result(result_text)
+
+    # Fields that must never be shipped to the AI provider (base64 images etc.)
+    _AI_PAYLOAD_DENY_KEYS = {
+        'image', 'signature_image', 'image_url', 'signature_image_url',
+        'avatar', 'photo', 'logo', 'base64', 'data_uri'
+    }
+
+    @classmethod
+    def _clean_profile_for_ai(cls, profile_data):
+        """
+        Deep-copy profile payload safe for LLM consumption:
+        strips image/signature/base64 blobs and huge data-URI strings to
+        avoid token explosions. Keeps all textual resume content.
+        """
+        if not isinstance(profile_data, dict):
+            return profile_data
+
+        def clean(obj):
+            if isinstance(obj, dict):
+                return {
+                    k: clean(v)
+                    for k, v in obj.items()
+                    if k not in cls._AI_PAYLOAD_DENY_KEYS
+                }
+            if isinstance(obj, list):
+                return [clean(item) for item in obj]
+            if isinstance(obj, str) and len(obj) > 2048:
+                # Drop likely base64 / data-URI blobs
+                if obj.startswith(('data:', '/9j/', 'iVBOR', 'data:image')):
+                    return ''
+            return obj
+
+        return clean(profile_data)
+
     @classmethod
     def parse_job_description(cls, job_text, api_key=None):
         system_prompt = (
@@ -100,25 +194,62 @@ class AIService:
             "Do not return any introductory text, preambles, or markdown."
         )
         
-        result_text = cls.call_deepseek(system_prompt, job_text, {"type": "json_object"}, api_key)
-        if result_text:
-            try:
-                res = json.loads(result_text)
-                res['keywords'] = res.get('primary_hard_skills', []) + res.get('secondary_soft_skills', [])
-                res['responsibilities'] = res.get('core_job_duties', [])
-                res['tone'] = res.get('corporate_culture_tone', 'professional')
-                return res
-            except ValueError:
-                pass
-                
+        result = cls._call_json(system_prompt, job_text, api_key, temperature=0.1)
+        if result and isinstance(result, dict):
+            result['keywords'] = result.get('primary_hard_skills', []) + result.get('secondary_soft_skills', [])
+            result['responsibilities'] = result.get('core_job_duties', [])
+            result['tone'] = result.get('corporate_culture_tone', 'professional')
+            return result
+
         raise ValueError("AI Service failed to parse job description. Please ensure a valid API key is configured.")
+
+    # Shared JSON schema fragment for the deep ATS analysis blocks.
+    # Used by both analyze_ats (recheck) and tailor_resume (single combined call)
+    # so every AI-powered insight is produced in ONE request.
+    # This is a top-level key; it MUST be the last entry in the JSON schema object.
+    DEEP_ANALYSIS_SCHEMA = (
+        '"deep_analysis": {\n'
+        '   "section_scores": [\n'
+        '      {"section": "summary" | "experience" | "projects" | "skills" | "education", "score": 0-100, "feedback": "string (English, one sentence)"}\n'
+        '   ],\n'
+        '   "weak_bullets": [\n'
+        '      {"id": "string (UUID of the work experience or project)", "type": "experience" | "project", "bullet_index": 0, "improved": "string (rewritten bullet with metric/action verb/keyword, same language as the resume)", "reason": "string (English, why the original was weak)"}\n'
+        '   ],\n'
+        '   "recommended_keywords": [\n'
+        '      {"name": "string", "category": "hard_skills" | "tools" | "soft_skills", "reason": "string (English, why this strengthens THIS CV for THIS job domain, even though not explicitly required by the JD)"}\n'
+        '   ],\n'
+        '   "recruiter_impression": {\n'
+        '      "first_impression": "string (English, 2-3 sentences simulating a recruiter 6-second scan of the top third of the resume)",\n'
+        '      "strengths": ["string"],\n'
+        '      "concerns": ["string"],\n'
+        '      "verdict": "string (English, one sentence: would the recruiter shortlist?)"\n'
+        '   },\n'
+        '   "fit_report": {\n'
+        '      "seniority_match": "below" | "at" | "above",\n'
+        '      "domain_overlap": 0-100,\n'
+        '      "gaps": [\n'
+        '         {"gap": "string (missing requirement or experience gap)", "cover_letter_tip": "string (English, how to address this gap in the cover letter)"}\n'
+        '      ]\n'
+        '   }\n'
+        '}\n'
+    )
+
+    DEEP_ANALYSIS_INSTRUCTIONS = (
+        "DEEP ANALYSIS REQUIREMENTS:\n"
+        "- 'section_scores': score each resume section independently (0-100) based on quality, completeness and relevance to the job.\n"
+        "- 'weak_bullets': identify the 3-6 WEAKEST bullets (no quantifiable metric, no strong action verb, or missing relevant keyword) from the resume's work experience and project bullets. For each, provide an improved rewrite that stays grounded in the original facts (never invent jobs, metrics, dates or degrees).\n"
+        "- 'recommended_keywords': suggest 5-8 domain-relevant skill keywords that are NOT explicitly required in the job description but would make this candidate's CV stronger for this specific role domain (e.g. for a backend engineering role suggest complementary tools/methodologies the candidate plausibly has). Prefer keywords supported by the candidate's actual profile; each must include a short reason.\n"
+        "- 'recruiter_impression': simulate a busy technical recruiter's 6-second first scan.\n"
+        "- 'fit_report': assess seniority alignment and domain overlap; list concrete gaps with actionable cover-letter tips.\n"
+        "- ALL analysis text (feedback, reasons, tips, impressions) MUST be in ENGLISH regardless of resume language. 'improved' bullets keep the resume's language.\n\n"
+    )
 
     @classmethod
     def analyze_ats(cls, profile_data, job_data, api_key=None):
         # Compares active candidate CV details against job description
-        profile_text = json.dumps(profile_data, default=str)
+        profile_text = json.dumps(cls._clean_profile_for_ai(profile_data), default=str)
         job_text = json.dumps(job_data, default=str)
-        
+
         system_prompt = (
             "You are an objective ATS (Applicant Tracking System) Scoring Algorithm.\n"
             "Compare the Candidate's Active CV Details (including summary, work experience, projects, and skills) against the target Job Description.\n"
@@ -131,24 +262,31 @@ class AIService:
             "1. Keyword Match (50%): Ratio of semantically matched keywords to total required job description keywords.\n"
             "2. Experience Depth (30%): Evaluation of whether the critical matched skills are actively demonstrated in the work experience descriptions/bullets rather than just listed in a static skills block.\n"
             "3. Structural & Formatting Quality (20%): Presence of contact details, professional summary, structured work experiences (with bullets), projects, and general compliance with resume length/layout guidelines.\n\n"
+            f"{cls.DEEP_ANALYSIS_INSTRUCTIONS}"
             "Return ONLY a JSON object matching this schema:\n"
             "{\n"
             "  \"score\": 0-100,\n"
             "  \"matched_keywords\": [\"string\"],\n"
             "  \"missing_keywords\": [\"string\"],\n"
-            "  \"suggestions\": [\"string\"]\n"
+            "  \"all_missing\": [\n"
+            "     {\"name\": \"string\", \"category\": \"hard_skills\" | \"tools\" | \"soft_skills\"}\n"
+            "  ],\n"
+            "  \"breakdown\": {\n"
+            "     \"keywords\": 0-100,\n"
+            "     \"structure\": 0-100,\n"
+            "     \"bullets\": 0-100\n"
+            "  },\n"
+            "  \"suggestions\": [\"string\"],\n"
+            f"  {cls.DEEP_ANALYSIS_SCHEMA}"
             "}\n"
             "Do not return markdown codeblocks."
         )
         
         user_content = f"CANDIDATE_ACTIVE_CV:\n{profile_text}\n\nTARGET_JOB_DESCRIPTION:\n{job_text}"
-        result_text = cls.call_deepseek(system_prompt, user_content, {"type": "json_object"}, api_key)
-        if result_text:
-            try:
-                return json.loads(result_text)
-            except ValueError:
-                pass
-                
+        result = cls._call_json(system_prompt, user_content, api_key, temperature=0.1)
+        if result and isinstance(result, dict):
+            return result
+
         raise ValueError("AI Service failed to analyze ATS compatibility. Please check your API key or try again later.")
 
     @classmethod
@@ -191,6 +329,45 @@ class AIService:
         )
 
     @staticmethod
+    def _date_sort_key(date_str):
+        """
+        Parse a date string into a sortable (year, month) tuple for
+        reverse-chronological ordering. Handles 'YYYY-MM', 'MM/YYYY',
+        'Mon YYYY' and bare 'YYYY'. Unparseable/missing dates sort oldest.
+        """
+        if not date_str:
+            return (0, 0)
+        s = str(date_str).strip()
+        year_match = re.search(r'(\d{4})', s)
+        if not year_match:
+            return (0, 0)
+        year = int(year_match.group(1))
+        month = 0
+
+        month_names = {
+            'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+            'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+            'januar': 1, 'februar': 2, 'maerz': 3, 'märz': 3, 'mai': 5,
+            'juni': 6, 'juli': 7, 'oktober': 10, 'dezember': 12
+        }
+        # MM/YYYY or MM-YYYY
+        m = re.search(r'\b(\d{1,2})[./-](\d{4})\b', s)
+        if m and 1 <= int(m.group(1)) <= 12:
+            month = int(m.group(1))
+        else:
+            # YYYY-MM
+            m = re.search(r'\b(\d{4})[-./](\d{1,2})\b', s)
+            if m and 1 <= int(m.group(2)) <= 12:
+                month = int(m.group(2))
+            else:
+                s_lower = s.lower()
+                for name, num in month_names.items():
+                    if name in s_lower:
+                        month = num
+                        break
+        return (year, month)
+
+    @staticmethod
     def prioritize_items(profile_data, job_data):
         keywords = [k.lower() for k in job_data.get('keywords', []) if k]
         primary_skills = [k.lower() for k in job_data.get('primary_hard_skills', []) if k]
@@ -206,51 +383,62 @@ class AIService:
             return 0
         sorted_skills = sorted(skills, key=skill_relevance, reverse=True)
 
+        # IMPORTANT: keep experiences/projects in REVERSE-CHRONOLOGICAL order
+        # (standard resume convention). Do NOT reorder them by keyword relevance,
+        # as that breaks the timeline the recruiter expects to see.
         experiences = profile_data.get('work_experiences', [])
-        def exp_relevance(e):
-            text = f"{e.get('position', '')} {e.get('company', '')} {' '.join(e.get('bullets', []) or [])}".lower()
-            score = 0
-            for term in all_target_terms:
-                if term in text:
-                    score += 1
-            return score
-        sorted_experiences = sorted(experiences, key=exp_relevance, reverse=True)
+        sorted_experiences = sorted(
+            experiences,
+            key=lambda e: AIService._date_sort_key(e.get('start_date')),
+            reverse=True
+        )
 
         projects = profile_data.get('projects', [])
-        def proj_relevance(p):
-            techs = " ".join(p.get('technologies', []) or []).lower()
-            text = f"{p.get('title', '')} {p.get('role', '')} {techs} {' '.join(p.get('bullets', []) or [])}".lower()
-            score = 0
-            for term in all_target_terms:
-                if term in text:
-                    score += 1
-            return score
-        sorted_projects = sorted(projects, key=proj_relevance, reverse=True)
+        sorted_projects = sorted(
+            projects,
+            key=lambda p: AIService._date_sort_key(p.get('date') or p.get('start_date')),
+            reverse=True
+        )
 
         return sorted_skills, sorted_experiences, sorted_projects
 
     @classmethod
     def tailor_resume(cls, profile_data, job_data, api_key=None, target_language="en", aggressive_mode=False):
+        # Normalize language input: accept 'DE', 'German', 'deutsch', 'de', etc.
+        target_language = (target_language or 'en').strip().lower()
+        profile_data = cls._clean_profile_for_ai(profile_data)
         profile_text = json.dumps(profile_data, default=str)
         job_text = json.dumps(job_data, default=str)
-        
+
         is_german = target_language in ['de', 'deutsch', 'german']
         lang_instruction = (
             "CRITICAL LANGUAGE MANDATE: TARGET LANGUAGE IS GERMAN (Deutsch).\n"
-            "- You MUST translate and write ALL tailored_summary text, ALL experience positions, experience locations, and experience bullet points in GERMAN.\n"
-            "- You MUST translate and write ALL project bullet points in GERMAN.\n"
-            "- You MUST translate education degrees, locations, fields of study, skill names, skill categories, and personal info fields into GERMAN (e.g. 'Computer Science' -> 'Informatik', 'Germany' -> 'Deutschland').\n"
+            "- You MUST translate and write ALL tailored_summary text, ALL experience positions, experience locations, and ALL experience bullet points in GERMAN.\n"
+            "- You MUST translate and write ALL project titles, roles, and ALL project bullet points in GERMAN.\n"
+            "- You MUST translate education degrees, locations, fields of study, and personal info fields into GERMAN (e.g. 'Computer Science' -> 'Informatik', 'Germany' -> 'Deutschland').\n"
+            "- TECHNICAL NAMES RULE: Keep established technical names (programming languages, frameworks, tools, products, standards) EXACTLY as they are - never translate them. 'React', 'Docker', 'Kubernetes', 'PostgreSQL', 'REST API', 'CI/CD', 'Scrum' etc. must remain unchanged in skill names and bullets.\n"
+            "- SKILL CATEGORY RULE: skill 'category' values are INTERNAL CANONICAL KEYS (e.g. 'languages', 'tools', 'frameworks', 'technical') and MUST be copied EXACTLY as provided in the MASTER_PROFILE - never translated, never renamed. Spoken languages MUST keep category 'languages' so they stay in the dedicated Languages subsection. Only non-technical skill NAMES may be translated.\n"
             "- Never mix English sentences into the output under any circumstances. Everything returned inside tailored_summary, tailored_experiences, tailored_projects, tailored_educations, tailored_skills, and tailored_personal_info MUST be strictly in German.\n"
+            "- For EVERY project in MASTER_PROFILE, you MUST provide a corresponding entry in 'tailored_projects' with its 'id', 'title', 'role', and an array of 'bullets' translated and tailored entirely in German.\n"
             "- The tailored_section_names dictionary keys MUST map to German values: summary -> 'Zusammenfassung', experience -> 'Berufserfahrung', projects -> 'Projekte', education -> 'Ausbildung', skills -> 'Kenntnisse'.\n\n"
             if is_german
-            else "Write ALL tailored summary, experience bullets, and project bullets in ENGLISH.\n\n"
+            else "Write ALL tailored summary, experience bullets, and project bullets in ENGLISH. Skill 'category' values MUST be copied EXACTLY from the MASTER_PROFILE (internal canonical keys like 'languages', 'tools' - never translated or renamed; spoken languages keep category 'languages').\n\n"
         )
 
         aggressive_instruction = (
             "CRITICAL ATS MANDATE: AGGRESSIVE ATS OPTIMIZATION IS ENABLED.\n"
-            "- You MUST actively and strategically weave key missing technical skills, tools, methodologies, and frameworks from the JOB_DESCRIPTION into the candidate's tailored_summary, work experience bullets, and project bullets to achieve a maximum ATS score.\n"
-            "- Do not fabricate new jobs, dates, or degrees, but you MUST adjust the descriptions of their work history and projects to explicitly call out usage of the required tools/frameworks where contextually appropriate.\n"
-            "- Ensure the tailored sentences remain natural, grammatically correct, and highly professional.\n\n"
+            "- Goal: make the candidate's GENUINE experience visible to ATS by naming required technologies where they plausibly apply. This is natural keyword integration, NEVER keyword stuffing.\n"
+            "- PLACEMENT PRIORITY:\n"
+            "  1. tailored_summary: integrate the 2-3 most critical missing keywords into the existing claims, woven into real statements about the candidate's background.\n"
+            "  2. work experience and project bullets: mention a required tool/method ONLY where the described activity plausibly involved it (e.g. 'Built a REST API' may become 'Built a REST API with Django').\n"
+            "- INTEGRATION RULES (STRICT):\n"
+            "  * Integrate each missing keyword AT MOST ONCE across the entire resume - ATS deduplicates, repetition reads as stuffing.\n"
+            "  * At most ONE keyword per bullet, and modify at most ONE THIRD of all bullets.\n"
+            "  * The keyword must be grammatically integrated as the tool/method actually used for the described task. NEVER append keyword lists like '(Python, Docker, AWS)', never use tacked-on clauses like 'utilizing X, Y and Z', and never create sentences whose only purpose is naming a tool.\n"
+            "  * If a keyword cannot be integrated plausibly into any existing achievement, LEAVE the text unchanged - do not force it in.\n"
+            "- PRESERVATION: keep the same number of bullets per experience/project, keep each bullet within ~25% of its original length, and never remove or weaken existing achievements or metrics to make room for keywords.\n"
+            "- GROUNDING: you may specify which of the candidate's existing tools/methodologies were used for their existing achievements, but never claim new jobs, employers, dates, degrees, certifications, or invented metrics.\n"
+            "- QUALITY BAR: every modified sentence must remain natural, grammatically correct and professional. If a recruiter would raise an eyebrow, rewrite it or revert to the original.\n\n"
             if aggressive_mode
             else "STANDARD PROFILE ALIGNMENT (STRICT):\n"
             "- Do NOT invent/fabricate new unlisted tools, jobs, dates, or degrees.\n"
@@ -272,7 +460,8 @@ class AIService:
             "1. Keyword Match (50%): Ratio of semantically matched keywords to total required job description keywords.\n"
             "2. Experience Depth (30%): Evaluation of whether the critical matched skills are actively demonstrated in the work experience descriptions/bullets rather than just listed in a static skills block.\n"
             "3. Structural & Formatting Quality (20%): Presence of contact details, professional summary, structured work experiences (with bullets), projects, and general compliance with resume length/layout guidelines.\n\n"
-            f"CRITICAL: {'Do NOT invent/fabricate entire jobs, dates, or degrees, but you must weave in required keywords contextually in work history as specified by AGGRESSIVE ATS OPTIMIZATION.' if aggressive_mode else 'Do NOT invent/fabricate skills, jobs, dates, or degrees.'}\n"
+            f"{cls.DEEP_ANALYSIS_INSTRUCTIONS}"
+            f"CRITICAL: {'Attribute existing achievements ONLY to tools/methods that plausibly were used, following the AGGRESSIVE ATS integration rules above - never fabricate jobs, employers, dates, degrees, certifications, or metrics.' if aggressive_mode else 'Do NOT invent/fabricate skills, jobs, dates, or degrees.'}\n"
             "Return ONLY a JSON object matching this schema:\n"
             "{\n"
             "  \"tailored_summary\": \"string\",\n"
@@ -304,7 +493,7 @@ class AIService:
             "     {\n"
             "       \"id\": \"string (UUID matches skill.id)\",\n"
             "       \"name\": \"string (MUST be in target language)\",\n"
-            "       \"category\": \"string (MUST be in target language)\"\n"
+            "       \"category\": \"string (MUST be copied EXACTLY from MASTER_PROFILE - internal canonical key like 'languages', 'tools' - NEVER translated)\"\n"
             "     }\n"
             "  ],\n"
             "  \"tailored_personal_info\": {\n"
@@ -339,118 +528,162 @@ class AIService:
             "       \"evidence_source\": \"string\",\n"
             "       \"reason\": \"string\"\n"
             "     }\n"
-            "  ]\n"
+            "  ],\n"
+            f"  {cls.DEEP_ANALYSIS_SCHEMA}"
             "}\n"
             "Do not return markdown."
         )
         
         user_content = f"MASTER_PROFILE:\n{profile_text}\n\nJOB_DESCRIPTION:\n{job_text}"
-        result_text = cls.call_deepseek(system_prompt, user_content, {"type": "json_object"}, api_key)
+        tailor_timeout = int(os.environ.get('DEEPSEEK_TIMEOUT_TAILOR', '120'))
+        res = cls._call_json(system_prompt, user_content, api_key, temperature=0.3, timeout=tailor_timeout)
         
         sorted_skills, sorted_experiences, sorted_projects = cls.prioritize_items(profile_data, job_data)
         
-        if result_text:
-            try:
-                res = json.loads(result_text)
-                
-                # Merge AI translated skills
-                ai_skills = res.get('tailored_skills', [])
-                if isinstance(ai_skills, list) and ai_skills:
-                    merged_skills = []
-                    for s in sorted_skills:
-                        matching_ai = next((ai for ai in ai_skills if str(ai.get('id')) == str(s.get('id'))), None)
-                        if matching_ai:
-                            merged_skills.append({
-                                **s,
-                                "name": matching_ai.get('name', s.get('name')),
-                                "category": matching_ai.get('category', s.get('category'))
-                            })
-                        else:
-                            merged_skills.append(s)
-                    res['tailored_skills'] = merged_skills
+        if res and isinstance(res, dict):
+            # ---------- COVERAGE-ENFORCED MERGING ----------
+            # Every master-profile item MUST appear in the tailored output.
+            # AI entries update matching items by id; missing items fall back
+            # to the master profile original (never dropped, never reordered).
+
+            def merge_by_id(orig_list, ai_list, str_fields):
+                ai_map = {}
+                if isinstance(ai_list, list):
+                    for item in ai_list:
+                        if isinstance(item, dict) and item.get('id') is not None:
+                            ai_map[str(item.get('id'))] = item
+                merged = []
+                for orig in orig_list:
+                    if not isinstance(orig, dict) or orig.get('id') is None:
+                        continue
+                    ai_item = ai_map.pop(str(orig.get('id')), None)
+                    if ai_item is None:
+                        # AI skipped this item -> keep the master original intact
+                        merged.append(dict(orig))
+                        continue
+                    merged_item = dict(orig)
+                    for field in str_fields:
+                        val = ai_item.get(field)
+                        if isinstance(val, (str, list)) and (val or isinstance(val, str)):
+                            merged_item[field] = val
+                    merged.append(merged_item)
+                return merged
+
+            # Skills: always derived from the master list, AI only refines
+            # the name (never adds, never drops, never reorders).
+            # NOTE: 'category' is a canonical internal key the frontend relies on
+            # (e.g. exact match 'languages' renders the dedicated Languages
+            # subsection), so the AI's category output is deliberately ignored.
+            ai_skills = res.get('tailored_skills', [])
+            merged_skills = []
+            if isinstance(ai_skills, list) and ai_skills:
+                ai_skill_map = {
+                    str(s.get('id')): s for s in ai_skills
+                    if isinstance(s, dict) and s.get('id') is not None
+                }
+            else:
+                ai_skill_map = {}
+            for s in sorted_skills:
+                if not isinstance(s, dict):
+                    continue
+                ai_s = ai_skill_map.get(str(s.get('id')))
+                if ai_s:
+                    merged_skills.append({
+                        **s,
+                        "name": ai_s.get('name', s.get('name'))
+                    })
                 else:
-                    res['tailored_skills'] = sorted_skills
+                    merged_skills.append(s)
+            res['tailored_skills'] = merged_skills
 
-                # Merge AI translated experience fields (position, location)
-                ai_exps = res.get('tailored_experiences', [])
-                if isinstance(ai_exps, list) and ai_exps:
-                    merged_exps = []
-                    for e in ai_exps:
-                        orig_e = next((oe for oe in profile_data.get('work_experiences', []) if str(oe.get('id')) == str(e.get('id'))), None)
-                        if orig_e:
-                            merged_exps.append({
-                                "id": e.get('id'),
-                                "bullets": e.get('bullets', orig_e.get('bullets', [])),
-                                "position": e.get('position', orig_e.get('position', '')),
-                                "location": e.get('location', orig_e.get('location', ''))
-                            })
-                        else:
-                            merged_exps.append(e)
-                    res['tailored_experiences'] = merged_exps
+            res['tailored_experiences'] = merge_by_id(
+                sorted_experiences,
+                res.get('tailored_experiences', []),
+                ['bullets', 'position', 'location']
+            )
 
-                # Merge AI translated projects
-                ai_projs = res.get('tailored_projects', [])
-                if isinstance(ai_projs, list) and ai_projs:
-                    merged_projs = []
-                    for p in ai_projs:
-                        orig_p = next((op for op in profile_data.get('projects', []) if str(op.get('id')) == str(p.get('id'))), None)
-                        if orig_p:
-                            merged_projs.append({
-                                "id": p.get('id'),
-                                "bullets": p.get('bullets', orig_p.get('bullets', [])),
-                                "title": p.get('title', orig_p.get('title', p.get('name', ''))),
-                                "role": p.get('role', orig_p.get('role', '')),
-                                "technologies": orig_p.get('technologies', p.get('technologies', []))
-                            })
-                        else:
-                            merged_projs.append(p)
-                    res['tailored_projects'] = merged_projs
-                else:
-                    res['tailored_projects'] = sorted_projects
+            res['tailored_projects'] = merge_by_id(
+                sorted_projects,
+                res.get('tailored_projects', []),
+                ['bullets', 'title', 'role']
+            )
 
-                # Merge AI translated education fields (degree, field_of_study, location)
-                ai_edus = res.get('tailored_educations', [])
-                if isinstance(ai_edus, list) and ai_edus:
-                    merged_edus = []
-                    for edu in ai_edus:
-                        orig_edu = next((oe for oe in profile_data.get('educations', []) if str(oe.get('id')) == str(edu.get('id'))), None)
-                        if orig_edu:
-                            merged_edus.append({
-                                "id": edu.get('id'),
-                                "degree": edu.get('degree', orig_edu.get('degree', '')),
-                                "field_of_study": edu.get('field_of_study', orig_edu.get('field_of_study', '')),
-                                "location": edu.get('location', orig_edu.get('location', ''))
-                            })
-                        else:
-                            merged_edus.append(edu)
-                    res['tailored_educations'] = merged_edus
-                else:
-                    res['tailored_educations'] = []
+            res['tailored_educations'] = merge_by_id(
+                profile_data.get('educations', []) or [],
+                res.get('tailored_educations', []),
+                ['degree', 'field_of_study', 'location']
+            )
 
-                # Merge AI translated personal info
-                ai_pi = res.get('tailored_personal_info', {})
-                if isinstance(ai_pi, dict) and ai_pi:
-                    res['tailored_personal_info'] = {
-                        "title": ai_pi.get('title', profile_data.get('personal_info', {}).get('title', '')),
-                        "location": ai_pi.get('location', profile_data.get('personal_info', {}).get('location', ''))
-                    }
-                else:
-                    res['tailored_personal_info'] = {}
+            # Personal info: only title/location are tailored; never blank out
+            ai_pi = res.get('tailored_personal_info', {})
+            if isinstance(ai_pi, dict) and ai_pi:
+                res['tailored_personal_info'] = {
+                    "title": ai_pi.get('title', profile_data.get('personal_info', {}).get('title', '')),
+                    "location": ai_pi.get('location', profile_data.get('personal_info', {}).get('location', ''))
+                }
+            else:
+                res['tailored_personal_info'] = {}
 
-                return res
-            except ValueError:
-                pass
-        
+            # ---------- EXPLANATIONS SANITIZATION (fix 13) ----------
+            valid_ids = set()
+            for collection in ('work_experiences', 'projects', 'educations', 'skills'):
+                for item in profile_data.get(collection, []) or []:
+                    if isinstance(item, dict) and item.get('id') is not None:
+                        valid_ids.add(str(item.get('id')))
+            sanitized_explanations = []
+            for ex in (res.get('explanations') or []):
+                if not isinstance(ex, dict):
+                    continue
+                section = str(ex.get('section', '')).strip()
+                if section != 'summary' and section not in valid_ids:
+                    continue
+                try:
+                    confidence = int(float(ex.get('confidence_score', 70)))
+                except (TypeError, ValueError):
+                    confidence = 70
+                sanitized_explanations.append({
+                    "section": section,
+                    "confidence_score": max(0, min(100, confidence)),
+                    "evidence_source": str(ex.get('evidence_source', '')),
+                    "reason": str(ex.get('reason', ''))
+                })
+            res['explanations'] = sanitized_explanations
+
+            # Normalize deep analysis block (defensive defaults for frontend)
+            deep = res.get('deep_analysis')
+            if not isinstance(deep, dict):
+                deep = {}
+            deep.setdefault('section_scores', [])
+            deep.setdefault('weak_bullets', [])
+            deep.setdefault('recommended_keywords', [])
+            deep.setdefault('recruiter_impression', {})
+            deep.setdefault('fit_report', {})
+            res['deep_analysis'] = deep
+
+            return res
+
         raise ValueError("AI Service failed to tailor resume. Please check your API key or try again later.")
 
     @classmethod
     def write_cover_letter(cls, profile_data, job_data, tone="professional", length="medium", api_key=None, target_language="en"):
-        import json
         from datetime import datetime
-        today_str = datetime.now().strftime("%B %d, %Y")
-        
+        # Normalize language input: accept 'DE', 'German', 'deutsch', 'de', etc.
+        target_language = (target_language or 'en').strip().lower()
+        profile_data = cls._clean_profile_for_ai(profile_data)
+
         is_german = target_language in ['de', 'deutsch', 'german']
         app_language = 'GERMAN' if is_german else 'ENGLISH'
+
+        if is_german:
+            # German convention: "15. März 2025" (never the US format)
+            german_months = {
+                1: 'Januar', 2: 'Februar', 3: 'März', 4: 'April', 5: 'Mai', 6: 'Juni',
+                7: 'Juli', 8: 'August', 9: 'September', 10: 'Oktober', 11: 'November', 12: 'Dezember'
+            }
+            now = datetime.now()
+            today_str = f"{now.day}. {german_months[now.month]} {now.year}"
+        else:
+            today_str = datetime.now().strftime("%B %d, %Y")
         
         # Extract metadata from job_data
         position = job_data.get('position', '') or 'Not Provided'
@@ -553,6 +786,7 @@ class AIService:
         
         user_content = (
             f"INPUTS\n\n"
+            f"Today's date:\n{today_str}\n\n"
             f"Target position:\n{position}\n\n"
             f"Company:\n{company}\n\n"
             f"Job advertisement:\n{job_description}\n\n"
@@ -573,30 +807,22 @@ class AIService:
         
         result_text = cls.call_deepseek(system_prompt, user_content, {"type": "json_object"}, api_key=api_key)
         if result_text:
-            import re
+            today_str_escaped = today_str
             result_text = re.sub(
                 r'\[[Dd]ate\]|\[[Cc]urrent\s+[Dd]ate\]|\[[Tt]oday\'s\s+[Dd]ate\]|\[date\]',
-                today_str,
+                today_str_escaped,
                 result_text
             )
-            # Clean markdown formatting tags like ```json or ``` if present
-            clean_text = result_text.strip()
-            if clean_text.startswith("```"):
-                if clean_text.startswith("```json"):
-                    clean_text = clean_text[7:]
-                else:
-                    clean_text = clean_text[3:]
-                if clean_text.endswith("```"):
-                    clean_text = clean_text[:-3]
-                clean_text = clean_text.strip()
-            return clean_text
-            
+            return cls._strip_json_fences(result_text)
+
         raise ValueError("AI Service failed to generate cover letter. Please check your API key or try again later.")
 
     # ================= MOCK FALLBACK IMPLEMENTATIONS =================
 
     @staticmethod
     def _mock_parse_job_description(text):
+        company = "Target Company"
+        position = "Software Engineer"
         sample_keywords = ["React", "TypeScript", "Node.js", "Django", "PostgreSQL", "Python", "Docker", "AWS", "Kubernetes", "Git"]
         found_keywords = [k for k in sample_keywords if k.lower() in text.lower()]
         
@@ -921,14 +1147,11 @@ Sincerely,
             "Do not return markdown headers or preambles."
         )
         
-        result_text = cls.call_deepseek(system_prompt, cv_text, {"type": "json_object"}, api_key)
-        if result_text:
-            try:
-                return json.loads(result_text)
-            except ValueError:
-                pass
-                
-        raise ValueError("AI Service failed to parse resume content. Please check your API key configuration or try again.")
+        result = cls._call_json(system_prompt, cv_text, api_key, temperature=0.1)
+        if result and isinstance(result, dict):
+            return result
+
+        raise ValueError("AI Service failed to parse resume content. Please check your API key configuration or try again later.")
 
     @classmethod
     def _mock_parse_resume_cv(cls, cv_text):
@@ -1017,12 +1240,19 @@ Sincerely,
         }
 
     @staticmethod
-    def validate_hallucinations(profile_data, tailored_summary, tailored_experiences):
-        import re
-        
+    def validate_hallucinations(profile_data, tailored_summary, tailored_experiences, tailored_projects=None, target_language='en'):
+        # Normalize language (accepts 'DE', 'German', 'deutsch', 'de', etc.)
+        target_language = (target_language or 'en').strip().lower()
+        is_german = target_language in ['de', 'deutsch', 'german']
+
+        # Strip image/base64 blobs from the matching haystack
+        profile_data = AIService._clean_profile_for_ai(profile_data)
+
         # Flatten all profile data to a single lowercase string for easy search
         profile_str = json.dumps(profile_data, default=str).lower()
-        
+        # Normalized copy for metric comparisons ('50,000'/'50.000' -> '50000')
+        profile_norm = re.sub(r'(?<=\d)[.,](?=\d)', '', profile_str)
+
         # List of common English verbs/nouns/connectives to ignore when capitalized
         ignore_words = {
             "the", "we", "i", "my", "our", "led", "managed", "designed", "developed", "implemented",
@@ -1032,7 +1262,7 @@ Sincerely,
             "resolved", "facilitated", "improved", "enhanced", "established", "automated",
             "coordinated", "mentored", "trained", "supervised", "pioneered", "launched",
             "generated", "secured", "negotiated", "strengthened", "cultivated", "expanded",
-            "drove", "championed", "leveraged", "utilized", "applied", "partnered", "formulated",
+            "drove", "championed", "leveraged", "utilized", "applied", "partnered",
             "senior", "junior", "lead", "staff", "principal", "manager", "director", "engineer",
             "developer", "architect", "analyst", "consultant", "specialist", "coordinator",
             "project", "product", "team", "client", "customer", "business", "company", "system",
@@ -1040,70 +1270,121 @@ Sincerely,
             "a", "an", "and", "or", "but", "so", "for", "with", "by", "at", "from", "to", "in", "on", "as",
             "highly", "proven", "results", "oriented", "seeking", "motivated", "dynamic", "professional"
         }
-        
+
         alerts = []
-        
+        seen_alerts = set()
+        MAX_ALERTS = 15
+
+        # Meaningful metrics ONLY: percentages, currency, multipliers ('3x'),
+        # and numbers with explicit units. Bare integers/years are ignored to
+        # avoid flooding users with false positives ('2020', version numbers...).
+        metric_pattern = re.compile(
+            r'(?:\d[\d.,]*\s?(?:%|percent|x\b|k\b|m\b|bn\b|billion|million|thousand'
+            r'|users|customers|clients|requests|records|transactions|hours|hrs|days|weeks|months|years'
+            r'|jahren|monaten|tagen|stunden|kunden|nutzer)'
+            r'|(?:\$|€|£)\s?\d[\d.,]*)',
+            re.IGNORECASE
+        )
+
+        def normalize_metric(metric):
+            m = metric.lower().strip()
+            m = re.sub(r'(?<=\d)[.,](?=\d)', '', m)   # 50,000 / 50.000 -> 50000
+            m = re.sub(r'\s+', '', m)                  # '35 %' -> '35%'
+            m = m.rstrip('.')                          # sentence periods
+            return m
+
         # Word starting with an uppercase letter, followed by letters/digits
         word_pattern = re.compile(r'\b[A-Z][a-zA-Z0-9\.\-\/]*\b')
-        # Numerical metrics, percentages, currency
-        metric_pattern = re.compile(r'\b(?:\$\d+(?:[kKmM])?|\d+(?:\.\d+)?%?|\d+\s*(?:years|months|x|X|percent|percent)?)\b')
-        
+
         def check_text(text, section_id, section_label):
-            if not text:
+            if not text or len(alerts) >= MAX_ALERTS:
                 return
-            
-            # Find metrics
-            metrics = metric_pattern.findall(text)
-            for metric in metrics:
-                clean_metric = metric.lower().strip()
-                if clean_metric in ['1', '2', '3', '4', '5', 'a', 'the']: # skip simple small integers unless with suffixes
+
+            # Find meaningful metrics
+            for metric in metric_pattern.findall(text):
+                normalized = normalize_metric(metric)
+                if not normalized:
                     continue
-                if clean_metric not in profile_str:
-                    alerts.append({
-                        "severity": "WARNING",
-                        "section": section_id,
-                        "section_label": section_label,
-                        "value": metric,
-                        "message": f"Metric '{metric}' was generated by AI but not verified in your Master Profile. Please check it."
-                    })
-            
-            # Find technology names / capitalized terms
-            words = word_pattern.findall(text)
-            for word in words:
+                # Skip trivial multipliers and years accidentally caught
+                if normalized in ('1x', '2x', '3x'):
+                    continue
+                year_only = re.fullmatch(r'\d{4}', re.sub(r'[^\d]', '', normalized))
+                if year_only:
+                    continue
+                # Present if found raw OR in normalized profile (separator variants)
+                if normalized in profile_str or normalized in profile_norm:
+                    continue
+                key = (section_id, normalized)
+                if key in seen_alerts:
+                    continue
+                seen_alerts.add(key)
+                alerts.append({
+                    "severity": "WARNING",
+                    "section": section_id,
+                    "section_label": section_label,
+                    "value": metric.strip(),
+                    "message": f"Metric '{metric.strip()}' was generated by AI but not verified in your Master Profile. Please check it."
+                })
+                if len(alerts) >= MAX_ALERTS:
+                    return
+
+            # Capitalized-term check: English only. German nouns are always
+            # capitalized, so this check would flag every ordinary word.
+            if is_german:
+                return
+
+            for word in word_pattern.findall(text):
+                if len(alerts) >= MAX_ALERTS:
+                    return
                 word_lower = word.lower()
                 if word_lower in ignore_words:
                     continue
                 if word.isdigit():
                     continue
-                if word_lower not in profile_str:
-                    alerts.append({
-                        "severity": "WARNING",
-                        "section": section_id,
-                        "section_label": section_label,
-                        "value": word,
-                        "message": f"Technology or term '{word}' was generated by AI but not verified in your Master Profile. Please check it."
-                    })
-                        
+                if word_lower in profile_str:
+                    continue
+                key = (section_id, word_lower)
+                if key in seen_alerts:
+                    continue
+                seen_alerts.add(key)
+                alerts.append({
+                    "severity": "WARNING",
+                    "section": section_id,
+                    "section_label": section_label,
+                    "value": word,
+                    "message": f"Technology or term '{word}' was generated by AI but not verified in your Master Profile. Please check it."
+                })
+
         # Check summary
         check_text(tailored_summary, "summary", "Professional Summary")
-        
+
         # Check experience bullets
-        for exp in tailored_experiences:
+        for exp in tailored_experiences or []:
             exp_id = exp.get('id', '')
             bullets = exp.get('bullets', [])
             company = exp.get('company', 'Work Experience')
             for i, bullet in enumerate(bullets):
                 check_text(bullet, exp_id, f"{company} (Bullet {i+1})")
-                
+
+        # Check project bullets too (previously missed entirely)
+        for proj in tailored_projects or []:
+            proj_id = proj.get('id', '')
+            bullets = proj.get('bullets', [])
+            title = proj.get('title', 'Project')
+            for i, bullet in enumerate(bullets):
+                check_text(bullet, proj_id, f"{title} (Bullet {i+1})")
+
         return alerts
 
     @classmethod
     def rephrase_block(cls, text, instruction, profile_data, api_key=None):
-        profile_text = json.dumps(profile_data, default=str)
+        profile_text = json.dumps(cls._clean_profile_for_ai(profile_data), default=str)
         system_prompt = (
             "You are an expert Resume Writer.\n"
             "Your task is to rephrase a specific block of text from a resume based on the user's instructions.\n"
-            "CRITICAL: Do NOT invent or fabricate any details, technologies, or accomplishments that are not backed by the user's Master Profile.\n"
+            "CRITICAL: Do NOT invent or fabricate any details, technologies, metrics, or accomplishments that are not backed by the user's Master Profile.\n"
+            "CRITICAL LANGUAGE RULE: Respond in the SAME language as the input text (German input -> German output, English input -> English output). Keep established technical names (React, Docker, PostgreSQL, CI/CD, etc.) unchanged.\n"
+            "CRITICAL LENGTH RULE: Keep the output roughly the same length as the input (within ~25%). It must remain a single bullet/sentence - never merge, split, or add multiple sentences.\n"
             "Return ONLY the rephrased text with no introductory text, no quotes, no markdown block wrappers."
         )
         user_content = (
@@ -1113,9 +1394,9 @@ Sincerely,
             f"Rephrased Output:"
         )
         
-        rephrased = cls.call_deepseek(system_prompt, user_content, api_key=api_key)
+        rephrased = cls.call_deepseek(system_prompt, user_content, api_key=api_key, temperature=0.3)
         if rephrased:
-            return rephrased.strip().strip('"')
+            return cls._strip_json_fences(rephrased).strip().strip('"')
             
         raise ValueError("AI Service failed to rephrase text block. Please check your API key configuration or try again.")
 

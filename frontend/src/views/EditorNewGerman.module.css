@@ -1,0 +1,145 @@
+/* German-Style CV Template styles */
+.germanHeaderLeft {
+  flex: 1;
+}
+
+.germanHeaderRight {
+  flex-shrink: 0;
+  margin-left: var(--space-6);
+}
+
+.germanName {
+  font-family: inherit;
+  font-size: calc(var(--base-font-size, 13px) * 1.55);
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 1px 0;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.germanTitle {
+  font-family: inherit;
+  font-size: calc(var(--base-font-size, 13px) * 0.95);
+  font-weight: 500;
+  color: #64748b;
+  margin: 0 0 16px 0;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+}
+
+.germanAvatar {
+  width: 95px;
+  height: 125px;
+  object-fit: cover;
+  border: 1px solid #94a3b8;
+}
+
+.germanAvatarPlaceholder {
+  width: 95px;
+  height: 125px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  color: #94a3b8;
+  font-size: 11px;
+  border: 1px solid #cbd5e1;
+}
+
+.germanContactGrid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: var(--space-2) var(--space-6);
+  padding: var(--space-3) 0 var(--space-3) 0px;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: var(--space-6);
+}
+
+.germanContactCol {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.germanContactItem {
+  display: flex;
+  align-items: flex-start;
+  font-size: calc(var(--base-font-size, 13px) * 0.85);
+}
+
+.germanContactLabel {
+  width: 90px;
+  font-weight: 700;
+  color: #334155;
+  flex-shrink: 0;
+}
+
+.germanContactVal {
+  flex: 1;
+  color: #475569;
+  text-align: left;
+}
+
+.germanSectionTitle {
+  font-size: calc(var(--base-font-size, 13px) * 1.25);
+  font-weight: 700;
+  color: var(--accent-color, #1e293b);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+  padding-bottom: 2px;
+  margin: 0 0 4px 0;
+  text-transform: uppercase;
+  text-align: left;
+  font-family: inherit;
+}
+
+.germanLeftCol {
+  flex-shrink: 0;
+  text-align: left;
+}
+
+.germanDateRange {
+  font-size: calc(var(--base-font-size, 13px) * 0.92);
+  color: #475569;
+  font-weight: 600;
+}
+
+.germanRightCol {
+  text-align: left;
+}
+
+.germanJobTitle {
+  font-size: calc(var(--base-font-size, 13px) * 0.92);
+  font-weight: 700;
+  color: #3d7ee6;
+  margin: 0 0 2px 0;
+}
+
+.germanDegree {
+  font-size: 1.02em;
+  font-weight: 700;
+  color: #3d7ee6;
+  margin: 0 0 2px 0;
+}
+
+.germanJobMeta {
+  font-size: 0.88em;
+  color: #64748b;
+  margin-bottom: var(--space-2);
+}
+
+.germanCompany {
+  font-weight: 600;
+}
+
+.germanBulletsList {
+  padding-left: 0;
+  list-style: none !important;
+  list-style-type: none !important;
+  display: flex;
+  flex-direction: column;
+  gap: var(--bullet-spacing, 4px);
+}
+

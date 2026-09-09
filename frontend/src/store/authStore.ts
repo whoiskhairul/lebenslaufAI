@@ -25,6 +25,9 @@ export interface User {
   account_locked_until?: string | null;
   last_login_ip?: string | null;
   date_joined?: string;
+  is_staff?: boolean;
+  is_superuser?: boolean;
+  is_active?: boolean;
   profile?: UserProfile;
 }
 

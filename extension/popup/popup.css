@@ -1,0 +1,63 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 300px;
+  font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: #F8FAFC;
+  color: #0F172A;
+}
+
+header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #6366F1, #4338CA);
+}
+.logo {
+  width: 34px; height: 34px; border-radius: 9px;
+  background: rgba(255,255,255,.18);
+  color: #fff; font-weight: 800; font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+}
+h1 { font-size: 15px; color: #fff; line-height: 1.1; }
+.sub { font-size: 11px; color: rgba(255,255,255,.75); }
+
+main, body > div { padding: 0 16px; }
+#loggedOut, #loggedIn { padding-top: 12px; padding-bottom: 8px; }
+
+.muted { font-size: 12.5px; color: #475569; margin-bottom: 10px; line-height: 1.5; }
+.hint { font-size: 12px; color: #475569; background: #E2E8F0; border-radius: 8px; padding: 9px 11px; margin-bottom: 10px; line-height: 1.45; }
+
+.row { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+.row.spread { justify-content: space-between; margin-bottom: 2px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot.ok { background: #10B981; box-shadow: 0 0 0 3px rgba(16,185,129,.18); }
+.email { font-size: 12.5px; font-weight: 600; word-break: break-all; }
+
+.btn {
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; border: none; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  padding: 10px 12px; margin-bottom: 8px;
+  transition: filter .12s ease;
+}
+.btn:hover { filter: brightness(.95); }
+.btn.primary { background: linear-gradient(135deg, #6366F1, #4F46E5); color: #fff; }
+.btn.ghost { background: #fff; border: 1px solid #CBD5E1; color: #0F172A; }
+.btn.link { background: transparent; color: #6366F1; text-decoration: underline; padding: 4px; margin-bottom: 4px; }
+.btn.link.danger { color: #DC2626; }
+.full { width: 100%; }
+.btn:disabled { opacity: .6; cursor: wait; }
+
+.status {
+  margin: 4px 16px 8px; padding: 9px 11px;
+  border-radius: 8px; font-size: 12px; line-height: 1.45;
+  background: #EEF2FF; color: #3730A3;
+}
+.status.err { background: #FEF2F2; color: #B91C1C; }
+.hidden { display: none; }
+
+footer {
+  padding: 8px 16px 12px;
+  font-size: 10px; color: #94A3B8;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

@@ -6,9 +6,11 @@ import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Toast } from '../components/Toast';
 import { Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Brain, Save, RefreshCw, Trash, Plus, Settings, Minimize2, LayoutGrid, Layers, Sliders, User, Briefcase, Code, GraduationCap, Globe, Eye, EyeOff, RotateCcw } from 'lucide-react';
-import styles from './EditorNew.module.css';
+import styles from './editorStyles';
 
-import { ATSDashboard, ATSReport, Proposal } from '../components/ATSDashboard';
+import { ATSDashboard, ATSReport, Proposal, WeakBulletWithOriginal, RecommendedKeyword } from '../components/ATSDashboard';
+import { DeepAnalysis } from './editor/types/editor.types';
+import { computeReadinessChecklist, buildOptimizationMarkdown, downloadMarkdown } from '../features/editor/utils/atsLocal';
 import { Snapshot } from '../components/VersionSnapshotDrawer';
 
 const templateClassMap: { [key: string]: string } = {
@@ -32,139 +34,13 @@ import { SectionSettingsPopover } from './editor/components/SectionSettingsPopov
 import { UnitRenderer } from './editor/components/UnitRenderer';
 import { SectionDetailEditor } from './editor/components/sidepanel/SectionDetailEditor';
 import { AddCustomSectionModal, CustomSectionFormat } from './editor/components/AddCustomSectionModal';
-interface ParsedLetter {
-  sender_name: string;
-  sender_address: string;
-  sender_phone: string;
-  sender_email: string;
-  recipient_contact: string;
-  recipient_company: string;
-  recipient_department: string;
-  recipient_address: string;
-  location: string;
-  date: string;
-  subject: string;
-  salutation: string;
-  body: string;
-  closing_salutation: string;
-  candidate_name: string;
-  verification_notes?: {
-    requirements_emphasized?: string[];
-    resume_evidence_used?: string[];
-    placeholders?: string[];
-    confirmation_needed?: string[];
-  };
-  is_json: boolean;
-}
-
-const getParsedLetter = (content: string, editablePersonalInfo: any): ParsedLetter => {
-  if (!content) {
-    return {
-      sender_name: editablePersonalInfo.full_name || '',
-      sender_address: editablePersonalInfo.location || '',
-      sender_phone: editablePersonalInfo.phone || '',
-      sender_email: editablePersonalInfo.email || '',
-      recipient_contact: '',
-      recipient_company: '',
-      recipient_department: '',
-      recipient_address: '',
-      location: editablePersonalInfo.location?.split(',')?.[0]?.trim() || '',
-      date: new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }),
-      subject: '',
-      salutation: '',
-      body: '',
-      closing_salutation: 'Mit freundlichen Grüßen',
-      candidate_name: editablePersonalInfo.full_name || '',
-      is_json: false
-    };
-  }
-
-  try {
-    const parsed = JSON.parse(content);
-    if (parsed && typeof parsed === 'object') {
-      return {
-        sender_name: parsed.sender_name || '',
-        sender_address: parsed.sender_address || '',
-        sender_phone: parsed.sender_phone || '',
-        sender_email: parsed.sender_email || '',
-        recipient_contact: parsed.recipient_contact || '',
-        recipient_company: parsed.recipient_company || '',
-        recipient_department: parsed.recipient_department || '',
-        recipient_address: parsed.recipient_address || '',
-        location: parsed.location || '',
-        date: parsed.date || '',
-        subject: parsed.subject || '',
-        salutation: parsed.salutation || '',
-        body: parsed.body || '',
-        closing_salutation: parsed.closing_salutation || '',
-        candidate_name: parsed.candidate_name || '',
-        verification_notes: parsed.verification_notes,
-        is_json: true
-      };
-    }
-  } catch (e) {
-    // Not JSON
-  }
-
-  // Legacy plain text parser fallback
-  const lines = content.split('\n');
-  let closingIndex = -1;
-  const triggers = [
-    'mit freundlichen',
-    'sincerely',
-    'best regards',
-    'kind regards',
-    'viele grüße',
-    'freundliche grüße',
-    'hochachtungsvoll',
-    'yours truly',
-    'mit besten',
-    'grüße'
-  ];
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const lineLower = lines[i].toLowerCase().trim();
-    if (triggers.some(t => lineLower.includes(t))) {
-      closingIndex = i;
-      break;
-    }
-  }
-
-  let bodyText = '';
-  let closingText = '';
-  let nameText = '';
-
-  if (closingIndex !== -1) {
-    bodyText = lines.slice(0, closingIndex).join('\n');
-    closingText = lines[closingIndex];
-    nameText = lines.slice(closingIndex + 1).join('\n');
-  } else if (lines.length > 2) {
-    bodyText = lines.slice(0, lines.length - 2).join('\n');
-    closingText = lines[lines.length - 2];
-    nameText = lines[lines.length - 1];
-  } else {
-    bodyText = content;
-  }
-
-  return {
-    sender_name: editablePersonalInfo.full_name || '',
-    sender_address: editablePersonalInfo.location || '',
-    sender_phone: editablePersonalInfo.phone || '',
-    sender_email: editablePersonalInfo.email || '',
-    recipient_contact: '',
-    recipient_company: '',
-    recipient_department: '',
-    recipient_address: '',
-    location: editablePersonalInfo.location?.split(',')?.[0]?.trim() || '',
-    date: new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }),
-    subject: '',
-    salutation: '',
-    body: bodyText,
-    closing_salutation: closingText || 'Mit freundlichen Grüßen',
-    candidate_name: nameText || editablePersonalInfo.full_name || '',
-    is_json: false
-  };
-};
-
+import { useCanvasZoom } from '../features/editor/hooks/useCanvasZoom';
+import { useCvPagination } from '../features/editor/hooks/useCvPagination';
+import { useCvDocumentStore } from '../features/editor/state/cvDocumentStore';
+import { StyleControlsPanel } from '../features/editor/panels/StyleControlsPanel';
+import { TailorPanel } from '../features/editor/panels/TailorPanel';
+import { useSectionOps } from '../features/editor/hooks/useSectionOps';
+import { getParsedLetter, ParsedLetter, normalizeLetterDate } from '../features/editor/utils/parsedLetter';
 const ResizableSignature: React.FC<{ src: string; height: number; onChange: (h: number) => void }> = ({ src, height, onChange }) => {
   const [isSelected, setIsSelected] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -172,32 +48,35 @@ const ResizableSignature: React.FC<{ src: string; height: number; onChange: (h: 
   const startYRef = useRef(0);
   const startHeightRef = useRef(0);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleResizeStart = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(true);
     startYRef.current = e.clientY;
     startHeightRef.current = height;
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   };
 
   useEffect(() => {
     if (!isResizing) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       const deltaY = e.clientY - startYRef.current;
       const newHeight = Math.max(20, Math.min(150, startHeightRef.current + deltaY));
       onChange(newHeight);
     };
 
-    const handleMouseUp = () => {
+    const handlePointerUp = () => {
       setIsResizing(false);
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
     };
   }, [isResizing, onChange]);
 
@@ -255,19 +134,20 @@ const ResizableSignature: React.FC<{ src: string; height: number; onChange: (h: 
           />
           <div
             className="no-print"
-            onMouseDown={handleMouseDown}
+            onPointerDown={handleResizeStart}
             style={{
               position: 'absolute',
               bottom: '-4px',
               right: '-4px',
-              width: '10px',
-              height: '10px',
+              width: '18px',
+              height: '18px',
               background: '#4f46e5',
               border: '1.5px solid white',
               borderRadius: '50%',
               cursor: 'se-resize',
               boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-              zIndex: 10
+              zIndex: 10,
+              touchAction: 'none'
             }}
           />
         </>
@@ -283,7 +163,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const [jobDescription, setJobDescription] = useState('');
   const [company, setCompany] = useState('');
   const [position, setPosition] = useState('');
-  const [template, setTemplate] = useState('pixel_perfect_pdf');
+  const template = useCvDocumentStore((s) => s.template);
+  const setTemplate = useCvDocumentStore((s) => s.setTemplate);
   const [isLoading, setIsLoading] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<ResumeVersion | null>(null);
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
@@ -312,7 +193,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const [activeStyleSubTab, setActiveStyleSubTab] = useState<'theme' | 'sections'>('sections');
   const [activeDetailSectionId, setActiveDetailSectionId] = useState<string | null>(null);
   const [expandedSectionSettings, setExpandedSectionSettings] = useState<string | null>(null);
-  const [headerStyles, setHeaderStyles] = useState<any>({});
+  const headerStyles = useCvDocumentStore((s) => s.headerStyles);
+  const setHeaderStyles = useCvDocumentStore((s) => s.setHeaderStyles);
   const [activeSectionSettings, setActiveSectionSettings] = useState<string | null>(null);
   const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
   const [editingSectionTitleId, setEditingSectionTitleId] = useState<string | null>(null);
@@ -361,41 +243,6 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         setAnimatingShowSectionId(null);
       }, 360);
     }
-  };
-
-  const handleCreateCustomSection = (title: string, format: CustomSectionFormat) => {
-    const newSecId = `custom_${Date.now()}`;
-    const newSec: any = {
-      id: newSecId,
-      name: title,
-      visible: true,
-      type: 'custom',
-      customFormat: format
-    };
-
-    if (format === 'keyvalue') {
-      newSec.keyValuePairs = [
-        { key: 'Category / Key', value: 'Tools, proficiencies, or relevant details' }
-      ];
-    } else if (format === 'entries') {
-      newSec.entries = [
-        {
-          id: `entry_${Date.now()}`,
-          title: `${title} Contributor / Role`,
-          subtitle: 'Organization or Project',
-          location: 'City, Country',
-          date: '2023 - Present',
-          bullets: ['Spearheaded key project initiative and delivered measurable performance outcomes.']
-        }
-      ];
-    } else if (format === 'paragraph') {
-      newSec.paragraphText = 'Experienced professional committed to delivering high-impact solutions, optimizing system performance, and driving core project objectives.';
-    } else {
-      newSec.bullets = ['Earned credential / accomplishment with distinguished outcome.'];
-    }
-
-    setSections(prev => [...prev, newSec]);
-    handleOpenSectionDetail(newSecId);
   };
 
   // Resizable Control Panel State
@@ -480,40 +327,9 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     };
   }, [activeSectionSettings]);
 
-  // Global Margins, Colors and Fonts
-  const [customStyles, setCustomStyles] = useState<{
-    fontSize: number;
-    headingSize: number;
-    lineHeight: number;
-    sectionSpacing: number;
-    accentColor: string;
-    textColor: string;
-    alignment: string;
-    pageMargin?: number;
-    bulletSpacing?: number;
-    personalDetailsOffset?: number;
-    headingSecondaryColor?: string;
-    dateFormat: 'MM/YYYY' | 'MMM YYYY' | 'YYYY';
-    pageSize: 'A4';
-    fontFamily?: string;
-    signatureHeight?: number;
-  }>({
-    fontSize: 13,
-    headingSize: 1.4,
-    lineHeight: 1.4,
-    sectionSpacing: 20,
-    accentColor: '#0f172a',
-    headingSecondaryColor: '#3d7ee6',
-    textColor: '#334155',
-    alignment: 'left',
-    pageMargin: 48,
-    bulletSpacing: 4,
-    personalDetailsOffset: 16,
-    dateFormat: 'MM/YYYY',
-    pageSize: 'A4',
-    fontFamily: '',
-    signatureHeight: 48
-  });
+  // Global Margins, Colors and Fonts (document store)
+  const customStyles = useCvDocumentStore((s) => s.customStyles);
+  const setCustomStyles = useCvDocumentStore((s) => s.setCustomStyles);
 
   const [letterStyles, setLetterStyles] = useState<{
     fontSize: number;
@@ -525,80 +341,29 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     fontFamily: ''
   });
 
-  // Section Ordering and Visibility Matrix
-  const [sections, setSections] = useState<Array<{
-    id: string;
-    name: string;
-    visible: boolean;
-    type: 'summary' | 'experience' | 'skills' | 'projects' | 'education' | 'custom';
-    bullets?: string[];
-    customStyles?: {
-      fontSize?: number;
-      spacing?: number;
-      alignment?: string;
-      headingSize?: number;
-      headingColor?: string;
-      headingSecondaryColor?: string;
-      headingWeight?: string;
-      headingStyle?: string;
-      headingAlignment?: string;
-      lineHeight?: number;
-      textColor?: string;
-      fontStyle?: string;
-      fontWeight?: string;
-      itemGap?: number;
-      bulletSpacing?: number;
-    };
-    customFormat?: 'bullets' | 'keyvalue' | 'entries' | 'paragraph';
-    keyValuePairs?: Array<{ key: string; value: string }>;
-    entries?: any[];
-    paragraphText?: string;
-    originalSnapshot?: any;
-    aiSnapshot?: any;
-    activeVersion?: 'original' | 'ai';
-  }>>([
-    { id: 'summary', name: 'Professional Summary', visible: true, type: 'summary' },
-    { id: 'experience', name: 'Work Experience', visible: true, type: 'experience' },
-    { id: 'projects', name: 'Projects', visible: true, type: 'projects' },
-    { id: 'education', name: 'Education', visible: true, type: 'education' },
-    { id: 'skills', name: 'Skills', visible: true, type: 'skills' }
-  ]);
+  // Section Ordering and Visibility Matrix (document store)
+  const sections = useCvDocumentStore((s) => s.sections);
+  const setSections = useCvDocumentStore((s) => s.setSections);
 
-  // Editable CV text grids
-  const [editableSummary, setEditableSummary] = useState('');
-  const [editablePersonalInfo, setEditablePersonalInfo] = useState<{
-    id?: string;
-    full_name: string;
-    title: string;
-    email: string;
-    phone: string;
-    location: string;
-    date_of_birth: string;
-    nationality: string;
-    linkedin: string;
-    github: string;
-    website: string;
-    image_url: string;
-    signature_image?: string;
-  }>({
-    full_name: '',
-    title: '',
-    email: '',
-    phone: '',
-    location: '',
-    date_of_birth: '',
-    nationality: '',
-    linkedin: '',
-    github: '',
-    website: '',
-    image_url: '',
-    signature_image: ''
-  });
-  const [editableExperiences, setEditableExperiences] = useState<Array<{ id: string; bullets: string[]; company?: string; position?: string; location?: string; start_date?: string; end_date?: string }>>([]);
-  const [editableProjects, setEditableProjects] = useState<Array<{ id: string; bullets: string[]; title?: string; role?: string; technologies?: string[] | string; date?: string; link?: string; github_url?: string; demo_url?: string }>>([]);
-  const [editableEducations, setEditableEducations] = useState<Array<{ id: string; institution: string; degree?: string; field_of_study?: string; start_date?: string; end_date?: string; location?: string; bullets?: string[] }>>([]);
-  const [editableSkills, setEditableSkills] = useState<Array<{ id: string; name: string; category: string }>>([]);
+  // Editable CV text grids (document store)
+  const editableSummary = useCvDocumentStore((s) => s.editableSummary);
+  const setEditableSummary = useCvDocumentStore((s) => s.setEditableSummary);
+  const editablePersonalInfo = useCvDocumentStore((s) => s.editablePersonalInfo);
+  const setEditablePersonalInfo = useCvDocumentStore((s) => s.setEditablePersonalInfo);
+  const editableExperiences = useCvDocumentStore((s) => s.editableExperiences);
+  const setEditableExperiences = useCvDocumentStore((s) => s.setEditableExperiences);
+  const editableProjects = useCvDocumentStore((s) => s.editableProjects);
+  const setEditableProjects = useCvDocumentStore((s) => s.setEditableProjects);
+  const editableEducations = useCvDocumentStore((s) => s.editableEducations);
+  const setEditableEducations = useCvDocumentStore((s) => s.setEditableEducations);
+  const editableSkills = useCvDocumentStore((s) => s.editableSkills);
+  const setEditableSkills = useCvDocumentStore((s) => s.setEditableSkills);
   const [expandedProjectCards, setExpandedProjectCards] = useState<Record<string, boolean>>({});
+
+  // Document state lives in a shared store — start every editor visit from clean defaults
+  useEffect(() => {
+    useCvDocumentStore.getState().resetDocument();
+  }, []);
 
   // Dynamic Document Title: "name of the applicant_Lebenslauf"
   useEffect(() => {
@@ -849,12 +614,141 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   const activeAtsScore = liveAtsReport?.score ?? (currentVersion?.ats_score || 85);
 
+  // ---- Deep ATS analysis (single combined AI call, persisted in tailored_details) ----
+  const [dismissedAts, setDismissedAts] = useState<string[]>(
+    (currentVersion?.tailored_details as any)?.customization?.dismissed_ats || []
+  );
+
+  const deepAnalysis: DeepAnalysis | null = React.useMemo(() => {
+    const td: any = (currentVersion?.tailored_details ?? {}) as any;
+    const d = td.deep_analysis || td.ats_report?.deep_analysis || (atsReport as any)?.deep_analysis;
+    if (!d || typeof d !== 'object') return null;
+    return {
+      section_scores: Array.isArray(d.section_scores) ? d.section_scores : [],
+      weak_bullets: Array.isArray(d.weak_bullets) ? d.weak_bullets : [],
+      recommended_keywords: Array.isArray(d.recommended_keywords) ? d.recommended_keywords : [],
+      recruiter_impression: d.recruiter_impression || {},
+      fit_report: d.fit_report || {}
+    };
+  }, [currentVersion, atsReport]);
+
+  const handleDismissAtsItem = (id: string) => {
+    setDismissedAts(prev => (prev.includes(id) ? prev : [...prev, id]));
+  };
+
+  const handleApplyBulletFix = (wb: WeakBulletWithOriginal) => {
+    createSnapshot(`Before apply bullet fix (${wb.contextLabel})`);
+    if (wb.type === 'project') {
+      setEditableProjects(prev => prev.map(proj => {
+        if (!proj.id || proj.id !== wb.id) return proj;
+        const bullets = [...(proj.bullets || [])];
+        if (bullets.length > wb.bullet_index) bullets[wb.bullet_index] = wb.improved;
+        return { ...proj, bullets };
+      }));
+    } else {
+      setEditableExperiences(prev => prev.map(exp => {
+        if (exp.id !== wb.id) return exp;
+        const bullets = [...(exp.bullets || [])];
+        if (bullets.length > wb.bullet_index) bullets[wb.bullet_index] = wb.improved;
+        return { ...exp, bullets };
+      }));
+    }
+    handleDismissAtsItem(`bullet:${wb.id}:${wb.bullet_index}`);
+  };
+
+  const recommendedKeywords: RecommendedKeyword[] = React.useMemo(() => {
+    const kw = deepAnalysis?.recommended_keywords || [];
+    return kw.map(k => ({
+      name: k.name,
+      category: k.category || 'hard_skills',
+      reason: k.reason,
+      applied: editableSkills.some(s => s.name.toLowerCase() === k.name.toLowerCase())
+    }));
+  }, [deepAnalysis, editableSkills]);
+
+  const weakBullets: WeakBulletWithOriginal[] = React.useMemo(() => {
+    const list = deepAnalysis?.weak_bullets || [];
+    return list.map(wb => {
+      let original = '';
+      let contextLabel = '';
+      if (wb.type === 'project') {
+        const proj = editableProjects.find(p => p.id === wb.id);
+        original = proj?.bullets?.[wb.bullet_index] || '';
+        contextLabel = proj?.title || 'Project';
+      } else {
+        const exp = editableExperiences.find(e => e.id === wb.id);
+        original = exp?.bullets?.[wb.bullet_index] || '';
+        contextLabel = exp ? `${exp.position || 'Role'}${exp.company ? ` @ ${exp.company}` : ''}` : 'Experience';
+      }
+      return { ...wb, original, contextLabel };
+    }).filter(wb => wb.original || wb.improved);
+  }, [deepAnalysis, editableExperiences, editableProjects]);
+
+  const atsChecklist = React.useMemo(() => computeReadinessChecklist({
+    personalInfo: editablePersonalInfo,
+    summary: editableSummary,
+    experiences: editableExperiences,
+    projects: editableProjects,
+    skills: editableSkills,
+    educations: editableEducations,
+    sections
+  }), [editablePersonalInfo, editableSummary, editableExperiences, editableProjects, editableSkills, editableEducations, sections]);
+
+  const atsCoverage = React.useMemo(() => {
+    if (!liveAtsReport) return null;
+    const matched = liveAtsReport.all_matched.length;
+    const total = matched + liveAtsReport.all_missing.length;
+    return { matched, total, percent: total > 0 ? Math.round((matched / total) * 100) : 0 };
+  }, [liveAtsReport]);
+
+  const beforeAfter = React.useMemo(() => {
+    const orig = currentVersion?.tailored_details?.original_profile;
+    if (!orig) return null;
+    const origBullets = [
+      ...(orig.work_experiences || []).flatMap(e => e.bullets || []),
+      ...(orig.projects || []).flatMap(p => p.bullets || []),
+    ].filter(b => b && b.trim());
+    const curBullets = [
+      ...editableExperiences.flatMap(e => e.bullets || []),
+      ...editableProjects.flatMap(p => p.bullets || []),
+    ].filter(b => b && b.trim());
+    const origSet = new Set(origBullets.map(b => b.trim()));
+    const changedCount = curBullets.filter(b => !origSet.has(b.trim())).length;
+    return {
+      originalSummary: orig.personal_info?.summary || '',
+      currentSummary: editableSummary,
+      changedBullets: changedCount,
+      totalBullets: curBullets.length,
+      originalSkillCount: (orig.skills || []).length,
+      currentSkillCount: editableSkills.length
+    };
+  }, [currentVersion, editableSummary, editableExperiences, editableProjects, editableSkills]);
+
+  const handleExportAtsReport = () => {
+    if (!liveAtsReport) return;
+    const md = buildOptimizationMarkdown({
+      targetRole: currentVersion?.target_role || position || '',
+      targetCompany: currentVersion?.target_company || company || '',
+      report: liveAtsReport,
+      coverage: atsCoverage,
+      checklist: atsChecklist,
+      deep: deepAnalysis
+    });
+    downloadMarkdown(
+      `ats-report-${(currentVersion?.target_company || 'resume').toLowerCase().replace(/\s+/g, '-')}.md`,
+      md
+    );
+  };
 
 
 
-  const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
-  const [languagesFirst, setLanguagesFirst] = useState(false);
-  const [languagesTitle, setLanguagesTitle] = useState<string>('');
+
+  const categoryOrder = useCvDocumentStore((s) => s.categoryOrder);
+  const setCategoryOrder = useCvDocumentStore((s) => s.setCategoryOrder);
+  const languagesFirst = useCvDocumentStore((s) => s.languagesFirst);
+  const setLanguagesFirst = useCvDocumentStore((s) => s.setLanguagesFirst);
+  const languagesTitle = useCvDocumentStore((s) => s.languagesTitle);
+  const setLanguagesTitle = useCvDocumentStore((s) => s.setLanguagesTitle);
   const [expandedSkillCats, setExpandedSkillCats] = useState<Record<string, boolean>>({});
 
   // Focus redirection metadata when editing lists dynamically
@@ -983,7 +877,6 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   // Canvas viewport scale settings
   const viewportRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
 
   const MOBILE_BREAKPOINT = 1024;
   const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT);
@@ -1000,7 +893,6 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   // Multi-Page Virtual Matrix state
   const hiddenCanvasRef = useRef<HTMLDivElement>(null);
-  const [pages, setPages] = useState<RenderableUnit[][]>([[]]);
   const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({});
 
   // Sync route param hashes
@@ -1024,46 +916,26 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     });
   }, [editableSkills]);
 
-  // Adjust canvas viewport zoom scale
-  useEffect(() => {
-    const handleResize = () => {
-      if (viewportRef.current) {
-        const viewportWidth = viewportRef.current.clientWidth - 40;
-        if (viewportWidth <= 0) return;
-        const pageWidth = 794;
-        setScale(Math.min(1, viewportWidth / pageWidth));
-      }
-    };
-    window.addEventListener('resize', handleResize);
-    handleResize();
-    const timer = setTimeout(handleResize, 150);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      clearTimeout(timer);
-    };
-  }, [currentVersion, editorTab, customStyles.pageSize, mobileActivePane]);
+  // Virtual page matrix + canvas zoom-to-fit
+  const pages = useCvPagination(
+    hiddenCanvasRef,
+    {
+      template, sections, editableExperiences, editableProjects,
+      editableEducations, editableSkills, customStyles,
+      languagesFirst, categoryOrder,
+    },
+    [
+      editableSummary, editablePersonalInfo, editableExperiences, editableSkills,
+      editableProjects, editableEducations, template, sections, customStyles, headerStyles,
+      languagesFirst, categoryOrder, mobileActivePane
+    ]
+  );
 
-  // Compensate the layout height of the scaled page stack (transform does not affect flow size)
-  const scaledWrapperRef = useRef<HTMLDivElement>(null);
-  const [wrapperHeightCompensation, setWrapperHeightCompensation] = useState(0);
-
-  useEffect(() => {
-    const el = scaledWrapperRef.current;
-    if (!el) return;
-    const measure = () => {
-      const h = el.offsetHeight;
-      setWrapperHeightCompensation(h > 0 ? h * (1 - scale) : 0);
-    };
-    measure();
-    let observer: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      observer = new ResizeObserver(measure);
-      observer.observe(el);
-    }
-    return () => {
-      if (observer) observer.disconnect();
-    };
-  }, [scale, editorTab, pages, customStyles]);
+  const { scale, scaledWrapperRef, wrapperHeightCompensation } = useCanvasZoom(
+    viewportRef,
+    [currentVersion, editorTab, customStyles.pageSize, mobileActivePane],
+    [editorTab, pages, customStyles]
+  );
 
   // Trigger DOM layout engine re-calculation when styling changes
   useEffect(() => {
@@ -1181,6 +1053,26 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     }
 
     const fetchExistingVersion = async () => {
+      // Chrome-extension deep link: /editor?versionId=<uuid>
+      if (initialJobParams?.version_id) {
+        try {
+          const res = await api.get('/resume/versions');
+          const ver = (res.data as any[]).find((v: any) => v.id === initialJobParams.version_id);
+          if (ver) {
+            setCompany(ver.target_company || '');
+            setPosition(ver.target_role || '');
+            setCurrentVersion(ver);
+            initializeVersionFields(ver);
+          } else {
+            setToast({ message: 'Linked CV version was not found.', type: 'error' });
+          }
+        } catch (err) {
+          console.error('Failed to load linked version:', err);
+          setToast({ message: 'Failed to load the CV generated by the extension.', type: 'error' });
+        }
+        return;
+      }
+
       if (initialJobParams?.application_id) {
         try {
           const appRes = await api.get(`/applications/${initialJobParams.application_id}`);
@@ -1280,13 +1172,13 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       });
       setEditableSkills(remappedSkills);
       const detailsAny = ver.tailored_details as any;
-      const tailoredProjects = detailsAny.tailored_projects || detailsAny.projects || profile.projects || [];
-      const mappedProjects = (profile.projects || tailoredProjects).map((p: any) => {
-        const tailoredP = (detailsAny.tailored_projects || []).find((tp: any) => tp.id === p.id);
+      const tailoredProjectsList = detailsAny.projects || detailsAny.tailored_projects || [];
+      const mappedProjects = (profile.projects || []).map((p: any) => {
+        const tailoredP = tailoredProjectsList.find((tp: any) => String(tp.id) === String(p.id));
         return {
           id: p.id || `proj_${Math.random()}`,
-          bullets: tailoredP?.bullets || p.bullets || [],
-          title: tailoredP?.title || p.title || p.title || '',
+          bullets: (tailoredP && tailoredP.bullets && tailoredP.bullets.length > 0) ? tailoredP.bullets : (p.bullets || []),
+          title: tailoredP?.title || p.title || '',
           role: tailoredP?.role || p.role || '',
           technologies: p.technologies || p.tech_stack || tailoredP?.technologies || [],
           date: p.date || '',
@@ -1314,6 +1206,22 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
     // Load styles config
     const customData = ver.tailored_details.customization;
+    // Restore resume language so German-tailored CVs get localized labels
+    // (section names, date formats, category headers like 'Sprachen').
+    {
+      const savedLang = String((ver.tailored_details as any)?.target_language || '').toLowerCase();
+      if (savedLang) {
+        setTargetLanguage(['de', 'deutsch', 'german'].includes(savedLang) ? 'de' : 'en');
+      } else {
+        // Legacy versions: heuristic detection from tailored content
+        const sample = [
+          ver.tailored_summary || '',
+          ...((ver.tailored_details?.experiences || []) as any[]).flatMap(e => e.bullets || [])
+        ].join(' ');
+        const germanHits = (sample.match(/\b(und|für|über|durch|bereich|entwicklung|verantwortlich|projekte|team)\b/gi) || []).length;
+        setTargetLanguage(germanHits >= 3 ? 'de' : 'en');
+      }
+    }
     if (customData) {
       if (customData.sections) setSections(customData.sections);
       if (customData.customStyles) {
@@ -1382,957 +1290,88 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   // ----------------------------------------------------
 
   // Section Reordering Handler
-  const handleMoveSection = (sectionId: string, direction: 'up' | 'down') => {
-    setSections(prev => {
-      const idx = prev.findIndex(s => s.id === sectionId);
-      if (idx === -1) return prev;
-      if (direction === 'up' && idx === 0) return prev;
-      if (direction === 'down' && idx === prev.length - 1) return prev;
-
-      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-      const nextList = [...prev];
-      const temp = nextList[idx];
-      nextList[idx] = nextList[targetIdx];
-      nextList[targetIdx] = temp;
-      return nextList;
-    });
-  };
-
-  // Quick Add Item Handler for Section Header Action Bar
-  const handleQuickAddSectionItem = (secId: string) => {
-    const targetSec = sections.find(s => s.id === secId);
-    if (!targetSec) return;
-
-    if (targetSec.type === 'summary') {
-      setEditableSummary(prev => prev ? `${prev}\n- Driven professional with expertise in technical execution and business impact.` : '- Driven professional with expertise in technical execution and business impact.');
-    } else if (targetSec.type === 'experience') {
-      handleAddExperience();
-    } else if (targetSec.type === 'projects') {
-      handleAddProject();
-    } else if (targetSec.type === 'education') {
-      handleAddEducation();
-    } else if (targetSec.type === 'skills') {
-      const newSkill = {
-        id: `skill_${Date.now()}`,
-        name: 'New Skill',
-        category: 'Technical Skills'
-      };
-      setEditableSkills(prev => [...prev, newSkill]);
-    } else if (targetSec.type === 'custom') {
-      handleAddCustomBullet(secId);
-    }
-  };
-
-  // AI Section Polish with Side-by-Side Comparison Generator
-  // Section AI Scope Options Generator (Section, Item, or Bullet)
-  const getSectionAiScopeOptions = (sectionId: string) => {
-    const targetSec = sections.find(s => s.id === sectionId);
-    if (!targetSec) return [{ id: 'all', label: 'Entire Section (All Content)' }];
-
-    const options: Array<{ id: string; label: string }> = [
-      { id: 'all', label: `Entire ${targetSec.name} Section` }
-    ];
-
-    if (targetSec.type === 'experience') {
-      editableExperiences.forEach((exp, expIdx) => {
-        const entryId = `entry_${exp.id}`;
-        options.push({
-          id: entryId,
-          label: `ðŸ¢ Job #${expIdx + 1}: ${exp.position || 'Position'} @ ${exp.company || 'Company'}`
-        });
-        (exp.bullets || []).forEach((bullet, bIdx) => {
-          options.push({
-            id: `bullet_${exp.id}_${bIdx}`,
-            label: `  ↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
-          });
-        });
-      });
-    } else if (targetSec.type === 'projects') {
-      editableProjects.forEach((proj, projIdx) => {
-        const entryId = `entry_${proj.id}`;
-        options.push({
-          id: entryId,
-          label: `ðŸš€ Project #${projIdx + 1}: ${proj.title || 'Project'}`
-        });
-        (proj.bullets || []).forEach((bullet, bIdx) => {
-          options.push({
-            id: `bullet_${proj.id}_${bIdx}`,
-            label: `  ↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
-          });
-        });
-      });
-    } else if (targetSec.type === 'education') {
-      editableEducations.forEach((edu, eduIdx) => {
-        const entryId = `entry_${edu.id}`;
-        options.push({
-          id: entryId,
-          label: `ðŸŽ“ Education #${eduIdx + 1}: ${edu.degree || 'Degree'} - ${edu.institution || 'Institution'}`
-        });
-        (edu.bullets || []).forEach((bullet, bIdx) => {
-          options.push({
-            id: `bullet_${edu.id}_${bIdx}`,
-            label: `  ↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
-          });
-        });
-      });
-    } else if (targetSec.type === 'custom') {
-      (targetSec.bullets || []).forEach((bullet, bIdx) => {
-        options.push({
-          id: `bullet_${targetSec.id}_${bIdx}`,
-          label: `↳ Bullet #${bIdx + 1}: "${bullet.length > 40 ? bullet.substring(0, 40) + '...' : bullet}"`
-        });
-      });
-    }
-
-    return options;
-  };
-
-  const extractContentForScope = (sectionId: string, scope: string): string => {
-    const targetSec = sections.find(s => s.id === sectionId);
-    if (!targetSec) return '';
-
-    if (scope === 'all') {
-      if (targetSec.type === 'summary') return editableSummary;
-      if (targetSec.type === 'experience') {
-        return editableExperiences.map(e => `${e.position || 'Position'} at ${e.company || 'Company'}\n${(e.bullets || []).join('\n')}`).join('\n\n');
-      }
-      if (targetSec.type === 'projects') {
-        return editableProjects.map(p => `${p.title || 'Project'}\n${(p.bullets || []).join('\n')}`).join('\n\n');
-      }
-      if (targetSec.type === 'education') {
-        return editableEducations.map(e => `${e.degree || 'Degree'} - ${e.institution || 'School'}\n${(e.bullets || []).join('\n')}`).join('\n\n');
-      }
-      if (targetSec.type === 'skills') {
-        return editableSkills.map(s => `${s.category}: ${s.name}`).join('\n');
-      }
-      if (targetSec.type === 'custom') {
-        return (targetSec.bullets || []).join('\n');
-      }
-    }
-
-    if (scope.startsWith('entry_')) {
-      const itemId = scope.replace('entry_', '');
-      if (targetSec.type === 'experience') {
-        const exp = editableExperiences.find(e => e.id === itemId);
-        return exp ? (exp.bullets || []).join('\n') : '';
-      }
-      if (targetSec.type === 'projects') {
-        const proj = editableProjects.find(p => p.id === itemId);
-        return proj ? (proj.bullets || []).join('\n') : '';
-      }
-      if (targetSec.type === 'education') {
-        const edu = editableEducations.find(e => e.id === itemId);
-        return edu ? (edu.bullets || []).join('\n') : '';
-      }
-    }
-
-    if (scope.startsWith('bullet_')) {
-      const parts = scope.replace('bullet_', '').split('_');
-      const itemId = parts[0];
-      const bulletIdx = parseInt(parts[1], 10);
-
-      if (targetSec.type === 'experience') {
-        const exp = editableExperiences.find(e => e.id === itemId);
-        return exp && exp.bullets ? (exp.bullets[bulletIdx] || '') : '';
-      }
-      if (targetSec.type === 'projects') {
-        const proj = editableProjects.find(p => p.id === itemId);
-        return proj && proj.bullets ? (proj.bullets[bulletIdx] || '') : '';
-      }
-      if (targetSec.type === 'education') {
-        const edu = editableEducations.find(e => e.id === itemId);
-        return edu && edu.bullets ? (edu.bullets[bulletIdx] || '') : '';
-      }
-      if (targetSec.type === 'custom') {
-        return targetSec.bullets ? (targetSec.bullets[bulletIdx] || '') : '';
-      }
-    }
-
-    return '';
-  };
-
-  // AI Section/Entry/Bullet Polish Generator
-  const handleGenerateSectionAi = async (sectionId: string, customInstruction?: string, scopeOverride?: string) => {
-    const targetSec = sections.find(s => s.id === sectionId);
-    if (!targetSec) return;
-
-    const activeScope = scopeOverride || sectionAiScope || 'all';
-    const contentToRewrite = extractContentForScope(sectionId, activeScope);
-
-    if (!contentToRewrite.trim()) return;
-
-    setIsGeneratingSectionAi(true);
-
-    try {
-      const instruction = customInstruction || sectionAiPrompt || 'Enhance impact with strong action verbs, professional tone, and ATS keyword relevance.';
-
-      const res = await api.post('/resume/rephrase', {
-        text: contentToRewrite,
-        instruction: instruction
-      });
-
-      const proposed = res.data?.rephrased || res.data?.rewritten_text || res.data?.result || res.data?.text || contentToRewrite;
-
-      setSectionAiProposal({
-        sectionId,
-        originalText: contentToRewrite,
-        proposedText: proposed,
-        payload: { sectionId, type: targetSec.type, scope: activeScope, proposed }
-      });
-    } catch (err) {
-      console.error('Section AI polish failed:', err);
-    } finally {
-      setIsGeneratingSectionAi(false);
-    }
-  };
-
-  const handleResetSectionToMasterProfile = (sectionId: string) => {
-    if (!masterProfileData) return;
-    if (sectionId === 'header') {
-      if (masterProfileData.personal_info) {
-        setEditablePersonalInfo(JSON.parse(JSON.stringify(masterProfileData.personal_info)));
-      }
-      return;
-    }
-    const sec = sections.find(s => s.id === sectionId);
-    if (!sec) return;
-
-    if (sec.type === 'summary') {
-      if (masterProfileData.personal_info?.summary) {
-        setEditableSummary(masterProfileData.personal_info.summary);
-      }
-    } else if (sec.type === 'experience') {
-      if (masterProfileData.work_experiences) {
-        setEditableExperiences(JSON.parse(JSON.stringify(masterProfileData.work_experiences)));
-      }
-    } else if (sec.type === 'projects') {
-      if (masterProfileData.projects) {
-        setEditableProjects(JSON.parse(JSON.stringify(masterProfileData.projects)));
-      }
-    } else if (sec.type === 'education') {
-      if (masterProfileData.educations) {
-        setEditableEducations(JSON.parse(JSON.stringify(masterProfileData.educations)));
-      }
-    } else if (sec.type === 'skills') {
-      if (masterProfileData.skills) {
-        setEditableSkills(JSON.parse(JSON.stringify(masterProfileData.skills)));
-      }
-    }
-  };
-
-  const handleToggleSectionVersion = (sectionId: string) => {
-    const sec = sections.find(s => s.id === sectionId);
-    if (!sec || !sec.originalSnapshot) return;
-
-    const isCurrentlyAi = sec.activeVersion !== 'original';
-    const nextVersion = isCurrentlyAi ? 'original' : 'ai';
-    const snapshot = isCurrentlyAi ? sec.originalSnapshot : sec.aiSnapshot;
-    if (!snapshot) return;
-
-    if (sec.type === 'summary') {
-      if (snapshot.summary !== undefined) setEditableSummary(snapshot.summary);
-    } else if (sec.type === 'experience') {
-      if (snapshot.experiences) setEditableExperiences(snapshot.experiences);
-    } else if (sec.type === 'projects') {
-      if (snapshot.projects) setEditableProjects(snapshot.projects);
-    } else if (sec.type === 'education') {
-      if (snapshot.educations) setEditableEducations(snapshot.educations);
-    }
-
-    setSections(prev => prev.map(s => {
-      if (s.id !== sectionId) return s;
-      return {
-        ...s,
-        activeVersion: nextVersion,
-        ...(s.type === 'custom' ? snapshot : {})
-      };
-    }));
-  };
-
-  const handleApplySectionAiProposal = () => {
-    if (!sectionAiProposal) return;
-    const { sectionId, type, scope, proposed } = sectionAiProposal.payload;
-
-    // 1. Capture original snapshot before applying AI changes
-    const targetSec = sections.find(s => s.id === sectionId);
-    if (targetSec && !targetSec.originalSnapshot) {
-      let origSnapshot: any = {};
-      if (targetSec.type === 'summary') {
-        origSnapshot = { summary: editableSummary };
-      } else if (targetSec.type === 'experience') {
-        origSnapshot = { experiences: JSON.parse(JSON.stringify(editableExperiences)) };
-      } else if (targetSec.type === 'projects') {
-        origSnapshot = { projects: JSON.parse(JSON.stringify(editableProjects)) };
-      } else if (targetSec.type === 'education') {
-        origSnapshot = { educations: JSON.parse(JSON.stringify(editableEducations)) };
-      } else if (targetSec.type === 'custom') {
-        origSnapshot = {
-          bullets: targetSec.bullets ? [...targetSec.bullets] : undefined,
-          keyValuePairs: targetSec.keyValuePairs ? JSON.parse(JSON.stringify(targetSec.keyValuePairs)) : undefined,
-          entries: targetSec.entries ? JSON.parse(JSON.stringify(targetSec.entries)) : undefined,
-          paragraphText: targetSec.paragraphText
-        };
-      }
-
-      setSections(prev => prev.map(s => s.id === sectionId ? { ...s, originalSnapshot: origSnapshot, activeVersion: 'ai' } : s));
-    }
-
-    // 2. Apply proposed AI content
-    if (scope === 'all') {
-      if (type === 'summary') {
-        setEditableSummary(proposed);
-      } else if (type === 'custom') {
-        const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
-        setSections(prev => prev.map(s => s.id === sectionId ? { ...s, bullets } : s));
-      } else if (type === 'experience') {
-        const blocks = proposed.split('\n\n');
-        setEditableExperiences(prev => prev.map((exp, idx) => {
-          const block = blocks[idx] || blocks[0];
-          if (!block) return exp;
-          const bullets = block.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter((b: string) => b && !b.toLowerCase().includes(' at '));
-          return bullets.length > 0 ? { ...exp, bullets } : exp;
-        }));
-      } else if (type === 'projects') {
-        const blocks = proposed.split('\n\n');
-        setEditableProjects(prev => prev.map((proj, idx) => {
-          const block = blocks[idx] || blocks[0];
-          if (!block) return proj;
-          const bullets = block.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter((b: string) => b && !b.includes('('));
-          return bullets.length > 0 ? { ...proj, bullets } : proj;
-        }));
-      } else if (type === 'education') {
-        const blocks = proposed.split('\n\n');
-        setEditableEducations(prev => prev.map((edu, idx) => {
-          const block = blocks[idx] || blocks[0];
-          if (!block) return edu;
-          const bullets = block.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter((b: string) => b && !b.includes('-'));
-          return bullets.length > 0 ? { ...edu, bullets } : edu;
-        }));
-      }
-    } else if (scope.startsWith('entry_')) {
-      const itemId = scope.replace('entry_', '');
-      const bullets = proposed.split('\n').map((b: string) => b.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
-      if (bullets.length > 0) {
-        if (type === 'experience') {
-          setEditableExperiences(prev => prev.map(e => e.id === itemId ? { ...e, bullets } : e));
-        } else if (type === 'projects') {
-          setEditableProjects(prev => prev.map(p => p.id === itemId ? { ...p, bullets } : p));
-        } else if (type === 'education') {
-          setEditableEducations(prev => prev.map(e => e.id === itemId ? { ...e, bullets } : e));
-        }
-      }
-    } else if (scope.startsWith('bullet_')) {
-      const parts = scope.replace('bullet_', '').split('_');
-      const itemId = parts[0];
-      const bulletIdx = parseInt(parts[1], 10);
-      const cleanBullet = proposed.trim().replace(/^[-•*]\s*/, '');
-
-      if (cleanBullet) {
-        if (type === 'experience') {
-          setEditableExperiences(prev => prev.map(exp => {
-            if (exp.id !== itemId) return exp;
-            const updated = [...exp.bullets];
-            updated[bulletIdx] = cleanBullet;
-            return { ...exp, bullets: updated };
-          }));
-        } else if (type === 'projects') {
-          setEditableProjects(prev => prev.map(proj => {
-            if (proj.id !== itemId) return proj;
-            const updated = [...proj.bullets];
-            updated[bulletIdx] = cleanBullet;
-            return { ...proj, bullets: updated };
-          }));
-        } else if (type === 'education') {
-          setEditableEducations(prev => prev.map(edu => {
-            if (edu.id !== itemId) return edu;
-            const updated = [...(edu.bullets || [])];
-            updated[bulletIdx] = cleanBullet;
-            return { ...edu, bullets: updated };
-          }));
-        } else if (type === 'custom') {
-          setSections(prev => prev.map(s => {
-            if (s.id !== sectionId) return s;
-            const updated = [...(s.bullets || [])];
-            updated[bulletIdx] = cleanBullet;
-            return { ...s, bullets: updated };
-          }));
-        }
-      }
-    }
-
-    // 3. Save AI snapshot for future toggle
-    setTimeout(() => {
-      setSections(prev => prev.map(s => {
-        if (s.id !== sectionId) return s;
-        let aiSnap: any = {};
-        if (s.type === 'summary') {
-          aiSnap = { summary: editableSummary };
-        } else if (s.type === 'experience') {
-          aiSnap = { experiences: JSON.parse(JSON.stringify(editableExperiences)) };
-        } else if (s.type === 'projects') {
-          aiSnap = { projects: JSON.parse(JSON.stringify(editableProjects)) };
-        } else if (s.type === 'education') {
-          aiSnap = { educations: JSON.parse(JSON.stringify(editableEducations)) };
-        } else if (s.type === 'custom') {
-          aiSnap = {
-            bullets: s.bullets ? [...s.bullets] : undefined,
-            keyValuePairs: s.keyValuePairs ? JSON.parse(JSON.stringify(s.keyValuePairs)) : undefined,
-            entries: s.entries ? JSON.parse(JSON.stringify(s.entries)) : undefined,
-            paragraphText: s.paragraphText
-          };
-        }
-        return { ...s, aiSnapshot: aiSnap, activeVersion: 'ai' };
-      }));
-    }, 60);
-
-    setSectionAiProposal(null);
-    setOpenSectionAiModalId(null);
-    setSectionAiPrompt('');
-  };
-
-  // Work Experience Operations
-  const handleAddExperience = () => {
-    const newId = `exp_${Date.now()}`;
-    const newExp = {
-      id: newId,
-      company: 'New Company',
-      position: 'Job Title',
-      location: 'City, Country',
-      start_date: '01/2026',
-      end_date: 'Present',
-      bullets: ['Describe your major contribution...']
-    };
-    setEditableExperiences(prev => [...prev, newExp]);
-  };
-
-  const handleMoveExperience = (idx: number, direction: 'up' | 'down') => {
-    if (direction === 'up' && idx === 0) return;
-    if (direction === 'down' && idx === editableExperiences.length - 1) return;
-    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-    const nextList = [...editableExperiences];
-    const temp = nextList[idx];
-    nextList[idx] = nextList[targetIdx];
-    nextList[targetIdx] = temp;
-    setEditableExperiences(nextList);
-  };
-
-  const getLocalizedCategoryName = (catName: string): string => {
-    const norm = (catName || '').toLowerCase().trim();
-    if (targetLanguage === 'de') {
-      if (norm === 'languages' || norm === 'languages & dialects' || norm === 'sprachen') return 'Sprachen';
-      if (norm === 'programming languages' || norm === 'technical' || norm === 'technologies' || norm === 'programmiersprachen') return 'Programmiersprachen & Kenntnisse';
-      if (norm === 'frameworks' || norm === 'frameworks & libraries' || norm === 'frameworks & bibliotheken') return 'Frameworks & Bibliotheken';
-      if (norm === 'databases' || norm === 'datenbanken') return 'Datenbanken';
-      if (norm === 'cloud' || norm === 'cloud & devops' || norm === 'devops' || norm === 'cloud & infrastructure') return 'Cloud & Infrastructure';
-      if (norm === 'tools' || norm === 'development tools' || norm === 'werkzeuge & tools') return 'Werkzeuge & Tools';
-      if (norm === 'soft_skills' || norm === 'soft skills') return 'Methodische & Soziale Kompetenzen';
-    }
-    return catName.charAt(0).toUpperCase() + catName.slice(1).replace(/_/g, ' ');
-  };
-
-  const handleMoveSkillInCategory = (skillId: string, direction: 'up' | 'down') => {
-    setEditableSkills(prev => {
-      const targetSkill = prev.find(s => s.id === skillId);
-      if (!targetSkill) return prev;
-
-      const catNormalized = (targetSkill.category || '').toLowerCase().trim();
-      const categorySkills = prev.filter(s => (s.category || '').toLowerCase().trim() === catNormalized);
-      const idx = categorySkills.findIndex(s => s.id === skillId);
-
-      if (direction === 'up' && idx === 0) return prev;
-      if (direction === 'down' && idx === categorySkills.length - 1) return prev;
-
-      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-      const itemToSwap = categorySkills[targetIdx];
-
-      const realIdx1 = prev.findIndex(s => s.id === skillId);
-      const realIdx2 = prev.findIndex(s => s.id === itemToSwap.id);
-
-      const updated = [...prev];
-      const temp = updated[realIdx1];
-      updated[realIdx1] = updated[realIdx2];
-      updated[realIdx2] = temp;
-      return updated;
-    });
-  };
-
-  const handleMoveSkillCategory = (catName: string, direction: 'up' | 'down') => {
-    const itSkills = editableSkills.filter(sk => (sk.category || '').toLowerCase().trim() !== 'languages');
-    const uniqueCats = Array.from(new Set(itSkills.map(sk => (sk.category || 'technical').toLowerCase().trim())));
-
-    const normalizedOrder = categoryOrder.map(c => c.toLowerCase().trim());
-    const currentItCats = normalizedOrder.filter(c => uniqueCats.includes(c));
-    const extraCats = uniqueCats.filter(c => !currentItCats.includes(c));
-    let currentList = [...currentItCats, ...extraCats];
-
-    if (categoryOrder.length === 0) {
-      const defaultOrder = ['programming languages', 'frameworks & libraries', 'databases', 'cloud & devops', 'development tools', 'testing'];
-      currentList.sort((a, b) => {
-        const idxA = defaultOrder.indexOf(a);
-        const idxB = defaultOrder.indexOf(b);
-        return (idxA !== -1 ? idxA : 100) - (idxB !== -1 ? idxB : 100);
-      });
-    }
-
-    const targetCat = catName.toLowerCase().trim();
-    const idx = currentList.indexOf(targetCat);
-    if (idx === -1) return;
-
-    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (newIdx < 0 || newIdx >= currentList.length) return;
-
-    const updatedList = [...currentList];
-    const temp = updatedList[idx];
-    updatedList[idx] = updatedList[newIdx];
-    updatedList[newIdx] = temp;
-
-    setCategoryOrder(updatedList);
-  };
-
-  const handleAddExperienceBullet = (expIdx: number, bulletIdx: number = -1) => {
-    setEditableExperiences(prev => prev.map((exp, i) => {
-      if (i === expIdx) {
-        const bullets = [...exp.bullets];
-        const insertAt = bulletIdx === -1 ? bullets.length : bulletIdx + 1;
-        bullets.splice(insertAt, 0, '');
-        // Trigger focus placement on new bullet
-        setFocusedBulletInfo({ type: 'experience', itemId: exp.id, bulletIdx: insertAt });
-        return { ...exp, bullets };
-      }
-      return exp;
-    }));
-  };
-
-  const handleRemoveExperienceBullet = (expIdx: number, bulletIdx: number) => {
-    const exp = editableExperiences[expIdx];
-    // Focus previous bullet if deleting current
-    if (bulletIdx > 0) {
-      setFocusedBulletInfo({ type: 'experience', itemId: exp.id, bulletIdx: bulletIdx - 1 });
-    }
-    setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? {
-      ...e,
-      bullets: e.bullets.filter((_, bIdx) => bIdx !== bulletIdx)
-    } : e));
-  };
-
-  // Projects Operations
-  const handleAddProject = () => {
-    const newId = `proj_${Date.now()}`;
-    const newProj = {
-      id: newId,
-      title: 'Project Title',
-      role: 'Your Role / Core Technologies',
-      date: '2026',
-      bullets: ['Describe project milestone deliverables...']
-    };
-    setEditableProjects(prev => [...prev, newProj]);
-  };
-
-  const handleMoveProject = (idx: number, direction: 'up' | 'down') => {
-    if (direction === 'up' && idx === 0) return;
-    if (direction === 'down' && idx === editableProjects.length - 1) return;
-    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-    const nextList = [...editableProjects];
-    const temp = nextList[idx];
-    nextList[idx] = nextList[targetIdx];
-    nextList[targetIdx] = temp;
-    setEditableProjects(nextList);
-  };
-
-  const handleAddProjectBullet = (projIdx: number, bulletIdx: number = -1) => {
-    setEditableProjects(prev => prev.map((proj, i) => {
-      if (i === projIdx) {
-        const bullets = [...proj.bullets];
-        const insertAt = bulletIdx === -1 ? bullets.length : bulletIdx + 1;
-        bullets.splice(insertAt, 0, '');
-        setFocusedBulletInfo({ type: 'project', itemId: proj.id, bulletIdx: insertAt });
-        return { ...proj, bullets };
-      }
-      return proj;
-    }));
-  };
-
-  const handleRemoveProjectBullet = (projIdx: number, bulletIdx: number) => {
-    const proj = editableProjects[projIdx];
-    if (bulletIdx > 0) {
-      setFocusedBulletInfo({ type: 'project', itemId: proj.id, bulletIdx: bulletIdx - 1 });
-    }
-    setEditableProjects(prev => prev.map((p, i) => i === projIdx ? {
-      ...p,
-      bullets: p.bullets.filter((_, bIdx) => bIdx !== bulletIdx)
-    } : p));
-  };
-
-  // Education Operations
-  const handleAddEducation = () => {
-    const newId = `edu_${Date.now()}`;
-    const newEdu = {
-      id: newId,
-      institution: 'Institution Name',
-      degree: 'Degree / Academic Title',
-      field_of_study: 'Field of Study',
-      start_date: '2022',
-      end_date: '2026',
-      location: 'City, Country'
-    };
-    setEditableEducations(prev => [...prev, newEdu]);
-  };
-
-  const handleMoveEducation = (idx: number, direction: 'up' | 'down') => {
-    if (direction === 'up' && idx === 0) return;
-    if (direction === 'down' && idx === editableEducations.length - 1) return;
-    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-    const nextList = [...editableEducations];
-    const temp = nextList[idx];
-    nextList[idx] = nextList[targetIdx];
-    nextList[targetIdx] = temp;
-    setEditableEducations(nextList);
-  };
-
-  const handleAddEducationBullet = (eduIdx: number, bulletIdx: number = -1) => {
-    setEditableEducations(prev => prev.map((edu, i) => {
-      if (i === eduIdx) {
-        const bullets = [...(edu.bullets || [])];
-        const insertAt = bulletIdx === -1 ? bullets.length : bulletIdx + 1;
-        bullets.splice(insertAt, 0, '');
-        setFocusedBulletInfo({ type: 'education', itemId: edu.id, bulletIdx: insertAt });
-        return { ...edu, bullets };
-      }
-      return edu;
-    }));
-  };
-
-  const handleRemoveEducationBullet = (eduIdx: number, bulletIdx: number) => {
-    const edu = editableEducations[eduIdx];
-    if (bulletIdx > 0) {
-      setFocusedBulletInfo({ type: 'education', itemId: edu.id, bulletIdx: bulletIdx - 1 });
-    }
-    setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? {
-      ...e,
-      bullets: (e.bullets || []).filter((_, bIdx) => bIdx !== bulletIdx)
-    } : e));
-  };
-
-  const handleOpenSectionDetail = (secId: string) => {
-    setActiveDetailSectionId(secId);
-    setTimeout(() => {
-      const secEl = document.querySelector(`[data-section-id="${secId}"]`);
-      if (secEl) {
-        secEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 100);
-  };
-
-  const handlePolishInlineText = (text: string, onAccept: (newText: string) => void) => {
-    if (!text || !text.trim()) return;
-    setPolishModalInfo({ text, onAccept });
-  };
-
-  // Custom Sections Item Operations
-  const handleAddCustomBullet = (secId: string, bulletIdx: number = -1) => {
-    setSections(prev => prev.map(s => {
-      if (s.id === secId) {
-        const bullets = [...(s.bullets || [])];
-        const insertAt = bulletIdx === -1 ? bullets.length : bulletIdx + 1;
-        bullets.splice(insertAt, 0, '');
-        setFocusedBulletInfo({ type: 'custom', itemId: secId, bulletIdx: insertAt });
-        return { ...s, bullets };
-      }
-      return s;
-    }));
-  };
-
-  const handleRemoveCustomBullet = (secId: string, bulletIdx: number) => {
-    if (bulletIdx > 0) {
-      setFocusedBulletInfo({ type: 'custom', itemId: secId, bulletIdx: bulletIdx - 1 });
-    }
-    setSections(prev => prev.map(s => s.id === secId ? {
-      ...s,
-      bullets: (s.bullets || []).filter((_, bI) => bI !== bulletIdx)
-    } : s));
-  };
-
-  // Keyboard List Navigation Handlers (Enter and Backspace listeners)
-  const handleBulletKeyDown = (
-    e: React.KeyboardEvent<HTMLTextAreaElement>,
-    type: 'experience' | 'project' | 'education' | 'custom',
-    itemId: string,
-    itemIdx: number,
-    bulletIdx: number,
-    bulletsArray: string[]
-  ) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (type === 'experience') {
-        handleAddExperienceBullet(itemIdx, bulletIdx);
-      } else if (type === 'project') {
-        handleAddProjectBullet(itemIdx, bulletIdx);
-      } else if (type === 'education') {
-        handleAddEducationBullet(itemIdx, bulletIdx);
-      } else if (type === 'custom') {
-        handleAddCustomBullet(itemId, bulletIdx);
-      }
-    } else if (e.key === 'Backspace' && bulletsArray[bulletIdx] === '') {
-      e.preventDefault();
-      if (bulletsArray.length <= 1) return; // Maintain at least 1 bullet point
-      if (type === 'experience') {
-        handleRemoveExperienceBullet(itemIdx, bulletIdx);
-      } else if (type === 'project') {
-        handleRemoveProjectBullet(itemIdx, bulletIdx);
-      } else if (type === 'education') {
-        handleRemoveEducationBullet(itemIdx, bulletIdx);
-      } else if (type === 'custom') {
-        handleRemoveCustomBullet(itemId, bulletIdx);
-      }
-    }
-  };
-
-
   // ----------------------------------------------------
-  // VIRTUAL PAGE MATRIX PARTITIONING SYSTEM
+  // SECTION OPERATIONS (logic lives in useSectionOps hook)
   // ----------------------------------------------------
-  useEffect(() => {
-    const measureAndLayout = () => {
-      if (!hiddenCanvasRef.current) return;
-      // Defer measurement while the canvas pane is hidden (mobile Editor mode) — zero-height reads would corrupt pagination
-      if (hiddenCanvasRef.current.getBoundingClientRect().width === 0) return;
+  const {
+    handleMoveSection,
+    handleQuickAddSectionItem,
+    getSectionAiScopeOptions,
+    extractContentForScope,
+    handleGenerateSectionAi,
+    handleResetSectionToMasterProfile,
+    handleToggleSectionVersion,
+    handleApplySectionAiProposal,
+    handleAddExperience,
+    handleMoveExperience,
+    getLocalizedCategoryName,
+    handleMoveSkillInCategory,
+    handleMoveSkillCategory,
+    handleAddExperienceBullet,
+    handleRemoveExperienceBullet,
+    handleAddProject,
+    handleMoveProject,
+    handleAddProjectBullet,
+    handleRemoveProjectBullet,
+    handleAddEducation,
+    handleMoveEducation,
+    handleAddEducationBullet,
+    handleRemoveEducationBullet,
+    handleOpenSectionDetail,
+    handlePolishInlineText,
+    handleAddCustomBullet,
+    handleRemoveCustomBullet,
+    handleBulletKeyDown
+  } = useSectionOps({
+    masterProfileData,
+    targetLanguage,
+    sectionAiScope,
+    sectionAiPrompt,
+    sectionAiProposal,
+    focusedBulletInfo,
+    setFocusedBulletInfo,
+    setSectionAiProposal,
+    setIsGeneratingSectionAi,
+    setOpenSectionAiModalId,
+    setSectionAiPrompt,
+    setActiveDetailSectionId,
+    setPolishModalInfo
+  });
 
-      // Create flat elements stream based on sections order and visible elements
-      const unitsList: RenderableUnit[] = [];
-
-      unitsList.push({ type: 'header', id: 'header' });
-
-      // Creative tech sidebar contacts static layout
-      if (template === 'creative_tech') {
-        unitsList.push({ type: 'contacts-static', id: 'contacts-static' });
-      }
-
-      sections.forEach(sec => {
-        if (!sec.visible) return;
-
-        if (sec.type === 'summary') {
-          unitsList.push({ type: 'section-title', id: `title-${sec.id}`, sectionId: sec.id, titleText: sec.name });
-          unitsList.push({ type: 'summary', id: `summary-content`, sectionId: sec.id });
-        } else if (sec.type === 'experience') {
-          unitsList.push({ type: 'section-title', id: `title-${sec.id}`, sectionId: sec.id, titleText: sec.name });
-          editableExperiences.forEach((exp, idx) => {
-            unitsList.push({
-              type: 'experience-item',
-              id: `exp-item-${exp.id}`,
-              sectionId: sec.id,
-              itemIndex: idx,
-              itemData: exp
-            });
-          });
-        } else if (sec.type === 'projects') {
-          unitsList.push({ type: 'section-title', id: `title-${sec.id}`, sectionId: sec.id, titleText: sec.name });
-          editableProjects.forEach((proj, idx) => {
-            unitsList.push({
-              type: 'project-item',
-              id: `proj-item-${proj.id}`,
-              sectionId: sec.id,
-              itemIndex: idx,
-              itemData: proj
-            });
-          });
-        } else if (sec.type === 'education') {
-          unitsList.push({ type: 'section-title', id: `title-${sec.id}`, sectionId: sec.id, titleText: sec.name });
-          editableEducations.forEach((edu, idx) => {
-            unitsList.push({
-              type: 'education-item',
-              id: `edu-item-${edu.id}`,
-              sectionId: sec.id,
-              itemIndex: idx,
-              itemData: edu
-            });
-          });
-        } else if (sec.type === 'skills') {
-          unitsList.push({ type: 'section-title', id: `title-${sec.id}`, sectionId: sec.id, titleText: sec.name });
-
-          const langSkills = editableSkills.filter(s => (s.category || '').toLowerCase().trim() === 'languages');
-          const itSkills = editableSkills.filter(s => (s.category || '').toLowerCase().trim() !== 'languages');
-          const uniqueCats = Array.from(new Set(itSkills.map(s => (s.category || 'technical').toLowerCase().trim())));
-
-          const normalizedOrder = categoryOrder.map(c => c.toLowerCase().trim());
-          const itCategories = normalizedOrder.filter(c => uniqueCats.includes(c));
-          const extraCats = uniqueCats.filter(c => !itCategories.includes(c));
-          const finalCategories = [...itCategories, ...extraCats];
-
-          if (categoryOrder.length === 0) {
-            finalCategories.sort((a, b) => {
-              const getCategoryOrderScore = (cat: string) => {
-                const order = [
-                  'programming languages',
-                  'frameworks & libraries',
-                  'databases',
-                  'cloud & devops',
-                  'development tools',
-                  'testing'
-                ];
-                const idx = order.indexOf(cat.toLowerCase().trim());
-                if (idx !== -1) return idx;
-                if (cat.toLowerCase().trim() === 'languages') return 999;
-                return 100;
-              };
-              return getCategoryOrderScore(a) - getCategoryOrderScore(b);
-            });
-          }
-
-          const addLanguagesUnit = () => {
-            if (langSkills.length > 0) {
-              unitsList.push({ type: 'skills-languages', id: 'skills-languages', sectionId: sec.id, skills: langSkills });
-            }
-          };
-
-          const addITSkillsUnits = () => {
-            finalCategories.forEach((cat) => {
-              const catSkills = itSkills.filter(s => (s.category || 'technical').toLowerCase().trim() === cat);
-              if (catSkills.length > 0) {
-                unitsList.push({
-                  type: 'skills-category',
-                  id: `skills-category-${cat}`,
-                  sectionId: sec.id,
-                  category: cat,
-                  skills: catSkills
-                });
-              }
-            });
-          };
-
-          if (languagesFirst) {
-            addLanguagesUnit();
-            addITSkillsUnits();
-          } else {
-            addITSkillsUnits();
-            addLanguagesUnit();
-          }
-        } else if (sec.type === 'custom') {
-          unitsList.push({ type: 'section-title', id: `title-${sec.id}`, sectionId: sec.id, titleText: sec.name });
-          unitsList.push({
-            type: 'custom-content',
-            id: `custom-content-${sec.id}`,
-            sectionId: sec.id,
-            bullets: sec.bullets || [],
-            itemData: sec
-          });
-        }
-      });
-
-      // Retrieve actual DOM client dimensions of elements inside hidden canvas
-      const measured: Record<string, number> = {};
-      const childElements = hiddenCanvasRef.current.querySelectorAll('[data-measuring-id]');
-      childElements.forEach((el: any) => {
-        const id = el.getAttribute('data-measuring-id');
-        if (id) {
-          const compStyle = window.getComputedStyle(el);
-          const marginTop = parseFloat(compStyle.marginTop) || 0;
-          const marginBottom = parseFloat(compStyle.marginBottom) || 0;
-          measured[id] = el.getBoundingClientRect().height + marginTop + marginBottom;
-        }
-      });
-
-      setMeasuredHeights(measured);
-
-      // Distribute stream across isolated pages
-      const pageHeight = 1123;
-      const pageMargin = customStyles.pageMargin || 48;
-
-      // Usable inner content height for allowedPageContentHeight zone (exact top/bottom margin bounds)
-      const printableContentHeight = pageHeight - 2 * pageMargin;
-      const activeColumnLimit = printableContentHeight;
-
-      // Helper to compute unit effective height directly from true measured DOM height
-      const getUnitEffectiveHeight = (u: RenderableUnit): number => {
-        const baseHeight = measured[u.id] || 0;
-        const unitGap = u.type === 'section-title' ? (customStyles.sectionSpacing || 14) : 4;
-        return baseHeight + unitGap;
-      };
-
-      const newPages: RenderableUnit[][] = [[]];
-
-      // Layout heights tracking (handles split grid column constraints in Creative Tech)
-      let currentMainHeight = 0;
-      let currentSidebarHeight = 0;
-
-      for (let i = 0; i < unitsList.length; i++) {
-        const unit = unitsList[i];
-        const effHeight = getUnitEffectiveHeight(unit);
-
-        // Header resides exclusively on page 1 top bounds
-        if (unit.type === 'header') {
-          newPages[0].push(unit);
-          currentMainHeight += effHeight;
-          currentSidebarHeight += effHeight;
-          continue;
-        }
-
-        // Determine columns division mapping
-        const isSidebarColumn = template === 'creative_tech' && (unit.sectionId === 'skills' || unit.type === 'contacts-static');
-
-        let shouldPushPage = false;
-
-        // Strict Section Atomicity Page Partitioning:
-        // When encountering a section-title, calculate the height of this title PLUS ALL ITS SUBSEQUENT ITEMS in unitsList.
-        if (unit.type === 'section-title') {
-          // Find all units belonging to this section starting from this title
-          let remainingSectionHeight = 0;
-          for (let j = i; j < unitsList.length && unitsList[j].sectionId === unit.sectionId; j++) {
-            remainingSectionHeight += getUnitEffectiveHeight(unitsList[j]);
-          }
-
-          const currentHeight = isSidebarColumn ? currentSidebarHeight : currentMainHeight;
-
-          // If the entire section can fit on a clean blank page (remainingSectionHeight <= activeColumnLimit),
-          // but DOES NOT fit in the current page's remaining space, push the ENTIRE section to the next page!
-          if (remainingSectionHeight <= activeColumnLimit) {
-            if (currentHeight + remainingSectionHeight > activeColumnLimit && currentHeight > 0) {
-              shouldPushPage = true;
-            }
-          } else {
-            // Section itself is larger than 1 full page:
-            // At least ensure title + first content item fit on the current page, otherwise push title to next page.
-            const firstContentUnit = unitsList[i + 1] && unitsList[i + 1].sectionId === unit.sectionId ? unitsList[i + 1] : null;
-            const minHeaderGroupHeight = effHeight + (firstContentUnit ? getUnitEffectiveHeight(firstContentUnit) : 0);
-            if (currentHeight + minHeaderGroupHeight > activeColumnLimit && currentHeight > 0) {
-              shouldPushPage = true;
-            }
-          }
-        } else {
-          // Individual item overflow check
-          const currentHeight = isSidebarColumn ? currentSidebarHeight : currentMainHeight;
-          if (currentHeight + effHeight > activeColumnLimit && currentHeight > 0) {
-            shouldPushPage = true;
-          }
-        }
-
-        if (shouldPushPage) {
-          newPages.push([]);
-          currentMainHeight = 0;
-          currentSidebarHeight = 0;
-        }
-
-        // Allocate unit into current page stack
-        newPages[newPages.length - 1].push(unit);
-        if (isSidebarColumn) {
-          currentSidebarHeight += effHeight;
-        } else {
-          currentMainHeight += effHeight;
-        }
-      }
-
-      setPages(newPages);
+  const handleCreateCustomSection = (title: string, format: CustomSectionFormat) => {
+    const newSecId = `custom_${Date.now()}`;
+    const newSec: any = {
+      id: newSecId,
+      name: title,
+      visible: true,
+      type: 'custom',
+      customFormat: format
     };
 
-    measureAndLayout();
-    const timer = setTimeout(measureAndLayout, 60);
-    return () => clearTimeout(timer);
-  }, [
-    editableSummary, editablePersonalInfo, editableExperiences, editableSkills,
-    editableProjects, editableEducations, template, sections, customStyles, headerStyles,
-    languagesFirst, categoryOrder, mobileActivePane
-  ]);
+    if (format === 'keyvalue') {
+      newSec.keyValuePairs = [
+        { key: 'Category / Key', value: 'Tools, proficiencies, or relevant details' }
+      ];
+    } else if (format === 'entries') {
+      newSec.entries = [
+        {
+          id: `entry_${Date.now()}`,
+          title: `${title} Contributor / Role`,
+          subtitle: 'Organization or Project',
+          location: 'City, Country',
+          date: '2023 - Present',
+          bullets: ['Spearheaded key project initiative and delivered measurable performance outcomes.']
+        }
+      ];
+    } else if (format === 'paragraph') {
+      newSec.paragraphText = 'Experienced professional committed to delivering high-impact solutions, optimizing system performance, and driving core project objectives.';
+    } else {
+      newSec.bullets = ['Earned credential / accomplishment with distinguished outcome.'];
+    }
 
-  // ----------------------------------------------------
+    setSections(prev => [...prev, newSec]);
+    handleOpenSectionDetail(newSecId);
+  };
   // API INTEGRATIONS & SERVICES
   // ----------------------------------------------------
 
@@ -2430,7 +1469,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         cv_details: activeCvDetails
       });
       if (res.data && res.data.success) {
-        setLetterContent(res.data.content || res.data.data?.content || '');
+        setLetterContent(normalizeLetterDate(res.data.content || res.data.data?.content || ''));
         // On mobile, bring the fresh letter into view immediately
         if (isMobileViewport && mobileActivePane === 'editor') {
           setMobileActivePane('preview');
@@ -2474,12 +1513,14 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         };
         const cleanMatched = parseKws(newReport.matched_keywords);
         const cleanMissing = parseKws(newReport.missing_keywords);
+        const newDeep: DeepAnalysis | undefined = (newReport as any)?.deep_analysis || undefined;
 
         setCurrentVersion(prev => prev ? {
           ...prev,
           ats_score: newReport.score ?? prev.ats_score,
           tailored_details: {
             ...prev.tailored_details,
+            deep_analysis: newDeep ?? prev.tailored_details.deep_analysis,
             ats_report: {
               ...newReport,
               matched_keywords: cleanMatched,
@@ -2616,7 +1657,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           categoryOrder,
           languagesFirst,
           languagesTitle,
-          letterStyles
+          letterStyles,
+          dismissed_ats: dismissedAts
         }
       };
 
@@ -2656,8 +1698,9 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       }
 
       if (letterContent) {
+        const targetAppId = initialJobParams?.application_id || savedVersion.application || currentVersion.application;
         const letterRes = await api.get('/resume/letters');
-        const matchedLetter = letterRes.data.find((l: any) => l.application === initialJobParams?.application_id || l.target_company === savedVersion.target_company);
+        const matchedLetter = letterRes.data.find((l: any) => (targetAppId && l.application === targetAppId) || l.target_company === savedVersion.target_company);
         if (matchedLetter) {
           await api.patch(`/resume/letters/${matchedLetter.id}`, {
             content: letterContent,
@@ -2665,7 +1708,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           });
         } else {
           await api.post('/resume/letters', {
-            application: initialJobParams?.application_id,
+            application: targetAppId || null,
             target_company: savedVersion.target_company,
             target_role: savedVersion.target_role,
             content: letterContent,
@@ -3027,470 +2070,43 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
 
           {activeControlTab === 'tailor' && (
-            editorTab === 'resume' ? (
-              // CV Tailoring UI
-              <>
-                <form onSubmit={handleTailor} className={`${styles.form} glass-card`}>
-                  <h3>Job Listing Details</h3>
-                  <div className={styles.formGrid}>
-                    <InputField
-                      label="Company Name"
-                      id="editorCompany"
-                      placeholder="e.g. Stripe"
-                      value={company}
-                      onChange={(e) => setCompany(e.target.value)}
-                    />
-                    <InputField
-                      label="Target Position"
-                      id="editorRole"
-                      placeholder="e.g. Lead Frontend Engineer"
-                      value={position}
-                      onChange={(e) => setPosition(e.target.value)}
-                    />
-                  </div>
-                  <InputField
-                    label="Job Description Text *"
-                    id="editorDesc"
-                    type="textarea"
-                    placeholder="Paste responsibilities and key requirements..."
-                    value={jobDescription}
-                    onChange={(e) => setJobDescription(e.target.value)}
-                    required
-                  />
-
-                  <div className={styles.selectGroup}>
-                    <label htmlFor="editorTemplate">Layout Template</label>
-                    <select id="editorTemplate" value={template} onChange={(e) => setTemplate(e.target.value)}>
-                      <option value="pixel_perfect_pdf">German Styled Template </option>
-                      <option value="modern_minimalist" disabled>More templates Coming soon</option>
-                    </select>
-
-                    {/* 1. Language & ATS Strategy Options */}
-                    <div className={styles.selectGroup} style={{ marginBottom: '16px' }}>
-                      <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main, #1e293b)', marginBottom: '6px', display: 'block' }}>
-                        Target Output Language
-                      </label>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
-                        <button
-                          type="button"
-                          onClick={() => setTargetLanguage('en')}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            border: targetLanguage === 'en' ? '2px solid #6366f1' : '1px solid #cbd5e1',
-                            background: targetLanguage === 'en' ? 'rgba(99, 102, 241, 0.1)' : '#ffffff',
-                            fontWeight: targetLanguage === 'en' ? 700 : 500,
-                            color: targetLanguage === 'en' ? '#4f46e5' : '#475569',
-                            cursor: 'pointer',
-                            fontSize: '13px',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          <span>🇬🇧 English</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTargetLanguage('de')}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            border: targetLanguage === 'de' ? '2px solid #6366f1' : '1px solid #cbd5e1',
-                            background: targetLanguage === 'de' ? 'rgba(99, 102, 241, 0.1)' : '#ffffff',
-                            fontWeight: targetLanguage === 'de' ? 700 : 500,
-                            color: targetLanguage === 'de' ? '#4f46e5' : '#475569',
-                            cursor: 'pointer',
-                            fontSize: '13px',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          <span>🇩🇪 Deutsch</span>
-                        </button>
-                      </div>
-
-                      <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main, #1e293b)', marginBottom: '6px', display: 'block' }}>
-                        ATS Keyword Strategy
-                      </label>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                        <button
-                          type="button"
-                          onClick={() => setAggressiveMode(false)}
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '2px',
-                            padding: '8px 10px',
-                            borderRadius: '8px',
-                            border: !aggressiveMode ? '2px solid #6366f1' : '1px solid #cbd5e1',
-                            background: !aggressiveMode ? 'rgba(99, 102, 241, 0.08)' : '#ffffff',
-                            color: !aggressiveMode ? '#4f46e5' : '#475569',
-                            cursor: 'pointer',
-                            textAlign: 'center'
-                          }}
-                        >
-                          <span style={{ fontWeight: 700, fontSize: '12px' }}>🛡️ Standard</span>
-                          <span style={{ fontSize: '10px', opacity: 0.8 }}>Strict Profile Match</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setAggressiveMode(true)}
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '2px',
-                            padding: '8px 10px',
-                            borderRadius: '8px',
-                            border: aggressiveMode ? '2px solid #6366f1' : '1px solid #cbd5e1',
-                            background: aggressiveMode ? 'rgba(99, 102, 241, 0.12)' : '#ffffff',
-                            color: aggressiveMode ? '#6d28d9' : '#475569',
-                            cursor: 'pointer',
-                            textAlign: 'center'
-                          }}
-                        >
-                          <span style={{ fontWeight: 700, fontSize: '12px' }}>⚡ Aggressive</span>
-                          <span style={{ fontSize: '10px', opacity: 0.85 }}>High ATS Optimization</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 2. Selective Projects List in Side Panel */}
-                  <div style={{ marginBottom: '16px', background: 'rgba(248, 250, 252, 0.8)', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px' }}>
-                    <div
-                      onClick={() => setIsProjectsCollapsed(!isProjectsCollapsed)}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>Include Projects ({masterProjects.length > 0 ? `${selectedProjectIds.length} of ${masterProjects.length} selected` : 'None added in profile'})</span>
-                      </div>
-                      <span style={{ fontSize: '11px', color: '#6366f1', fontWeight: 600 }}>
-                        {isProjectsCollapsed ? 'Expand ▼' : 'Collapse ▲'}
-                      </span>
-                    </div>
-
-                    {!isProjectsCollapsed && (
-                      <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
-                        {masterProjects.length > 0 ? (
-                          masterProjects.map(proj => {
-                            const isChecked = selectedProjectIds.includes(proj.id);
-                            return (
-                              <label
-                                key={proj.id}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  padding: '6px 8px',
-                                  borderRadius: '6px',
-                                  background: isChecked ? '#ffffff' : 'transparent',
-                                  border: isChecked ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent',
-                                  cursor: 'pointer',
-                                  fontSize: '12px'
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setSelectedProjectIds(prev => [...prev, proj.id]);
-                                    } else {
-                                      setSelectedProjectIds(prev => prev.filter(id => id !== proj.id));
-                                    }
-                                  }}
-                                  style={{ accentColor: '#6366f1' }}
-                                />
-                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  <strong style={{ color: '#1e293b', display: 'block', lineHeight: '1.2' }}>{proj.title}</strong>
-                                  {proj.role && <span style={{ fontSize: '10.5px', color: '#64748b' }}>{proj.role}</span>}
-                                </div>
-                              </label>
-                            );
-                          })
-                        ) : (
-                          <div style={{ fontSize: '11.5px', color: '#94a3b8', padding: '6px 4px', fontStyle: 'italic' }}>
-                            No projects found in Master Profile. Add projects in your profile settings to filter them here.
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 3. Missing Profile Details Diagnostic Widget in Side Panel */}
-                  {(() => {
-                    const infoToCheck = currentVersion ? editablePersonalInfo : (masterProfileInfo || {});
-                    const missing: { field: string; label: string; icon: string }[] = [];
-                    if (!infoToCheck.linkedin) missing.push({ field: 'linkedin', label: 'LinkedIn Profile URL', icon: 'ðŸ”—' });
-                    if (!infoToCheck.github) missing.push({ field: 'github', label: 'GitHub Profile URL', icon: 'ðŸ’»' });
-                    if (!infoToCheck.phone) missing.push({ field: 'phone', label: 'Phone Number', icon: 'ðŸ“ž' });
-                    if (!infoToCheck.location) missing.push({ field: 'location', label: 'Location / City', icon: 'ðŸ“' });
-                    if (!infoToCheck.email) missing.push({ field: 'email', label: 'Email Address', icon: 'âœ‰ï¸' });
-
-                    if (missing.length === 0) return null;
-
-                    return (
-                      <div style={{ marginBottom: '16px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '8px', padding: '12px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#d48806', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                          <ShieldAlert size={14} />
-                          <span>Missing Profile Details ({missing.length})</span>
-                        </div>
-                        <p style={{ fontSize: '11px', color: '#8c6b00', marginBottom: '8px', lineHeight: '1.4' }}>
-                          {currentVersion
-                            ? "The following optional details are missing from your active canvas and won't appear on your CV:"
-                            : "The following optional details are missing from your Master Profile:"}
-                        </p>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                          {missing.map((item, idx) => (
-                            <span
-                              key={idx}
-                              style={{
-                                fontSize: '10.5px',
-                                background: '#fff',
-                                border: '1px solid #ffe58f',
-                                padding: '3px 8px',
-                                borderRadius: '12px',
-                                color: '#ad6800',
-                                fontWeight: 500
-                              }}
-                            >
-                              {item.icon} {item.label}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                    <input
-                      type="checkbox"
-                      id="saveAutomatically"
-                      checked={saveAutomatically}
-                      onChange={(e) => setSaveAutomatically(e.target.checked)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <label htmlFor="saveAutomatically" style={{ fontSize: '13px', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main, #1e293b)' }}>
-                      Save tailored copy automatically
-                    </label>
-                  </div>
-
-                  <Button type="submit" isLoading={isLoading} className={styles.tailorBtn}>
-                    <Wand2 size={16} />
-                    <span>Analyze & Tailor</span>
-                  </Button>
-                </form>
-
-                {currentVersion && (
-                  <div className={styles.trackingSection} style={{ marginTop: '16px', padding: '12px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.2)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main, #1e293b)' }}>
-                        {applicationTracked ? 'âœ“ Tracking this Application' : 'Track this job application?'}
-                      </div>
-                    </div>
-                    {!applicationTracked ? (
-                      <Button onClick={handleTrackApplication} isLoading={isTrackingLoading} style={{ width: '100%' }}>
-                        Add to Application Tracking
-                      </Button>
-                    ) : (
-                      <div style={{ fontSize: '12px', color: '#475569' }}>
-                        This CV is linked to an active job tracking card.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            ) : (
-              // Cover Letter Tailoring UI
-              <>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleGenerateLetter(company, position);
-                  }}
-                  className={`${styles.form} glass-card`}
-                >
-                  <h3>Cover Letter Tailoring</h3>
-                  <div className={styles.formGrid}>
-                    <InputField
-                      label="Company Name"
-                      id="letterCompany"
-                      placeholder="e.g. Stripe"
-                      value={company}
-                      onChange={(e) => setCompany(e.target.value)}
-                    />
-                    <InputField
-                      label="Target Position"
-                      id="letterRole"
-                      placeholder="e.g. Lead Frontend Engineer"
-                      value={position}
-                      onChange={(e) => setPosition(e.target.value)}
-                    />
-                  </div>
-                  <InputField
-                    label="Job Description Text *"
-                    id="letterDesc"
-                    type="textarea"
-                    placeholder="Paste job details to tailor your cover letter..."
-                    value={jobDescription}
-                    onChange={(e) => setJobDescription(e.target.value)}
-                    required
-                  />
-
-                  <div className={styles.formGrid} style={{ marginBottom: '16px' }}>
-                    <div className={styles.selectGroup}>
-                      <label htmlFor="letterTone">Writing Tone</label>
-                      <select
-                        id="letterTone"
-                        value={letterTone}
-                        onChange={(e) => setLetterTone(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '10px 14px',
-                          borderRadius: '8px',
-                          border: '1px solid var(--card-border, #cbd5e1)',
-                          background: 'white',
-                          fontSize: '13px',
-                          outline: 'none',
-                          color: 'var(--text-main, #1e293b)'
-                        }}
-                      >
-                        <option value="professional">Professional & Direct (Recommended)</option>
-                        <option value="enthusiastic">Enthusiastic & Passionate</option>
-                        <option value="creative">Creative & Narrative</option>
-                        <option value="executive">Executive & Formal</option>
-                        <option value="direct">Short & Conversational</option>
-                      </select>
-                    </div>
-
-                    <div className={styles.selectGroup}>
-                      <label htmlFor="letterLanguageSelect">Cover Letter Language</label>
-                      <select
-                        id="letterLanguageSelect"
-                        value={letterLanguage}
-                        onChange={(e) => setLetterLanguage(e.target.value as any)}
-                        style={{
-                          width: '100%',
-                          padding: '10px 14px',
-                          borderRadius: '8px',
-                          border: '1px solid var(--card-border, #cbd5e1)',
-                          background: 'white',
-                          fontSize: '13px',
-                          outline: 'none',
-                          color: 'var(--text-main, #1e293b)'
-                        }}
-                      >
-                        <option value="auto">Auto (Match Resume Language)</option>
-                        <option value="en">English</option>
-                        <option value="de">German</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <Button type="submit" isLoading={isLetterLoading} className={styles.tailorBtn}>
-                    <Sparkles size={16} />
-                    <span>Generate & Tailor Cover Letter</span>
-                  </Button>
-                </form>
-
-                <div className={`${styles.atsCard} glass-card`}>
-                  <h3>Cover Letter Guidelines</h3>
-                  <div style={{ fontSize: '13px', lineHeight: '1.6', color: 'var(--muted, #64748b)', display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-                    <p>
-                      <strong>1. Premium Structure:</strong> A cover letter should be kept to a single, impactful page. It includes contact details, greeting, hook opening, value body paragraphs, and professional closing.
-                    </p>
-                    <p>
-                      <strong>2. Adaptive Tone:</strong> Startups value enthusiastic/conversational tones, whereas traditional businesses require a professional/executive tone. Match the writing tone above accordingly.
-                    </p>
-                  </div>
-                </div>
-
-                {(() => {
-                  const letter = getParsedLetter(letterContent, editablePersonalInfo);
-                  const notes = letter.verification_notes;
-                  if (!notes || (!notes.requirements_emphasized?.length && !notes.resume_evidence_used?.length && !notes.placeholders?.length && !notes.confirmation_needed?.length)) {
-                    return null;
-                  }
-                  return (
-                    <div className={`${styles.atsCard} glass-card`} style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
-                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e293b', fontSize: '14px', fontWeight: 700, margin: 0 }}>
-                          <Sparkles size={16} style={{ color: '#6366f1' }} />
-                          AI Generation Audit
-                        </h3>
-                        <span style={{ fontSize: '10px', background: '#e0e7ff', color: '#4f46e5', padding: '3px 8px', borderRadius: '12px', fontWeight: 600 }}>Active Audit</span>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {notes.requirements_emphasized && notes.requirements_emphasized.length > 0 && (
-                          <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '3.5px solid #6366f1', border: '1px solid #e2e8f0', borderLeftWidth: '3.5px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>ðŸŽ¯</span>
-                              <strong style={{ fontSize: '12px', color: '#1e293b' }}>Emphasized Requirements</strong>
-                            </div>
-                            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              {notes.requirements_emphasized.map((req, idx) => (
-                                <li key={idx} style={{ lineHeight: '1.4' }}>{req}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {notes.resume_evidence_used && notes.resume_evidence_used.length > 0 && (
-                          <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '3.5px solid #10b981', border: '1px solid #e2e8f0', borderLeftWidth: '3.5px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>ðŸ“„</span>
-                              <strong style={{ fontSize: '12px', color: '#1e293b' }}>Evidence Used from CV</strong>
-                            </div>
-                            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              {notes.resume_evidence_used.map((ev, idx) => (
-                                <li key={idx} style={{ lineHeight: '1.4' }}>{ev}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {notes.placeholders && notes.placeholders.length > 0 && (
-                          <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#fffbeb', borderLeft: '3.5px solid #f59e0b', border: '1px solid #fef3c7', borderLeftWidth: '3.5px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>âš ï¸</span>
-                              <strong style={{ fontSize: '12px', color: '#b45309' }}>Missing Facts / Placeholders</strong>
-                            </div>
-                            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#78350f', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              {notes.placeholders.map((pl, idx) => (
-                                <li key={idx} style={{ lineHeight: '1.4' }}>{pl}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {notes.confirmation_needed && notes.confirmation_needed.length > 0 && (
-                          <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#fef2f2', borderLeft: '3.5px solid #ef4444', border: '1px solid #fee2e2', borderLeftWidth: '3.5px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '14px' }}>ðŸ”</span>
-                              <strong style={{ fontSize: '12px', color: '#b91c1c' }}>Confirmation Required</strong>
-                            </div>
-                            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#991b1b', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              {notes.confirmation_needed.map((conf, idx) => (
-                                <li key={idx} style={{ lineHeight: '1.4' }}>{conf}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </>
-            )
+            <TailorPanel
+              editorTabIsResume={editorTab === 'resume'}
+              company={company}
+              setCompany={setCompany}
+              position={position}
+              setPosition={setPosition}
+              jobDescription={jobDescription}
+              setJobDescription={setJobDescription}
+              template={template}
+              setTemplate={setTemplate}
+              targetLanguage={targetLanguage}
+              setTargetLanguage={setTargetLanguage}
+              aggressiveMode={aggressiveMode}
+              setAggressiveMode={setAggressiveMode}
+              masterProjects={masterProjects}
+              selectedProjectIds={selectedProjectIds}
+              setSelectedProjectIds={setSelectedProjectIds}
+              isProjectsCollapsed={isProjectsCollapsed}
+              setIsProjectsCollapsed={setIsProjectsCollapsed}
+              masterProfileInfo={masterProfileInfo}
+              editablePersonalInfo={editablePersonalInfo}
+              currentVersion={currentVersion}
+              saveAutomatically={saveAutomatically}
+              setSaveAutomatically={setSaveAutomatically}
+              isLoading={isLoading}
+              applicationTracked={applicationTracked}
+              isTrackingLoading={isTrackingLoading}
+              onTailor={handleTailor}
+              onTrackApplication={handleTrackApplication}
+              letterTone={letterTone}
+              setLetterTone={setLetterTone}
+              letterLanguage={letterLanguage}
+              setLetterLanguage={(v) => setLetterLanguage(v as any)}
+              isLetterLoading={isLetterLoading}
+              letterContent={letterContent}
+              onGenerateLetter={handleGenerateLetter}
+            />
           )}
 
           {activeControlTab === 'ats' && (
@@ -3500,6 +2116,18 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               onInjectSkill={handleInjectSkill}
               onRemoveSkill={handleRemoveSkill}
               existingCategories={Array.from(new Set(editableSkills.map(s => (s.category || 'technical').toLowerCase().trim())))}
+              deepAnalysis={deepAnalysis}
+              checklist={atsChecklist}
+              dismissedIds={dismissedAts}
+              onDismiss={handleDismissAtsItem}
+              onApplyBulletFix={handleApplyBulletFix}
+              onExportReport={handleExportAtsReport}
+              isRefreshing={isAtsChecking}
+              coverage={atsCoverage}
+              recommendedKeywords={recommendedKeywords}
+              weakBullets={weakBullets}
+              jobDescription={jobDescription || ''}
+              beforeAfter={beforeAfter}
             />
           )}
 
@@ -3507,507 +2135,27 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             // Design and Typography Customizers
             editorTab === 'resume' ? (
               // CV Design & Layout Options
-              <div className={`${styles.styleControlsForm} glass-card`}>
-                {/* Sub-Tab Navigation Bar: Theme vs Sections */}
-                <div className={styles.subTabContainer}>
-                  <button
-                    type="button"
-                    className={`${styles.subTabBtn} ${activeStyleSubTab === 'sections' ? styles.activeSubTab : ''}`}
-                    onClick={() => setActiveStyleSubTab('sections')}
-                  >
-                    <Layers size={13} />
-                    <span>Sections & Content</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.subTabBtn} ${activeStyleSubTab === 'theme' ? styles.activeSubTab : ''}`}
-                    onClick={() => setActiveStyleSubTab('theme')}
-                  >
-                    <Sliders size={13} />
-                    <span>Theme & Typography</span>
-                  </button>
-                </div>
 
-                {/* Sub-Tab 1: Theme & Typography */}
-                {activeStyleSubTab === 'theme' && (
-                  <>
-                    <h3>Typography & Layout Presets</h3>
-
-                    <div className={styles.presetCard}>
-                      <div className={styles.presetHeader}>
-                        <label className={styles.presetLabel}>
-                          <Sliders size={16} style={{ color: 'var(--primary, #6366f1)' }} />
-                          <span>Quick Spacing & Density Presets</span>
-                        </label>
-                      </div>
-                      <div className={styles.presetGrid}>
-                        {[
-                          {
-                            id: 'standard',
-                            title: 'Standard',
-                            subtitle: 'Default balance',
-                            icon: LayoutGrid,
-                            config: { fontSize: 13, headingSize: 1.4, lineHeight: 1.4, sectionSpacing: 20, bulletSpacing: 4 }
-                          },
-                          {
-                            id: 'tight',
-                            title: 'Tight',
-                            subtitle: 'Fit ~15% more',
-                            icon: Minimize2,
-                            config: { fontSize: 12, headingSize: 1.3, lineHeight: 1.3, sectionSpacing: 14, bulletSpacing: 3 }
-                          },
-                          {
-                            id: 'ultra',
-                            title: 'Ultra Tight',
-                            subtitle: 'Max density',
-                            icon: Layers,
-                            config: { fontSize: 11, headingSize: 1.2, lineHeight: 1.2, sectionSpacing: 10, bulletSpacing: 2 }
-                          }
-                        ].map(preset => {
-                          const IconComponent = preset.icon;
-                          const isActive =
-                            customStyles.fontSize === preset.config.fontSize &&
-                            customStyles.sectionSpacing === preset.config.sectionSpacing;
-
-                          return (
-                            <button
-                              key={preset.id}
-                              type="button"
-                              className={`${styles.presetTile} ${isActive ? styles.presetTileActive : ''}`}
-                              onClick={() => setCustomStyles(s => ({ ...s, ...preset.config }))}
-                            >
-                              <div className={styles.presetTileTop}>
-                                <IconComponent size={14} className={styles.presetIcon} />
-                                {isActive && (
-                                  <span className={styles.presetCheck}>
-                                    <Check size={10} />
-                                  </span>
-                                )}
-                              </div>
-                              <div>
-                                <div className={styles.presetTitle}>{preset.title}</div>
-                                <div className={styles.presetSubtitle}>{preset.subtitle}</div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className={styles.slidersTwinGrid}>
-                      <div className={styles.sliderGroup}>
-                        <label>Base Font Size: <strong>{customStyles.fontSize}px</strong></label>
-                        <input
-                          type="range"
-                          min="10"
-                          max="18"
-                          step="0.1"
-                          value={customStyles.fontSize}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, fontSize: parseFloat(e.target.value) }))}
-                        />
-                      </div>
-
-                      <div className={styles.sliderGroup}>
-                        <label>Heading Multiplier: <strong>x{customStyles.headingSize}</strong></label>
-                        <input
-                          type="range"
-                          min="1.0"
-                          max="2.2"
-                          step="0.05"
-                          value={customStyles.headingSize}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, headingSize: parseFloat(e.target.value) }))}
-                        />
-                      </div>
-                    </div>
-
-                    <div className={styles.slidersTwinGrid}>
-                      <div className={styles.sliderGroup}>
-                        <label>Line Height: <strong>{customStyles.lineHeight}</strong></label>
-                        <input
-                          type="range"
-                          min="1.0"
-                          max="2.0"
-                          step="0.05"
-                          value={customStyles.lineHeight}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, lineHeight: parseFloat(e.target.value) }))}
-                        />
-                      </div>
-
-                      <div className={styles.sliderGroup}>
-                        <label>Section Spacing: <strong>{customStyles.sectionSpacing}px</strong></label>
-                        <input
-                          type="range"
-                          min="10"
-                          max="45"
-                          step="0.5"
-                          value={customStyles.sectionSpacing}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, sectionSpacing: parseFloat(e.target.value) }))}
-                        />
-                      </div>
-                    </div>
-
-                    <div className={styles.slidersTwinGrid}>
-                      <div className={styles.sliderGroup}>
-                        <label>Bullet Point Spacing: <strong>{customStyles.bulletSpacing !== undefined ? customStyles.bulletSpacing : 4}px</strong></label>
-                        <input
-                          type="range"
-                          min="0"
-                          max="15"
-                          step="0.5"
-                          value={customStyles.bulletSpacing !== undefined ? customStyles.bulletSpacing : 4}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, bulletSpacing: parseFloat(e.target.value) }))}
-                        />
-                      </div>
-
-                      <div className={styles.sliderGroup}>
-                        <label>Page Margin: <strong>{customStyles.pageMargin || 48}px</strong></label>
-                        <input
-                          type="range"
-                          min="15"
-                          max="90"
-                          step="0.5"
-                          value={customStyles.pageMargin || 48}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, pageMargin: parseFloat(e.target.value) }))}
-                        />
-                      </div>
-                    </div>
-
-                    <div className={styles.colorPickers}>
-                      <div className={styles.colorPickerGroup}>
-                        <label>Accent Color</label>
-                        <input
-                          type="color"
-                          value={customStyles.accentColor}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, accentColor: e.target.value }))}
-                        />
-                      </div>
-                      <div className={styles.colorPickerGroup}>
-                        <label>Title 2nd Word Color</label>
-                        <input
-                          type="color"
-                          value={customStyles.headingSecondaryColor || '#3d7ee6'}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, headingSecondaryColor: e.target.value }))}
-                        />
-                      </div>
-                      <div className={styles.colorPickerGroup}>
-                        <label>Text Color</label>
-                        <input
-                          type="color"
-                          value={customStyles.textColor}
-                          onChange={(e) => setCustomStyles(s => ({ ...s, textColor: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-
-                    <div className={styles.selectGroup} style={{ marginTop: '12px' }}>
-                      <label htmlFor="globalFontFamily">Font Family</label>
-                      <select
-                        id="globalFontFamily"
-                        value={customStyles.fontFamily || ''}
-                        onChange={(e) => setCustomStyles(s => ({ ...s, fontFamily: e.target.value }))}
-                        style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--card-border)', background: 'var(--card-bg)', color: 'var(--foreground)' }}
-                      >
-                        <option value="">Template Default</option>
-                        <option value="'Aptos', 'Calibri', sans-serif">Aptos</option>
-                        <option value="'Inter', sans-serif">Inter</option>
-                        <option value="'Calibri', 'Segoe UI', sans-serif">Calibri</option>
-                        <option value="'Helvetica Neue', 'Helvetica', 'Arial', sans-serif">Helvetica</option>
-                        <option value="'Source Sans 3', 'Source Sans Pro', sans-serif">Source Sans 3</option>
-                        <option value="'IBM Plex Sans', sans-serif">IBM Plex Sans</option>
-                        <option value="'Arial', sans-serif">Arial</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-
-                {/* Sub-Tab 2: Sections & Content */}
-                {activeStyleSubTab === 'sections' && (
-                  activeDetailSectionId ? (
-                    /* Master-Detail Full Section Editor */
-                    <SectionDetailEditor
-                      sectionId={activeDetailSectionId}
-                      sections={sections}
-                      setSections={setSections}
-                      onBack={() => setActiveDetailSectionId(null)}
-                      onSelectSection={(newSecId) => handleOpenSectionDetail(newSecId)}
-                      personalInfo={editablePersonalInfo}
-                      setPersonalInfo={setEditablePersonalInfo}
-                      summary={editableSummary}
-                      setSummary={setEditableSummary}
-                      experiences={editableExperiences}
-                      setExperiences={setEditableExperiences}
-                      onAddExperience={handleAddExperience}
-                      projects={editableProjects}
-                      setProjects={setEditableProjects}
-                      onAddProject={handleAddProject}
-                      educations={editableEducations}
-                      setEducations={setEditableEducations}
-                      onAddEducation={handleAddEducation}
-                      skills={editableSkills}
-                      setSkills={setEditableSkills}
-                      categoryOrder={categoryOrder}
-                      onMoveSkillCategory={handleMoveSkillCategory}
-                      getLocalizedCategoryName={getLocalizedCategoryName}
-                      languagesTitle={languagesTitle}
-                      setLanguagesTitle={setLanguagesTitle}
-                      targetLanguage={targetLanguage}
-                      onOpenAiPolishModal={(secId) => setOpenSectionAiModalId(secId)}
-                      onPolishBullet={handlePolishInlineText}
-                      toggleSectionVisibility={toggleSectionVisibility}
-                      animatingHideSectionId={animatingHideSectionId}
-                      onToggleSectionVersion={handleToggleSectionVersion}
-                      onResetToMasterProfile={handleResetSectionToMasterProfile}
-                    />
-                  ) : (
-                    /* Section Control Overview Matrix */
-                    <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <h3 style={{ margin: 0 }}>Sections Control Panel</h3>
-                        <span style={{ fontSize: '11px', color: 'var(--muted, #64748b)', fontWeight: 600 }}>
-                          {sections.filter(s => s.visible).length} visible / {sections.length + 1} total
-                        </span>
-                      </div>
-
-                      {/* Header / Personal Info Card */}
-                      <div className={`${styles.sectionCardItem} ${styles.sectionCardHeaderItem}`} style={{ marginBottom: '8px' }}>
-                        <div
-                          className={styles.sectionCardLeft}
-                          onClick={() => handleOpenSectionDetail('header')}
-                        >
-                          <div
-                            className={styles.sectionIconBadge}
-                            style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#4f46e5' }}
-                          >
-                            <User size={16} />
-                          </div>
-                          <div className={styles.sectionCardInfo}>
-                            <div className={styles.sectionCardTitle}>
-                              <span>Personal Info & Header</span>
-                            </div>
-                            <div className={styles.sectionCardSubtitle}>
-                              {editablePersonalInfo.full_name || 'Your name'} • {editablePersonalInfo.title || 'Headline & Contact'}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className={styles.sectionCardRight}>
-                          <button
-                            type="button"
-                            className={styles.sectionAiCardBtn}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleResetSectionToMasterProfile('header');
-                            }}
-                            title="Reset Personal Info & Header to Master Profile Original"
-                            style={{ marginRight: '4px' }}
-                          >
-                            <RotateCcw size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.sectionEditCardBtn}
-                            onClick={() => handleOpenSectionDetail('header')}
-                            title="Edit Personal Information"
-                          >
-                            <span>Edit</span>
-                            <Settings size={12} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Dynamic CV Sections Cards */}
-                      <div className={styles.sectionsList}>
-                        {sections.map((secItem, idx) => {
-                          const meta = (() => {
-                            if (secItem.type === 'summary' || secItem.id === 'summary') {
-                              const words = editableSummary ? editableSummary.trim().split(/\s+/).filter(Boolean).length : 0;
-                              return {
-                                icon: <FileText size={16} />,
-                                iconBg: 'rgba(99, 102, 241, 0.12)',
-                                iconColor: '#6366f1',
-                                subtitle: words > 0 ? `${words} words pitch` : 'Summary not set'
-                              };
-                            }
-                            if (secItem.type === 'experience' || secItem.id === 'experience') {
-                              return {
-                                icon: <Briefcase size={16} />,
-                                iconBg: 'rgba(59, 130, 246, 0.12)',
-                                iconColor: '#3b82f6',
-                                subtitle: `${editableExperiences.length} position${editableExperiences.length === 1 ? '' : 's'}`
-                              };
-                            }
-                            if (secItem.type === 'projects' || secItem.id === 'projects') {
-                              return {
-                                icon: <Code size={16} />,
-                                iconBg: 'rgba(16, 185, 129, 0.12)',
-                                iconColor: '#10b981',
-                                subtitle: `${editableProjects.length} project${editableProjects.length === 1 ? '' : 's'}`
-                              };
-                            }
-                            if (secItem.type === 'education' || secItem.id === 'education') {
-                              return {
-                                icon: <GraduationCap size={16} />,
-                                iconBg: 'rgba(245, 158, 11, 0.12)',
-                                iconColor: '#f59e0b',
-                                subtitle: `${editableEducations.length} degree${editableEducations.length === 1 ? '' : 's'}`
-                              };
-                            }
-                            if (secItem.type === 'skills' || secItem.id === 'skills') {
-                              const langCount = editableSkills.filter(s => (s.category || '').toLowerCase().trim() === 'languages').length;
-                              const itCount = editableSkills.length - langCount;
-                              return {
-                                icon: <Globe size={16} />,
-                                iconBg: 'rgba(236, 72, 153, 0.12)',
-                                iconColor: '#ec4899',
-                                subtitle: `${itCount} skills • ${langCount} languages`
-                              };
-                            }
-                            const count = secItem.customFormat === 'keyvalue' ? (secItem.keyValuePairs?.length || 0) : (secItem.bullets?.length || 0);
-                            return {
-                              icon: <Layers size={16} />,
-                              iconBg: 'rgba(99, 102, 241, 0.12)',
-                              iconColor: '#6366f1',
-                              subtitle: `${count} custom item${count === 1 ? '' : 's'}`
-                            };
-                          })();
-
-                          return (
-                            <div
-                              key={secItem.id}
-                              className={`${styles.sectionCardItem} ${!secItem.visible ? styles.sectionCardDisabled : ''}`}
-                            >
-                              <div
-                                className={styles.sectionCardLeft}
-                                onClick={() => handleOpenSectionDetail(secItem.id)}
-                              >
-                                <div
-                                  className={styles.sectionIconBadge}
-                                  style={{ background: meta.iconBg, color: meta.iconColor }}
-                                >
-                                  {meta.icon}
-                                </div>
-                                <div className={styles.sectionCardInfo}>
-                                  <div className={styles.sectionCardTitle}>
-                                    <span>{secItem.name}</span>
-                                    {!secItem.visible && (
-                                      <span className={styles.sectionHiddenBadge}>Hidden</span>
-                                    )}
-                                  </div>
-                                  <div className={styles.sectionCardSubtitle}>
-                                    {meta.subtitle}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className={styles.sectionCardRight}>
-                                <button
-                                  type="button"
-                                  className={`${styles.sectionVisibilityBtn} ${secItem.visible && animatingHideSectionId !== secItem.id ? styles.sectionVisibilityBtnActive : ''}`}
-                                  onClick={() => toggleSectionVisibility(secItem.id)}
-                                  title={secItem.visible && animatingHideSectionId !== secItem.id ? 'Hide section from CV' : 'Show section on CV'}
-                                >
-                                  {secItem.visible && animatingHideSectionId !== secItem.id ? <Eye size={13} /> : <EyeOff size={13} />}
-                                </button>
-
-                                <button
-                                  type="button"
-                                  className={styles.sectionAiCardBtn}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenSectionAiModalId(secItem.id);
-                                  }}
-                                  title={`AI Polish & Tailor ${secItem.name}`}
-                                >
-                                  <Sparkles size={13} />
-                                </button>
-
-                                <button
-                                  type="button"
-                                  className={styles.sectionAiCardBtn}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleResetSectionToMasterProfile(secItem.id);
-                                  }}
-                                  title={`Reset ${secItem.name} to Master Profile Original`}
-                                >
-                                  <RotateCcw size={13} />
-                                </button>
-
-                                <button
-                                  type="button"
-                                  className={styles.sectionEditCardBtn}
-                                  onClick={() => handleOpenSectionDetail(secItem.id)}
-                                  title={`Edit ${secItem.name}`}
-                                >
-                                  <span>Edit</span>
-                                  <Settings size={11} />
-                                </button>
-
-                                {secItem.id.startsWith('custom_') && (
-                                  <button
-                                    type="button"
-                                    className={styles.sectionDeleteBtn}
-                                    onClick={() => {
-                                      if (window.confirm(`Delete section "${secItem.name}"?`)) {
-                                        setSections(prev => prev.filter(s => s.id !== secItem.id));
-                                      }
-                                    }}
-                                    title="Delete Custom Section"
-                                  >
-                                    <Trash size={12} />
-                                  </button>
-                                )}
-
-                                <div className={styles.sectionSortGroup}>
-                                  <button
-                                    type="button"
-                                    className={styles.sectionSortBtn}
-                                    disabled={idx === 0}
-                                    onClick={() => {
-                                      const reordered = [...sections];
-                                      const temp = reordered[idx];
-                                      reordered[idx] = reordered[idx - 1];
-                                      reordered[idx - 1] = temp;
-                                      setSections(reordered);
-                                    }}
-                                    title="Move Up"
-                                  >
-                                    ▲
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={styles.sectionSortBtn}
-                                    disabled={idx === sections.length - 1}
-                                    onClick={() => {
-                                      const reordered = [...sections];
-                                      const temp = reordered[idx];
-                                      reordered[idx] = reordered[idx + 1];
-                                      reordered[idx + 1] = temp;
-                                      setSections(reordered);
-                                    }}
-                                    title="Move Down"
-                                  >
-                                    ▼
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      <button
-                        type="button"
-                        className={styles.addCustomSectionCard}
-                        onClick={() => setIsAddCustomSectionOpen(true)}
-                      >
-                        <Plus size={15} />
-                        <span>Add Custom Section (Certifications, Awards, etc.)</span>
-                      </button>
-                    </>
-                  )
-                )}
-              </div>
+            <StyleControlsPanel
+              activeStyleSubTab={activeStyleSubTab}
+              setActiveStyleSubTab={setActiveStyleSubTab}
+              activeDetailSectionId={activeDetailSectionId}
+              targetLanguage={targetLanguage}
+              animatingHideSectionId={animatingHideSectionId}
+              onOpenSectionDetail={handleOpenSectionDetail}
+              onCloseSectionDetail={() => setActiveDetailSectionId(null)}
+              onAddExperience={handleAddExperience}
+              onAddProject={handleAddProject}
+              onAddEducation={handleAddEducation}
+              onMoveSkillCategory={handleMoveSkillCategory}
+              getLocalizedCategoryName={getLocalizedCategoryName}
+              onPolishBullet={handlePolishInlineText}
+              onToggleSectionVersion={handleToggleSectionVersion}
+              onResetToMasterProfile={handleResetSectionToMasterProfile}
+              toggleSectionVisibility={toggleSectionVisibility}
+              onOpenAiModal={setOpenSectionAiModalId}
+              onOpenAddCustomSection={() => setIsAddCustomSectionOpen(true)}
+            />
             ) : (
               // Cover Letter Design Options
               <div className={`${styles.styleControlsForm} glass-card`}>
@@ -4119,7 +2267,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                 <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '16px', paddingTop: '16px' }}>
                   <h3 style={{ fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                    âœï¸ Signature Settings
+                    ✍️ Signature Settings
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>

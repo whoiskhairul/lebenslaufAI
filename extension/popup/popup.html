@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <div class="logo">L</div>
+    <div>
+      <h1>LebenslaufAI</h1>
+      <span class="sub">Job Tailorer</span>
+    </div>
+  </header>
+
+  <!-- logged-out view -->
+  <div id="loggedOut" class="hidden">
+    <p class="muted">Connect your LebenslaufAI account by signing in on the website — Google login works too. The extension picks up the session automatically.</p>
+    <button id="websiteLogin" class="btn primary full">🌐 Sign in via Website</button>
+    <button id="connectNow" class="btn ghost full">Already signed in? Connect now</button>
+  </div>
+
+  <!-- logged-in view -->
+  <div id="loggedIn" class="hidden">
+    <div class="row">
+      <span class="dot ok"></span>
+      <span id="userEmail" class="email"></span>
+    </div>
+
+    <div class="hint" id="pageHint">Open a job posting on LinkedIn, Xing or Indeed → click below. The editor opens pre-filled; press <b>Analyze &amp; Tailor</b> there.</div>
+
+    <button id="tailorBtn" class="btn primary full">⚡ Tailor this job</button>
+
+    <button id="openApp" class="btn ghost full">Open web app</button>
+    <div class="row spread">
+      <button id="goOptions" class="btn link">Settings</button>
+      <button id="logoutBtn" class="btn link danger">Sign out</button>
+    </div>
+    <div id="connectRow" class="hidden">
+      <button id="connectNow2" class="btn link">Re-connect to website session</button>
+    </div>
+  </div>
+
+  <div id="statusLine" class="status hidden"></div>
+
+  <footer>API: <span id="apiBase"></span></footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
