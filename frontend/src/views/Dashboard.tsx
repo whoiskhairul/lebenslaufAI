@@ -3,9 +3,11 @@ import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { navigateTo } from '../utils/navigation';
+import { CompanyAutocomplete } from '../components/CompanyAutocomplete';
+import { CompanyLogo } from '../components/CompanyLogo';
 import { KanbanCardSkeleton } from '../components/skeleton/DashboardSkeleton';
 import { Skeleton } from '../components/skeleton/Skeleton';
-import { Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, ExternalLink, Sparkles, Info, FileText } from 'lucide-react';
+import { Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, ExternalLink, Sparkles, Info, FileText, Archive, Undo2, Search } from 'lucide-react';
 
 // Shared utility class strings for the kanban icon buttons
 const iconBtnBase = 'w-[26px] h-[26px] rounded-md flex items-center justify-center text-muted transition-colors';
@@ -23,14 +25,16 @@ const truncateTitle = (text: string): { display: string; truncated: boolean } =>
 interface Application {
   id: string;
   company: string;
+  company_domain?: string | null;
   position: string;
-  status: 'wishlist' | 'preparing' | 'applied' | 'interview' | 'offer' | 'rejected';
+  status: 'wishlist' | 'preparing' | 'applied' | 'interview' | 'offer' | 'rejected' | 'archived';
   url?: string;
   salary?: string;
   location?: string;
   notes?: string;
   job_description?: string;
   deadline?: string;
+  status_history?: Array<{ status: string; date: string }>;
   updated_at: string;
 }
 
@@ -54,11 +58,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
+  // Board vs Archived list view
+  const [activeView, setActiveView] = useState<'board' | 'archived'>('board');
+  const [archivedSearch, setArchivedSearch] = useState('');
+
   // Job titles expanded in place (kanban cards)
   const [expandedTitles, setExpandedTitles] = useState<Record<string, boolean>>({});
 
   // Form Fields
   const [company, setCompany] = useState('');
+  const [companyDomain, setCompanyDomain] = useState('');
   const [position, setPosition] = useState('');
   const [status, setStatus] = useState<'wishlist' | 'preparing' | 'applied' | 'interview' | 'offer' | 'rejected'>('wishlist');
   const [url, setUrl] = useState('');
@@ -115,6 +124,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
     if (activeAppId && applications.length > 0) {
       const matched = applications.find(a => a.id === activeAppId);
       if (matched) {
+        // Deep-linking an archived card opens the Archived view instead of the board.
+        setActiveView(matched.status === 'archived' ? 'archived' : 'board');
         setSelectedApp(matched);
         setIsDetailsOpen(true);
       }
@@ -135,11 +146,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
 
     try {
       await api.post('/applications', {
-        company, position, status, url, salary, location, deadline, notes, job_description: jobDescription
+        company, company_domain: companyDomain || null, position, status, url, salary, location, deadline, notes, job_description: jobDescription
       });
       setIsModalOpen(false);
       // Reset form
       setCompany('');
+      setCompanyDomain('');
       setPosition('');
       setStatus('wishlist');
       setUrl('');
@@ -169,6 +181,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleArchive = async (appId: string) => {
+    await handleUpdateStatus(appId, 'archived');
+  };
+
+  const previousStatusFor = (app: Application): Application['status'] => {
+    const history = app.status_history || [];
+    for (let i = history.length - 1; i >= 0; i--) {
+      const s = history[i]?.status;
+      if (s && s !== 'archived') return s as Application['status'];
+    }
+    return 'wishlist';
+  };
+
+  const handleRestore = async (appId: string) => {
+    const app = applications.find(a => a.id === appId) || selectedApp;
+    const target = app ? previousStatusFor(app) : 'wishlist';
+    await handleUpdateStatus(appId, target);
   };
 
   const handleDelete = async (appId: string) => {
@@ -208,10 +239,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
     }
   };
 
-  // Metrics calculators
-  const totalApps = applications.length;
-  const interviewApps = applications.filter(a => a.status === 'interview').length;
-  const offerApps = applications.filter(a => a.status === 'offer').length;
+  // Metrics calculators (archived cards are excluded from the active pipeline)
+  const activeApplications = applications.filter(a => a.status !== 'archived');
+  const archivedApplications = applications.filter(a => a.status === 'archived');
+  const totalApps = activeApplications.length;
+  const interviewApps = activeApplications.filter(a => a.status === 'interview').length;
+  const offerApps = activeApplications.filter(a => a.status === 'offer').length;
 
   const scoreValues = Object.values(atsScores);
   const avgMatchScore = scoreValues.length > 0
@@ -237,10 +270,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
           <h2 className="font-header text-xl md:text-2xl font-extrabold text-foreground">Career Command Center</h2>
           <p className="text-xs md:text-sm text-muted">Track applications, verify conversions, and launch tailoring tasks.</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 justify-center">
-          <Plus size={18} />
-          <span>Track Application</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-mutedlight rounded-lg p-1" role="tablist" aria-label="Board or archived view">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeView === 'board'}
+              onClick={() => setActiveView('board')}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${activeView === 'board' ? 'bg-card text-foreground shadow-sm' : 'text-muted hover:text-foreground'}`}
+            >
+              Board ({isInitialLoading ? '…' : activeApplications.length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeView === 'archived'}
+              onClick={() => setActiveView('archived')}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors flex items-center gap-1 ${activeView === 'archived' ? 'bg-card text-foreground shadow-sm' : 'text-muted hover:text-foreground'}`}
+            >
+              <Archive size={13} />
+              Archived ({isInitialLoading ? '…' : archivedApplications.length})
+            </button>
+          </div>
+          <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 justify-center">
+            <Plus size={18} />
+            <span>Track Application</span>
+          </Button>
+        </div>
       </div>
 
       {/* Analytics Panel - Values show inline skeleton while loading */}
@@ -278,10 +334,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
       </div>
 
       {/* Kanban Board Container - Board layout & headers render immediately */}
+      {activeView === 'board' ? (
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-1 pb-4 snap-x snap-proximity md:snap-none thin-scrollbar">
         <div className="flex gap-3.5 h-full min-w-[1000px]">
           {columns.map((col) => {
-            const colApps = applications.filter((app) => app.status === col.id);
+            const colApps = activeApplications.filter((app) => app.status === col.id);
             const isDragOver = dragOverCol === col.id;
             return (
               <div
@@ -368,7 +425,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-muted font-medium">{app.company}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <CompanyLogo company={app.company} domain={app.company_domain} size={24} />
+                              <p className="text-xs text-muted font-medium truncate">{app.company}</p>
+                            </div>
                           </div>
 
                           <div className="flex flex-wrap gap-2 my-3">
@@ -430,6 +490,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                               >
                                 <ExternalLink size={14} />
                               </button>
+                              <button onClick={() => handleArchive(app.id)} title="Archive card" className={`${iconBtnBase} hover:bg-mutedlight hover:text-foreground`}>
+                                <Archive size={14} />
+                              </button>
                               <button onClick={() => handleDelete(app.id)} title="Delete card" className={`${iconBtnBase} hover:bg-mutedlight`}>
                                 <Trash2 size={14} className="text-danger" />
                               </button>
@@ -445,6 +508,82 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
           })}
         </div>
       </div>
+      ) : (
+      /* Archived list view — compact rows, not a kanban board */
+      <div className="flex-1 overflow-y-auto p-1 pb-4 thin-scrollbar">
+        <div className="glass-card p-4 md:p-6 max-w-[900px] mx-auto w-full">
+          <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+            <div>
+              <h3 className="font-header text-base font-bold text-foreground">Archived Applications</h3>
+              <p className="text-xs text-muted">Cards you archived stay here — restore them to their previous column or delete permanently.</p>
+            </div>
+            <div className="relative md:ml-auto w-full md:w-[280px]">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              <input
+                value={archivedSearch}
+                onChange={(e) => setArchivedSearch(e.target.value)}
+                placeholder="Search company or position…"
+                className="w-full pl-9 pr-3 py-2 rounded-lg border border-cardline bg-card text-foreground text-sm outline-none focus:border-primary"
+              />
+            </div>
+          </div>
+          {isInitialLoading ? (
+            <>
+              <KanbanCardSkeleton />
+              <KanbanCardSkeleton />
+            </>
+          ) : (() => {
+            const q = archivedSearch.trim().toLowerCase();
+            const rows = archivedApplications.filter(a =>
+              !q || a.company.toLowerCase().includes(q) || a.position.toLowerCase().includes(q)
+            );
+            if (rows.length === 0) {
+              return (
+                <div className="flex justify-center items-center h-[120px] text-muted text-sm border-[1.5px] border-dashed border-cardline rounded-[10px]">
+                  {archivedApplications.length === 0 ? 'Nothing archived yet. Use the archive icon on any card.' : 'No archived cards match your search.'}
+                </div>
+              );
+            }
+            return (
+              <div className="flex flex-col gap-2">
+                {rows.map((app) => (
+                  <div
+                    key={app.id}
+                    onClick={() => {
+                      setSelectedApp(app);
+                      setIsDetailsOpen(true);
+                      navigateTo(`/dashboard?appId=${app.id}`);
+                    }}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-cardline bg-card hover:border-primary hover:shadow-sm cursor-pointer transition-all"
+                  >
+                    <CompanyLogo company={app.company} domain={app.company_domain} size={32} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-foreground truncate">{app.position}</p>
+                      <p className="text-xs text-muted truncate">{app.company}{app.location ? ` • ${app.location}` : ''}</p>
+                    </div>
+                    <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-wide text-muted bg-mutedlight px-2 py-1 rounded-full shrink-0">
+                      was: {previousStatusFor(app)}
+                    </span>
+                    <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => handleRestore(app.id)}
+                        title={`Restore to ${previousStatusFor(app)}`}
+                        className={`${iconBtnBase} hover:bg-mutedlight hover:text-success`}
+                      >
+                        <Undo2 size={14} />
+                      </button>
+                      <button onClick={() => handleDelete(app.id)} title="Delete permanently" className={`${iconBtnBase} hover:bg-mutedlight`}>
+                        <Trash2 size={14} className="text-danger" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+      )}
 
       {/* Slide-out Application Details Side Panel */}
       {isDetailsOpen && selectedApp && (
@@ -459,9 +598,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
 
 
             <div className="flex-1 px-4 md:px-6 py-4 md:py-6 overflow-y-auto flex flex-col gap-4 md:gap-6">
-              <div className="flex flex-col gap-1">
-                <h2>{selectedApp.position}</h2>
-                <h3 className="text-primary text-lg font-semibold">{selectedApp.company}</h3>
+              <div className="flex items-center gap-3">
+                <CompanyLogo company={selectedApp.company} domain={selectedApp.company_domain} size={44} />
+                <div className="flex flex-col gap-1 min-w-0">
+                  <h2 className="truncate">{selectedApp.position}</h2>
+                  <h3 className="text-primary text-lg font-semibold truncate">{selectedApp.company}</h3>
+                  {selectedApp.company_domain && (
+                    <span className="text-xs text-muted">{selectedApp.company_domain}</span>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 bg-slate-500/5 p-4 rounded-lg">
@@ -583,6 +728,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                   <span>Launch Tailoring Canvas</span>
                 </Button>
 
+                {selectedApp.status === 'archived' ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleRestore(selectedApp.id)}
+                    className="w-full"
+                  >
+                    <Undo2 size={16} />
+                    <span>Restore to {previousStatusFor(selectedApp)}</span>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleArchive(selectedApp.id)}
+                    className="w-full"
+                  >
+                    <Archive size={16} />
+                    <span>Archive Tracking Card</span>
+                  </Button>
+                )}
+
                 <Button
                   variant="secondary"
                   onClick={() => handleDelete(selectedApp.id)}
@@ -612,12 +777,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
 
             <form onSubmit={handleCreate} className="flex flex-col gap-1">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField
-                  label="Company Name *"
+                <CompanyAutocomplete
                   id="modalCompany"
+                  label="Company Name *"
                   placeholder="e.g. Google"
                   value={company}
-                  onChange={(e) => setCompany(e.target.value)}
+                  domain={companyDomain}
+                  onCompanyChange={setCompany}
+                  onDomainChange={setCompanyDomain}
                 />
                 <InputField
                   label="Position / Role *"

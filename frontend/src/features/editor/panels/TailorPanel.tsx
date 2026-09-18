@@ -2,6 +2,8 @@ import React from 'react';
 import { Wand2, Sparkles, ShieldAlert } from 'lucide-react';
 import { Button } from '../../../components/Button';
 import { InputField } from '../../../components/InputField';
+import { CompanyAutocomplete } from '../../../components/CompanyAutocomplete';
+import { CompanyLogo } from '../../../components/CompanyLogo';
 import ed from '../../../views/editorStyles';
 import { getParsedLetter } from '../utils/parsedLetter';
 
@@ -11,6 +13,8 @@ interface TailorPanelProps {
   editorTabIsResume: boolean;
   company: string;
   setCompany: (v: string) => void;
+  companyDomain: string;
+  setCompanyDomain: (v: string) => void;
   position: string;
   setPosition: (v: string) => void;
   jobDescription: string;
@@ -51,13 +55,21 @@ export const TailorPanel: React.FC<TailorPanelProps> = (p) => (
     <>
       <form onSubmit={p.onTailor} className={`${styles.form} glass-card`}>
         <h3>Job Listing Details</h3>
+        {/* <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <CompanyLogo company={p.company} domain={p.companyDomain} size={36} />
+          <div style={{ fontSize: 12, color: 'var(--muted, #64748b)' }}>
+            {p.companyDomain ? p.companyDomain : 'Type to search — pick a suggestion to capture its domain & logo.'}
+          </div>
+        </div> */}
         <div className={styles.formGrid}>
-          <InputField
-            label="Company Name"
+          <CompanyAutocomplete
             id="editorCompany"
+            label="Company Name"
             placeholder="e.g. Stripe"
             value={p.company}
-            onChange={(e) => p.setCompany(e.target.value)}
+            domain={p.companyDomain}
+            onCompanyChange={p.setCompany}
+            onDomainChange={p.setCompanyDomain}
           />
           <InputField
             label="Target Position"
@@ -338,13 +350,21 @@ export const TailorPanel: React.FC<TailorPanelProps> = (p) => (
         className={`${styles.form} glass-card`}
       >
         <h3>Cover Letter Tailoring</h3>
+        {/* <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <CompanyLogo company={p.company} domain={p.companyDomain} size={36} />
+          <div style={{ fontSize: 12, color: 'var(--muted, #64748b)' }}>
+            {p.companyDomain ? p.companyDomain : 'Type to search — pick a suggestion to capture its domain & logo.'}
+          </div>
+        </div> */}
         <div className={styles.formGrid}>
-          <InputField
-            label="Company Name"
+          <CompanyAutocomplete
             id="letterCompany"
+            label="Company Name"
             placeholder="e.g. Stripe"
             value={p.company}
-            onChange={(e) => p.setCompany(e.target.value)}
+            domain={p.companyDomain}
+            onCompanyChange={p.setCompany}
+            onDomainChange={p.setCompanyDomain}
           />
           <InputField
             label="Target Position"

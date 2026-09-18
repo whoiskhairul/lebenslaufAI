@@ -216,6 +216,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   // Main CV Parameters
   const [jobDescription, setJobDescription] = useState('');
   const [company, setCompany] = useState('');
+  const [companyDomain, setCompanyDomain] = useState('');
   const [position, setPosition] = useState('');
   const template = useCvDocumentStore((s) => s.template);
   const setTemplate = useCvDocumentStore((s) => s.setTemplate);
@@ -1114,9 +1115,23 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           const ver = (res.data as any[]).find((v: any) => v.id === initialJobParams.version_id);
           if (ver) {
             setCompany(ver.target_company || '');
+            setCompanyDomain('');
             setPosition(ver.target_role || '');
             setCurrentVersion(ver);
             initializeVersionFields(ver);
+            // If this version is linked to a tracked application, pull its saved domain.
+            const linkedAppId = (ver as any).application;
+            if (linkedAppId) {
+              try {
+                const appRes = await api.get(`/applications/${linkedAppId}`);
+                if (appRes.data) {
+                  if (appRes.data.company) setCompany(appRes.data.company);
+                  setCompanyDomain(appRes.data.company_domain || '');
+                }
+              } catch (err) {
+                console.error('Failed to load linked application domain:', err);
+              }
+            }
           } else {
             setToast({ message: 'Linked CV version was not found.', type: 'error' });
           }
@@ -1132,6 +1147,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           const appRes = await api.get(`/applications/${initialJobParams.application_id}`);
           if (appRes.data) {
             setCompany(appRes.data.company || '');
+            setCompanyDomain(appRes.data.company_domain || '');
             setPosition(appRes.data.position || '');
             setJobDescription(appRes.data.job_description || '');
           }
@@ -1442,6 +1458,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       const res = await api.post('/resume/tailor', {
         job_description: jobDescription,
         company,
+        company_domain: companyDomain || null,
         position,
         template,
         application_id: initialJobParams?.application_id,
@@ -1455,6 +1472,20 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         setCurrentVersion(ver);
         initializeVersionFields(ver);
         setApplicationTracked(!!ver.application);
+        // Keep a linked tracking card in sync so the dashboard logo updates.
+        const linkedAppId = (ver as any).application || initialJobParams?.application_id;
+        if (linkedAppId) {
+          try {
+            await api.patch(`/applications/${linkedAppId}`, {
+              company,
+              company_domain: companyDomain || null,
+              position,
+              job_description: jobDescription,
+            });
+          } catch (syncErr) {
+            console.error('Failed to sync application domain:', syncErr);
+          }
+        }
         // On mobile, bring the fresh result into view immediately
         if (isMobileViewport && mobileActivePane === 'editor') {
           setMobileActivePane('preview');
@@ -1473,8 +1504,9 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     setIsTrackingLoading(true);
     try {
       const appRes = await api.post('/applications', {
-        company: currentVersion.target_company,
-        position: currentVersion.target_role,
+        company: company || currentVersion.target_company,
+        company_domain: companyDomain || null,
+        position: position || currentVersion.target_role,
         status: 'preparing',
         job_description: jobDescription
       });
@@ -2128,6 +2160,8 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               editorTabIsResume={editorTab === 'resume'}
               company={company}
               setCompany={setCompany}
+              companyDomain={companyDomain}
+              setCompanyDomain={setCompanyDomain}
               position={position}
               setPosition={setPosition}
               jobDescription={jobDescription}

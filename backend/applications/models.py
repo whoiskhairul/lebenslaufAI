@@ -9,12 +9,14 @@ STATUS_CHOICES = (
     ('interview', 'Interview'),
     ('offer', 'Offer'),
     ('rejected', 'Rejected'),
+    ('archived', 'Archived'),
 )
 
 class Application(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='applications')
     company = models.CharField(max_length=255)
+    company_domain = models.CharField(max_length=255, blank=True, null=True)
     position = models.CharField(max_length=255)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='wishlist')
     url = models.URLField(blank=True, null=True)
