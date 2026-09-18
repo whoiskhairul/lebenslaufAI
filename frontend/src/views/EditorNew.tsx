@@ -41,6 +41,60 @@ import { StyleControlsPanel } from '../features/editor/panels/StyleControlsPanel
 import { TailorPanel } from '../features/editor/panels/TailorPanel';
 import { useSectionOps } from '../features/editor/hooks/useSectionOps';
 import { getParsedLetter, ParsedLetter, normalizeLetterDate } from '../features/editor/utils/parsedLetter';
+
+/* Print-safe form fields for the letter canvas: browsers do not print
+   textarea/input values (they are DOM properties, not text nodes), so each
+   field is paired with a print-only text mirror of the same typography. */
+const printMirrorStyle = (style?: React.CSSProperties): React.CSSProperties => ({
+  ...style,
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+  overflow: 'visible',
+  resize: undefined
+});
+
+const PrintSafeInput: React.FC<{
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  style?: React.CSSProperties;
+  placeholder?: string;
+}> = ({ value, onChange, style, placeholder }) => (
+  <>
+    <input
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      style={style}
+      className="print-hidden"
+    />
+    <div aria-hidden="true" className="print-only-block" style={printMirrorStyle(style)}>
+      {value || '\u00A0'}
+    </div>
+  </>
+);
+
+const PrintSafeTextarea: React.FC<{
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  style?: React.CSSProperties;
+  placeholder?: string;
+  rows?: number;
+}> = ({ value, onChange, style, placeholder, rows }) => (
+  <>
+    <textarea
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      rows={rows}
+      style={style}
+      className="print-hidden"
+    />
+    <div aria-hidden="true" className="print-only-block" style={printMirrorStyle(style)}>
+      {value || '\u00A0'}
+    </div>
+  </>
+);
+
 const ResizableSignature: React.FC<{ src: string; height: number; onChange: (h: number) => void }> = ({ src, height, onChange }) => {
   const [isSelected, setIsSelected] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -3107,7 +3161,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                 />
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
-                                  <textarea
+                                  <PrintSafeTextarea
                                     value={letter.closing_salutation}
                                     onChange={(e) => updateField('closing_salutation', e.target.value)}
                                     rows={1}
@@ -3137,7 +3191,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                     />
                                   )}
 
-                                  <textarea
+                                  <PrintSafeTextarea
                                     value={letter.candidate_name}
                                     onChange={(e) => updateField('candidate_name', e.target.value)}
                                     rows={2}
@@ -3180,25 +3234,25 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                               {/* 1. Sender Info Header (Applicant details aligned to the top-right) */}
                               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '32px' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', textAlign: 'right', alignItems: 'flex-end', width: '280px' }}>
-                                  <input
+                                  <PrintSafeInput
                                     value={letter.sender_name}
                                     onChange={(e) => updateField('sender_name', e.target.value)}
                                     style={{ fontWeight: 'bold', fontSize: '15px', border: 'none', outline: 'none', background: 'transparent', width: '100%', textAlign: 'right', padding: 0 }}
                                     placeholder="Your Name"
                                   />
-                                  <input
+                                  <PrintSafeInput
                                     value={letter.sender_address}
                                     onChange={(e) => updateField('sender_address', e.target.value)}
                                     style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', textAlign: 'right', padding: 0, fontSize: '12px', color: '#64748b' }}
                                     placeholder="Your Address"
                                   />
-                                  <input
+                                  <PrintSafeInput
                                     value={letter.sender_phone}
                                     onChange={(e) => updateField('sender_phone', e.target.value)}
                                     style={{ border: 'none', outline: 'none', background: 'transparent', textAlign: 'right', padding: 0, fontSize: '12px', color: '#64748b', width: '100%' }}
                                     placeholder="Your Phone"
                                   />
-                                  <input
+                                  <PrintSafeInput
                                     value={letter.sender_email}
                                     onChange={(e) => updateField('sender_email', e.target.value)}
                                     style={{ border: 'none', outline: 'none', background: 'transparent', textAlign: 'right', padding: 0, fontSize: '12px', color: '#64748b', width: '100%' }}
@@ -3209,13 +3263,13 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                               {/* 2. Recipient Info (Company name first, then contact person, then address) */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '320px', marginBottom: '20px' }}>
-                                <input
+                                <PrintSafeInput
                                   value={letter.recipient_company}
                                   onChange={(e) => updateField('recipient_company', e.target.value)}
                                   style={{ fontWeight: 'bold', border: 'none', outline: 'none', background: 'transparent', width: '100%', padding: 0 }}
                                   placeholder="Company Name"
                                 />
-                                <input
+                                <PrintSafeInput
                                   value={
                                     letter.recipient_contact && letter.recipient_contact !== 'NOT PROVIDED'
                                       ? letter.recipient_contact
@@ -3227,7 +3281,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                   style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', padding: 0, color: '#475569' }}
                                   placeholder="Contact Person / Hiring Manager"
                                 />
-                                <textarea
+                                <PrintSafeTextarea
                                   value={letter.recipient_address}
                                   onChange={(e) => updateField('recipient_address', e.target.value)}
                                   rows={2}
@@ -3238,7 +3292,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                               {/* 3. Location and Date (to the right side, combined to prevent empty gaps) */}
                               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '28px' }}>
-                                <input
+                                <PrintSafeInput
                                   value={letter.location && letter.date ? `${letter.location}, ${letter.date}` : (letter.location || letter.date || '')}
                                   onChange={(e) => {
                                     const val = e.target.value;
@@ -3260,7 +3314,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                               {/* 4. Subject Line (Bold, Clean, No Bold Asterisks!) */}
                               <div style={{ marginBottom: '20px' }}>
-                                <textarea
+                                <PrintSafeTextarea
                                   value={letter.subject}
                                   onChange={(e) => updateField('subject', e.target.value)}
                                   rows={1}
@@ -3271,7 +3325,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                               {/* 5. Salutation */}
                               <div style={{ marginBottom: '16px' }}>
-                                <input
+                                <PrintSafeInput
                                   value={letter.salutation}
                                   onChange={(e) => updateField('salutation', e.target.value)}
                                   style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', lineHeight: 'inherit', color: 'inherit' }}
@@ -3304,7 +3358,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                               {/* 7. Closing, Signature and Name */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <input
+                                <PrintSafeInput
                                   value={letter.closing_salutation}
                                   onChange={(e) => updateField('closing_salutation', e.target.value)}
                                   style={{ border: 'none', outline: 'none', background: 'transparent', width: '250px', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', lineHeight: 'inherit', color: 'inherit' }}
@@ -3319,7 +3373,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                   />
                                 )}
 
-                                <input
+                                <PrintSafeInput
                                   value={letter.candidate_name}
                                   onChange={(e) => updateField('candidate_name', e.target.value)}
                                   style={{ fontWeight: 'bold', border: 'none', outline: 'none', background: 'transparent', width: '250px', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', lineHeight: 'inherit', color: 'inherit' }}

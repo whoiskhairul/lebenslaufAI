@@ -134,6 +134,14 @@ button {
   outline-offset: 2px;
 }
 
+/* Print-only mirrors: real DOM text replacements for form fields (textarea/input
+   values are DOM properties and are NOT printed by browsers). Hidden on screen. */
+.print-hidden { }
+.print-only-block,
+.print-only-inline {
+  display: none;
+}
+
 /* Print optimizations for PDF resumes */
 @media print {
   @page {
@@ -148,6 +156,18 @@ button {
 
   .no-print {
     display: none !important;
+  }
+
+  .print-hidden {
+    display: none !important;
+  }
+
+  .print-only-block {
+    display: block !important;
+  }
+
+  .print-only-inline {
+    display: inline-block !important;
   }
 
   main {

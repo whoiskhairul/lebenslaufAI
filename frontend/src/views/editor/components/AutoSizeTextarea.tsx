@@ -150,7 +150,7 @@ export const AutoSizeTextarea: React.FC<AutoSizeTextareaProps> = ({
         onSelect={handleSelect}
         onKeyDown={onKeyDown}
         onBlur={onBlur}
-        className={`${className || ''} ${styles.canvasFieldEdit}`}
+        className={`${className || ''} ${styles.canvasFieldEdit} print-hidden`}
         placeholder={placeholder}
         rows={1}
         style={{
@@ -177,6 +177,25 @@ export const AutoSizeTextarea: React.FC<AutoSizeTextareaProps> = ({
           ...style
         }}
       />
+      {/* Print mirror: browsers do not print textarea values (they are DOM
+          properties, not text nodes), so render the same value as real text. */}
+      <div
+        aria-hidden="true"
+        className={singleLine ? 'print-only-inline' : 'print-only-block'}
+        style={{
+          width: singleLine ? 'auto' : '100%',
+          maxWidth: '100%',
+          padding: '1px 3px',
+          margin: '-1px -3px',
+          boxSizing: 'border-box',
+          verticalAlign: 'baseline',
+          whiteSpace: singleLine ? 'nowrap' : 'pre-wrap',
+          wordBreak: singleLine ? 'keep-all' : 'break-word',
+          ...style
+        }}
+      >
+        {value || '\u00A0'}
+      </div>
     </div>
   );
 };

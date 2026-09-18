@@ -2625,7 +2625,11 @@
 /* PRINT OVERRIDES                                      */
 /* ---------------------------------------------------- */
 @media print {
+  /* The page containers are hardcoded to A4 (210mm x 297mm). Pin the paper
+     size to A4, otherwise the browser falls back to its default (e.g. US
+     Letter) and every page overflows/clips or produces blank sheets. */
   @page {
+    size: 210mm 297mm !important;
     margin: 0 !important;
   }
 
@@ -2639,6 +2643,13 @@
     height: auto !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* Safety net: other modules (e.g. the admin CV viewer) ship print rules in the
+     same global bundle. Ensure nothing hides the printable canvas. The admin
+     modal re-hides via the higher-specificity body.cv-viewer-print-open rules. */
+  body * {
+    visibility: visible;
   }
 
   .bulletDot {

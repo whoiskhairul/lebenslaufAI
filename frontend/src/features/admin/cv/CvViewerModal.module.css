@@ -76,29 +76,9 @@
   }
 }
 
-@media print {
-  body * {
-    visibility: hidden;
-  }
+/* NOTE: the print rules for this modal live in an inline <style> tag inside
+   CvViewerModal.tsx (gated on the literal body class `cv-viewer-print-open`).
+   Do not move them back into this file: CSS Modules selectors are hashed, and
+   compiled print CSS ships globally — an unscoped print rule here once blanked
+   out the entire app's printed output. */
 
-  .printRoot,
-  .printRoot * {
-    visibility: visible;
-  }
-
-  .printRoot {
-    position: absolute !important;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-  }
-
-  .printRoot > div:first-child {
-    display: none !important;
-  }
-}
