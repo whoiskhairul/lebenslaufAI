@@ -14,49 +14,32 @@
 
     <section>
       <h2>Server</h2>
+      <div class="row">
+        <button id="useLocal" class="btn">Use Local</button>
+        <button id="useProd" class="btn">Use Production</button>
+      </div>
       <label>
         API base URL
-        <input id="apiBase" type="url" placeholder="http://localhost:8000/api/v1" />
+        <input id="apiBase" type="url" placeholder="API base URL" />
       </label>
       <label>
         Web app URL (where generated CVs open)
-        <input id="appUrl" type="url" placeholder="http://localhost:5173" />
+        <input id="appUrl" type="url" placeholder="Web app URL" />
       </label>
       <button id="saveServer" class="btn">Save URLs</button>
       <p id="serverMsg" class="note hidden"></p>
-    </section>
-
-    <section>
-      <h2>Account</h2>
-
-      <div id="signedInAs" class="hidden">
-        <p class="ok">✓ Connected as <strong id="whoami"></strong></p>
-        <div class="row">
-          <button id="connectNowBtn" class="btn">Re-connect to website session</button>
-          <button id="logoutBtn" class="btn danger">Sign out of extension</button>
-        </div>
-      </div>
-
-      <div id="notConnected">
-        <p class="muted">
-          No password needed here. Click below — the website's own login page opens
-          (email/password or Google), and this extension picks up the session automatically.
-        </p>
-        <button id="websiteLoginBtn" class="btn primary">🌐 Sign in via Website</button>
-        <button id="connectNowAlt" class="btn">Already signed in on a tab? Connect now</button>
-      </div>
-      <p id="authMsg" class="note"></p>
     </section>
 
     <section class="mutedbox">
       <h2>How it works</h2>
       <ol>
         <li>Open a job posting on LinkedIn, Xing or Indeed.</li>
-        <li>Click the floating <strong>⚡ Tailor this job</strong> button.</li>
-        <li>The job text goes to your LebenslaufAI backend, which generates a tailored CV (+ cover letter) and opens it in the web-app editor.</li>
+        <li>Click the extension button → <strong>⚡ Tailor this job</strong>.</li>
+        <li>The editor opens pre-filled. Sign in on the website if asked — the job data is kept and restored after login.</li>
       </ol>
     </section>
   </div>
+  <script src="../config.js"></script>
   <script src="options.js"></script>
 </body>
 </html>
