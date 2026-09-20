@@ -77,8 +77,11 @@ class ResumeTailorView(APIView):
         
         profile_serialized = FullProfileSerializer(profile_data).data
 
-        # Extract Client DeepSeek Key
+        # Extract Client DeepSeek Key + per-user provider/model overrides
+        # (Settings page sends X-AI-Provider / X-AI-Model; validated inside
+        # AIService.request_overrides, server env is the fallback).
         api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
+        ai_overrides = AIService.request_overrides(request)
 
         # Fetch Application if ID is provided
         application = None
@@ -87,8 +90,12 @@ class ResumeTailorView(APIView):
 
         try:
             # 2. Extract Job Details if missing
+            # Always keep the RAW job description on the payload: the ATS
+            # keyword safety net (services/ats_keywords.py) scans the raw ad
+            # exhaustively, otherwise JD terms are silently "neither matched
+            # nor missing".
             if not company or not position:
-                job_details = AIService.parse_job_description(job_description, api_key=api_key)
+                job_details = AIService.parse_job_description(job_description, api_key=api_key, **ai_overrides)
                 company = company or job_details.get('company', 'Target Company')
                 position = position or job_details.get('position', 'Role Candidate')
             else:
@@ -97,6 +104,8 @@ class ResumeTailorView(APIView):
                     "position": position,
                     "keywords": []
                 }
+            if isinstance(job_details, dict):
+                job_details["job_description"] = job_description
 
             # Sync unedited job description to the application if linked
             if application:
@@ -105,7 +114,7 @@ class ResumeTailorView(APIView):
                     application.save()
 
             # 3. Single-Pass DeepSeek Tailoring & ATS Auditing
-            tailored_result = AIService.tailor_resume(profile_serialized, job_details, api_key=api_key, target_language=target_language, aggressive_mode=aggressive_mode)
+            tailored_result = AIService.tailor_resume(profile_serialized, job_details, api_key=api_key, target_language=target_language, aggressive_mode=aggressive_mode, **ai_overrides)
 
             # Retrieve single-pass ats_report or fallback if missing
             ats_report = tailored_result.get('ats_report')
@@ -118,7 +127,7 @@ class ResumeTailorView(APIView):
                     "projects": tailored_result.get('tailored_projects', profile_serialized.get('projects', [])),
                     "educations": profile_serialized.get('educations', [])
                 }
-                ats_report = AIService.analyze_ats(tailored_profile_data, job_details, api_key=api_key)
+                ats_report = AIService.analyze_ats(tailored_profile_data, job_details, api_key=api_key, **ai_overrides)
         except ValueError as err:
             return Response({
                 "success": False,
@@ -233,8 +242,9 @@ class CoverLetterGenerateView(APIView):
                 "error": {"message": "Job description text is required."}
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Extract Client DeepSeek Key
+        # Extract Client DeepSeek Key + provider/model overrides (Settings page)
         api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
+        ai_overrides = AIService.request_overrides(request)
 
         # Fetch Application if ID is provided
         application = None
@@ -243,7 +253,7 @@ class CoverLetterGenerateView(APIView):
 
         # Ensure we have company and position names
         if not company or not position:
-            parsed = AIService.parse_job_description(job_description, api_key=api_key)
+            parsed = AIService.parse_job_description(job_description, api_key=api_key, **ai_overrides)
             company = company or parsed.get('company', 'Target Company')
             position = position or parsed.get('position', 'Candidate')
             
@@ -283,7 +293,7 @@ class CoverLetterGenerateView(APIView):
 
         # Call AI
         try:
-            letter_content = AIService.write_cover_letter(profile_serialized, job_details, tone, length, api_key=api_key, target_language=resolved_lang)
+            letter_content = AIService.write_cover_letter(profile_serialized, job_details, tone, length, api_key=api_key, target_language=resolved_lang, **ai_overrides)
 
             # Return generated letter content to frontend without saving to the database
             return Response({
@@ -321,8 +331,9 @@ class ResumeRephraseView(APIView):
         }
         
         api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
+        ai_overrides = AIService.request_overrides(request)
         try:
-            rephrased = AIService.rephrase_block(text, instruction, lightweight_context, api_key=api_key)
+            rephrased = AIService.rephrase_block(text, instruction, lightweight_context, api_key=api_key, **ai_overrides)
             return Response({
                 "success": True,
                 "rephrased": rephrased
@@ -349,8 +360,9 @@ class ATSScoreCheckView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
+        ai_overrides = AIService.request_overrides(request)
         try:
-            ats_report = AIService.analyze_ats(cv_details, job_description, api_key=api_key)
+            ats_report = AIService.analyze_ats(cv_details, job_description, api_key=api_key, **ai_overrides)
 
             return Response({
                 "success": True,

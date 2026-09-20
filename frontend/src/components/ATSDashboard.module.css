@@ -599,6 +599,28 @@
   opacity: 1;
 }
 
+/* Subtle "hide keyword" × — revealed on hover so pills stay clean.
+   Always visible on touch devices (no hover capability). */
+.tagHideBtn {
+  opacity: 0;
+  margin-left: 0;
+}
+
+.tagPill:hover .tagHideBtn,
+.tagHideBtn:focus-visible {
+  opacity: 0.75;
+}
+
+.tagHideBtn:hover {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .tagHideBtn {
+    opacity: 0.75;
+  }
+}
+
 /* ---------- Keyword reasons ---------- */
 .keywordReasons {
   margin-top: 12px;

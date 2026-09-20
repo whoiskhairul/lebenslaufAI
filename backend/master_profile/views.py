@@ -157,10 +157,11 @@ class ImportCVView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
-        
+
         from services.ai_service import AIService
+        ai_overrides = AIService.request_overrides(request)
         try:
-            parsed_cv = AIService.parse_resume_cv(cv_text, api_key=api_key)
+            parsed_cv = AIService.parse_resume_cv(cv_text, api_key=api_key, **ai_overrides)
             parsed_safe = json.loads(json.dumps(parsed_cv, default=str))
 
             return Response({
@@ -214,8 +215,9 @@ class GenerateSummaryView(APIView):
         api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
 
         from services.ai_service import AIService
+        ai_overrides = AIService.request_overrides(request)
         try:
-            summary = AIService.generate_executive_summary(profile_serialized, api_key=api_key)
+            summary = AIService.generate_executive_summary(profile_serialized, api_key=api_key, **ai_overrides)
 
             return Response({
                 "success": True,

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Plus, Trash, ArrowUp, ArrowDown, Sparkles, List, Columns2, Briefcase, AlignLeft } from 'lucide-react';
+import { ConfirmPopover } from '../../../../components/ConfirmPopover';
 import styles from '../../../EditorNew.module.css';
 
 export interface CustomSectionEntry {
@@ -36,6 +37,7 @@ export const CustomSectionEditor: React.FC<CustomSectionEditorProps> = ({
   onDeleteSection,
   onPolishBullet
 }) => {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const format = section.customFormat || 'bullets';
   const bullets = Array.isArray(section.bullets) ? section.bullets : ['Earned industry credential / achievement with distinction.'];
   const keyValuePairs = Array.isArray(section.keyValuePairs) ? section.keyValuePairs : [
@@ -591,15 +593,21 @@ export const CustomSectionEditor: React.FC<CustomSectionEditorProps> = ({
         <button
           type="button"
           className={styles.sideDeleteSectionBtn}
-          onClick={() => {
-            if (window.confirm(`Are you sure you want to permanently delete section "${section.name}"?`)) {
-              onDeleteSection();
-            }
-          }}
+          onClick={() => setConfirmingDelete(true)}
         >
           <Trash size={13} /> Delete This Section
         </button>
       </div>
+      {confirmingDelete && (
+        <ConfirmPopover
+          message={`Are you sure you want to permanently delete section "${section.name}"?`}
+          onConfirm={() => {
+            setConfirmingDelete(false);
+            onDeleteSection();
+          }}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
     </div>
   );
 };

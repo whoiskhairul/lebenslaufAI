@@ -194,7 +194,7 @@
 
 /* ATS Match Card */
 .atsCard {
-  padding: var(--space-5);
+  padding: var(--space-6);
   text-align: left;
   display: flex;
   flex-direction: column;
@@ -2625,6 +2625,7 @@
 /* PRINT OVERRIDES                                      */
 /* ---------------------------------------------------- */
 @media print {
+
   /* The page containers are hardcoded to A4 (210mm x 297mm). Pin the paper
      size to A4, otherwise the browser falls back to its default (e.g. US
      Letter) and every page overflows/clips or produces blank sheets. */
@@ -4789,8 +4790,8 @@
     gap: 6px;
   }
 
-  .exportActions > button,
-  .exportActions > div {
+  .exportActions>button,
+  .exportActions>div {
     flex: 0 1 auto;
     min-width: 0;
   }
@@ -4828,6 +4829,7 @@
 }
 
 @media (max-width: 480px) {
+
   /* Stack twin-column grids inside the control panel */
   .formGrid,
   .keywordsTwinGrid,
@@ -4931,6 +4933,7 @@
 }
 
 @media print {
+
   /* Never hide the printable canvas when printing from a phone in Editor pane mode */
   .previewContainer.paneHiddenMobile {
     display: block !important;
@@ -5087,10 +5090,10 @@
   transform: translateY(0);
   transform-origin: top center;
   transition: max-height 0.34s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.24s cubic-bezier(0.4, 0, 0.2, 1),
-              transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
-              margin 0.34s cubic-bezier(0.4, 0, 0.2, 1),
-              padding 0.34s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+    margin 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+    padding 0.34s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: visible;
   will-change: max-height, opacity, transform;
 }
@@ -5107,11 +5110,11 @@
   pointer-events: none !important;
   visibility: hidden;
   transition: max-height 0.34s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.2s ease,
-              transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
-              margin 0.34s cubic-bezier(0.4, 0, 0.2, 1),
-              padding 0.34s cubic-bezier(0.4, 0, 0.2, 1),
-              visibility 0s linear 0.22s !important;
+    opacity 0.2s ease,
+    transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+    margin 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+    padding 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+    visibility 0s linear 0.22s !important;
 }
 
 .unitTransitionEntering {
@@ -5125,10 +5128,12 @@
     transform: translateY(10px) scale(0.99);
     overflow: hidden;
   }
+
   40% {
     opacity: 0.6;
     max-height: 500px;
   }
+
   100% {
     opacity: 1;
     max-height: 3000px;

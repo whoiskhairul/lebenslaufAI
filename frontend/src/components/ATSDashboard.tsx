@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { ATSDashboardSkeleton } from './skeleton/ATSDashboardSkeleton';
 import {
   Brain, Sparkles, Plus, RefreshCw, CheckCircle2, XCircle, X, Download,
-  Target, FileText, Lightbulb, Eye, TrendingUp, AlertTriangle, Award, Circle, RotateCcw, Zap, ListChecks, ChevronDown
+  Target, FileText, Lightbulb, Eye, EyeOff, TrendingUp, AlertTriangle, Award, Circle, RotateCcw, Zap, ListChecks, ChevronDown
 } from 'lucide-react';
 import { DeepAnalysis } from '../views/editor/types/editor.types';
 import { ChecklistItem } from '../features/editor/utils/atsLocal';
@@ -95,6 +95,8 @@ interface ATSDashboardProps {
   checklist?: ChecklistItem[];
   dismissedIds?: string[];
   onDismiss?: (id: string) => void;
+  hiddenKeywordCount?: number;
+  onRestoreHiddenKeywords?: () => void;
   onApplyBulletFix?: (wb: WeakBulletWithOriginal) => void;
   onExportReport?: () => void;
   isRefreshing?: boolean;
@@ -274,6 +276,8 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
   checklist = [],
   dismissedIds = [],
   onDismiss,
+  hiddenKeywordCount = 0,
+  onRestoreHiddenKeywords,
   onApplyBulletFix,
   onExportReport,
   isRefreshing,
@@ -555,6 +559,19 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
                   <X size={11} />
                 </button>
               )}
+              {onDismiss && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDismiss(`kw:${k.name.toLowerCase()}`);
+                  }}
+                  className={`${styles.tagActionBtn} ${styles.tagHideBtn}`}
+                  title={`Ignore '${k.name}' — not a real skill`}
+                >
+                  <EyeOff size={11} />
+                </button>
+              )}
             </span>
           ))}
 
@@ -572,8 +589,32 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
               <span className={styles.tagActionBtn} style={{ marginLeft: '2px' }}>
                 <Plus size={11} />
               </span>
+              {onDismiss && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDismiss(`kw:${k.name.toLowerCase()}`);
+                  }}
+                  className={`${styles.tagActionBtn} ${styles.tagHideBtn}`}
+                  style={{ marginLeft: '2px' }}
+                  title={`Ignore '${k.name}' — not a real skill`}
+                >
+                  <EyeOff size={11} />
+                </button>
+              )}
             </span>
           ))}
+        {(hiddenKeywordCount ?? 0) > 0 && onRestoreHiddenKeywords && (
+          <button
+            type="button"
+            className={styles.jdToggle}
+            onClick={onRestoreHiddenKeywords}
+            style={{ marginTop: '8px' }}
+          >
+            <RotateCcw size={11} /> {hiddenKeywordCount} hidden — restore
+          </button>
+        )}
 
         {(keywordFilter === 'all' || keywordFilter === 'recommended') &&
           recommendedKeywords.map((rk, i) => {

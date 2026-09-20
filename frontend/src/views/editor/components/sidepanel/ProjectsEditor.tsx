@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Code, Plus, Trash, ArrowUp, ArrowDown, ExternalLink, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { ConfirmPopover } from '../../../../components/ConfirmPopover';
 import styles from '../../../EditorNew.module.css';
 
 export interface ProjectItem {
@@ -59,10 +60,11 @@ export const ProjectsEditor: React.FC<ProjectsEditorProps> = ({
     setProjects(prev => prev.map((proj, i) => i === index ? { ...proj, ...updates } : proj));
   };
 
+  const [pendingDeleteIndex, setPendingDeleteIndex] = useState<number | null>(null);
+
   const handleDeleteProj = (index: number) => {
-    if (window.confirm('Delete this project entry?')) {
-      setProjects(prev => prev.filter((_, i) => i !== index));
-    }
+    setProjects(prev => prev.filter((_, i) => i !== index));
+    setPendingDeleteIndex(null);
   };
 
   const handleMoveProj = (index: number, dir: 'up' | 'down') => {
@@ -224,7 +226,7 @@ export const ProjectsEditor: React.FC<ProjectsEditorProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDeleteProj(pIdx)}
+                    onClick={() => setPendingDeleteIndex(pIdx)}
                     className={`${styles.sideIconBtn} ${styles.sideIconBtnDanger}`}
                     title="Delete Project"
                   >
@@ -380,6 +382,13 @@ export const ProjectsEditor: React.FC<ProjectsEditorProps> = ({
             <Plus size={13} /> Add First Project
           </button>
         </div>
+      )}
+      {pendingDeleteIndex !== null && (
+        <ConfirmPopover
+          message="Delete this project entry?"
+          onConfirm={() => handleDeleteProj(pendingDeleteIndex)}
+          onCancel={() => setPendingDeleteIndex(null)}
+        />
       )}
     </div>
   );

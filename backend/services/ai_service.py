@@ -5,19 +5,64 @@ import requests
 from django.conf import settings
 
 class AIService:
+    # Providers a user may select per-request (Settings page). Anything else
+    # is ignored and falls back to the server default. Base URLs are NEVER
+    # taken from the client (SSRF) — they always come from server env.
+    ALLOWED_PROVIDERS = ('deepseek', 'gemini')
+    _MODEL_RE = r'[A-Za-z0-9._-]{1,80}'
+
     @staticmethod
-    def _get_api_key(api_key=None):
+    def _resolve_provider(provider=None):
+        p = (provider or os.environ.get('ACTIVE_AI_PROVIDER', 'deepseek') or 'deepseek').lower().strip()
+        return p if p in AIService.ALLOWED_PROVIDERS else 'deepseek'
+
+    @staticmethod
+    def _resolve_model(provider, model=None):
+        m = (model or '').strip()
+        if m and not re.fullmatch(AIService._MODEL_RE, m):
+            m = ''
+        if m:
+            return m
+        if provider == 'gemini':
+            return os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+        return os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
+
+    @staticmethod
+    def request_overrides(request):
+        """
+        Per-request AI overrides from client headers (Settings page).
+        Returns {'provider': ..., 'model': ...} with Nones for anything
+        missing/invalid so callers can blindly splat it into AI methods.
+        """
+        raw_provider = ''
+        raw_model = ''
+        try:
+            headers = getattr(request, 'headers', {}) or {}
+            raw_provider = headers.get('X-AI-Provider', '') or ''
+            raw_model = headers.get('X-AI-Model', '') or ''
+        except Exception:
+            pass
+        provider = raw_provider.lower().strip()
+        if provider not in AIService.ALLOWED_PROVIDERS:
+            provider = None
+        model = raw_model.strip()
+        if not model or not re.fullmatch(AIService._MODEL_RE, model):
+            model = None
+        return {'provider': provider, 'model': model}
+
+    @staticmethod
+    def _get_api_key(api_key=None, provider=None):
         if api_key:
             return api_key
-        provider = os.environ.get('ACTIVE_AI_PROVIDER', 'deepseek').lower().strip()
+        provider = AIService._resolve_provider(provider)
         if provider == 'gemini':
             return os.environ.get('GEMINI_API_KEY', '').strip()
         return os.environ.get('DEEPSEEK_API_KEY', '').strip()
 
     @staticmethod
-    def call_deepseek(system_prompt, user_content, response_format=None, api_key=None, temperature=0.3, timeout=None, max_tokens=None):
-        provider = os.environ.get('ACTIVE_AI_PROVIDER', 'deepseek').lower().strip()
-        key = AIService._get_api_key(api_key)
+    def call_deepseek(system_prompt, user_content, response_format=None, api_key=None, temperature=0.3, timeout=None, max_tokens=None, provider=None, model=None):
+        provider = AIService._resolve_provider(provider)
+        key = AIService._get_api_key(api_key, provider)
         if not key:
             print(f"AI Service Error: API key missing for provider '{provider}'")
             return None
@@ -27,12 +72,11 @@ class AIService:
             "Authorization": f"Bearer {key}"
         }
 
+        model = AIService._resolve_model(provider, model)
         if provider == 'gemini':
-            model = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
             base_url = os.environ.get('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai/').rstrip('/')
             url = f"{base_url}/chat/completions"
         else:
-            model = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
             base_url = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com').rstrip('/')
             if not base_url.endswith('/v1'):
                 url = f"{base_url}/v1/chat/completions"
@@ -115,7 +159,7 @@ class AIService:
             return None
 
     @classmethod
-    def _call_json(cls, system_prompt, user_content, api_key=None, temperature=0.1, timeout=None):
+    def _call_json(cls, system_prompt, user_content, api_key=None, temperature=0.1, timeout=None, provider=None, model=None):
         """
         Deterministic JSON call: low temperature, fence-tolerant parsing,
         and ONE automatic retry demanding raw JSON if the first parse fails.
@@ -123,7 +167,8 @@ class AIService:
         """
         result_text = cls.call_deepseek(
             system_prompt, user_content, {"type": "json_object"},
-            api_key, temperature=temperature, timeout=timeout
+            api_key, temperature=temperature, timeout=timeout,
+            provider=provider, model=model
         )
         parsed = cls._parse_json_result(result_text)
         if parsed is not None:
@@ -141,7 +186,8 @@ class AIService:
         )
         result_text = cls.call_deepseek(
             retry_system, retry_content, {"type": "json_object"},
-            api_key, temperature=temperature, timeout=timeout
+            api_key, temperature=temperature, timeout=timeout,
+            provider=provider, model=model
         )
         return cls._parse_json_result(result_text)
 
@@ -179,7 +225,7 @@ class AIService:
         return clean(profile_data)
 
     @classmethod
-    def parse_job_description(cls, job_text, api_key=None):
+    def parse_job_description(cls, job_text, api_key=None, provider=None, model=None):
         system_prompt = (
             "You are an expert ATS (Applicant Tracking System) parser.\n"
             "Extract details from the job advertisement and return ONLY a JSON object matching this schema:\n"
@@ -194,7 +240,7 @@ class AIService:
             "Do not return any introductory text, preambles, or markdown."
         )
         
-        result = cls._call_json(system_prompt, job_text, api_key, temperature=0.1)
+        result = cls._call_json(system_prompt, job_text, api_key, temperature=0.1, provider=provider, model=model)
         if result and isinstance(result, dict):
             result['keywords'] = result.get('primary_hard_skills', []) + result.get('secondary_soft_skills', [])
             result['responsibilities'] = result.get('core_job_duties', [])
@@ -245,18 +291,24 @@ class AIService:
     )
 
     @classmethod
-    def analyze_ats(cls, profile_data, job_data, api_key=None):
-        # Compares active candidate CV details against job description
+    def analyze_ats(cls, profile_data, job_data, api_key=None, provider=None, model=None):
+        # Compares active candidate CV details against job description.
+        # NOTE: the LLM lists are post-merged with a deterministic exhaustive
+        # extractor (services/ats_keywords.py) so no JD term is silently
+        # dropped (neither matched nor missing).
+        from services import ats_keywords as _ats_kw
         profile_text = json.dumps(cls._clean_profile_for_ai(profile_data), default=str)
         job_text = json.dumps(job_data, default=str)
 
         system_prompt = (
             "You are an objective ATS (Applicant Tracking System) Scoring Algorithm.\n"
             "Compare the Candidate's Active CV Details (including summary, work experience, projects, and skills) against the target Job Description.\n"
-            "CRITICAL REQUIREMENT - SEMANTIC MATCHING:\n"
-            "- Perform semantic synonym matching (e.g. count 'React.js', 'ReactJS', and 'React' as matching; count 'Amazon Web Services' and 'AWS' as matching).\n"
+            "CRITICAL REQUIREMENT - EXHAUSTIVE SEMANTIC MATCHING:\n"
+            "- Extract EVERY distinct skill, tool, technology, methodology and soft-skill requirement literally mentioned in the job description (aim for completeness over brevity: 25-60 items for a typical ad, not 8-12).\n"
+            "- Perform semantic synonym matching (e.g. count 'React.js', 'ReactJS', and 'React' as matching; count 'Amazon Web Services' and 'AWS' as matching; 'Postgres' = 'PostgreSQL').\n"
             "- 'matched_keywords' MUST contain all job requirements that are semantically present in the candidate's active profile.\n"
-            "- 'missing_keywords' MUST contain only job requirement keywords that are NOT semantically present in the profile.\n\n"
+            "- 'missing_keywords' MUST contain only job requirement keywords that are NOT semantically present in the profile.\n"
+            "- Every extracted JD requirement MUST appear in exactly one of the two lists (matched + missing = 100% of JD keywords). Never silently drop a JD term.\n\n"
             "SCORING METRICS (Strict 50/30/20 Weights):\n"
             "Calculate the final 'score' (0-100 scale) as a weighted combination of:\n"
             "1. Keyword Match (50%): Ratio of semantically matched keywords to total required job description keywords.\n"
@@ -283,14 +335,21 @@ class AIService:
         )
         
         user_content = f"CANDIDATE_ACTIVE_CV:\n{profile_text}\n\nTARGET_JOB_DESCRIPTION:\n{job_text}"
-        result = cls._call_json(system_prompt, user_content, api_key, temperature=0.1)
+        result = cls._call_json(system_prompt, user_content, api_key, temperature=0.1, provider=provider, model=model)
         if result and isinstance(result, dict):
-            return result
+            # Deterministic safety net: union LLM lists with exhaustive
+            # taxonomy scan of the RAW JD so nothing is "neither matched
+            # nor missing". Also re-validates each term against the CV and
+            # recomputes score/breakdown consistently.
+            try:
+                return _ats_kw.merge_reports(result, profile_data, job_data)
+            except Exception:
+                return result
 
         raise ValueError("AI Service failed to analyze ATS compatibility. Please check your API key or try again later.")
 
     @classmethod
-    def generate_executive_summary(cls, profile_data, api_key=None):
+    def generate_executive_summary(cls, profile_data, api_key=None, provider=None, model=None):
         profile_text = json.dumps(profile_data, default=str)
         system_prompt = (
             "You are an expert executive resume writer.\n"
@@ -303,7 +362,7 @@ class AIService:
             "5. Concise Length: Keep under 65 words total."
         )
         user_content = f"MASTER_PROFILE:\n{profile_text}\n\nExecutive Summary:"
-        res = cls.call_deepseek(system_prompt, user_content, api_key=api_key)
+        res = cls.call_deepseek(system_prompt, user_content, api_key=api_key, provider=provider, model=model)
         if res:
             return res.strip().strip('"')
             
@@ -403,7 +462,7 @@ class AIService:
         return sorted_skills, sorted_experiences, sorted_projects
 
     @classmethod
-    def tailor_resume(cls, profile_data, job_data, api_key=None, target_language="en", aggressive_mode=False):
+    def tailor_resume(cls, profile_data, job_data, api_key=None, target_language="en", aggressive_mode=False, provider=None, model=None):
         # Normalize language input: accept 'DE', 'German', 'deutsch', 'de', etc.
         target_language = (target_language or 'en').strip().lower()
         profile_data = cls._clean_profile_for_ai(profile_data)
@@ -451,10 +510,12 @@ class AIService:
             f"{aggressive_instruction}"
             "Tailor the user's resume summary, experience bullets, and project bullets to match the job description.\n"
             "Simultaneously audit the tailored resume against the job description and calculate an accurate ATS match report.\n"
-            "CRITICAL REQUIREMENT - SEMANTIC MATCHING:\n"
-            "- Perform semantic synonym matching when checking keywords (e.g. 'React.js' and 'React' are considered matching).\n"
+            "CRITICAL REQUIREMENT - EXHAUSTIVE SEMANTIC MATCHING:\n"
+            "- Extract EVERY distinct skill, tool, technology, methodology and soft-skill requirement literally mentioned in the job description (aim for completeness: 25-60 items, not 8-12).\n"
+            "- Perform semantic synonym matching when checking keywords (e.g. 'React.js' and 'React' are considered matching; 'AWS' = 'Amazon Web Services').\n"
             "- 'matched_keywords' MUST contain all job requirements that are semantically present in the candidate's active profile.\n"
-            "- 'missing_keywords' MUST contain only job requirement keywords that are NOT semantically present in the profile.\n\n"
+            "- 'missing_keywords' MUST contain only job requirement keywords that are NOT semantically present in the profile.\n"
+            "- Every extracted JD requirement MUST appear in exactly one of the two lists (matched + missing = 100% of JD keywords). Never silently drop a JD term.\n\n"
             "SCORING METRICS (Strict 50/30/20 Weights):\n"
             "Calculate the final ats_report 'score' (0-100 scale) as a weighted combination of:\n"
             "1. Keyword Match (50%): Ratio of semantically matched keywords to total required job description keywords.\n"
@@ -536,7 +597,7 @@ class AIService:
         
         user_content = f"MASTER_PROFILE:\n{profile_text}\n\nJOB_DESCRIPTION:\n{job_text}"
         tailor_timeout = int(os.environ.get('DEEPSEEK_TIMEOUT_TAILOR', '120'))
-        res = cls._call_json(system_prompt, user_content, api_key, temperature=0.3, timeout=tailor_timeout)
+        res = cls._call_json(system_prompt, user_content, api_key, temperature=0.3, timeout=tailor_timeout, provider=provider, model=model)
         
         sorted_skills, sorted_experiences, sorted_projects = cls.prioritize_items(profile_data, job_data)
         
@@ -660,12 +721,34 @@ class AIService:
             deep.setdefault('fit_report', {})
             res['deep_analysis'] = deep
 
+            # Deterministic ATS safety net (same as analyze_ats): the backend
+            # unions the LLM ats_report with an exhaustive taxonomy scan of
+            # the RAW JD, validated against the TAILORED resume (not the
+            # master profile), so the Optimization tab never shows a JD term
+            # as "neither matched nor missing".
+            try:
+                from services import ats_keywords as _ats_kw_tailor
+                ats_report = res.get('ats_report')
+                if isinstance(ats_report, dict):
+                    tailored_profile_for_ats = {
+                        "summary": res.get('tailored_summary', ''),
+                        "work_experiences": res.get('tailored_experiences', []),
+                        "projects": res.get('tailored_projects', []),
+                        "skills": res.get('tailored_skills', []),
+                        "educations": res.get('tailored_educations', []),
+                    }
+                    res['ats_report'] = _ats_kw_tailor.merge_reports(
+                        ats_report, tailored_profile_for_ats, job_data
+                    )
+            except Exception:
+                pass
+
             return res
 
         raise ValueError("AI Service failed to tailor resume. Please check your API key or try again later.")
 
     @classmethod
-    def write_cover_letter(cls, profile_data, job_data, tone="professional", length="medium", api_key=None, target_language="en"):
+    def write_cover_letter(cls, profile_data, job_data, tone="professional", length="medium", api_key=None, target_language="en", provider=None, model=None):
         from datetime import datetime
         # Normalize language input: accept 'DE', 'German', 'deutsch', 'de', etc.
         target_language = (target_language or 'en').strip().lower()
@@ -805,7 +888,7 @@ class AIService:
             f"- Additional notes/context from applicant: {notes_text or 'None'}\n"
         )
         
-        result_text = cls.call_deepseek(system_prompt, user_content, {"type": "json_object"}, api_key=api_key)
+        result_text = cls.call_deepseek(system_prompt, user_content, {"type": "json_object"}, api_key=api_key, provider=provider, model=model)
         if result_text:
             today_str_escaped = today_str
             result_text = re.sub(
@@ -1089,7 +1172,7 @@ Sincerely,
         return letter
 
     @classmethod
-    def parse_resume_cv(cls, cv_text, api_key=None):
+    def parse_resume_cv(cls, cv_text, api_key=None, provider=None, model=None):
         # Parses a raw resume text to extract structured sections
         system_prompt = (
             "You are a professional Resume parser AI.\n"
@@ -1147,7 +1230,7 @@ Sincerely,
             "Do not return markdown headers or preambles."
         )
         
-        result = cls._call_json(system_prompt, cv_text, api_key, temperature=0.1)
+        result = cls._call_json(system_prompt, cv_text, api_key, temperature=0.1, provider=provider, model=model)
         if result and isinstance(result, dict):
             return result
 
@@ -1377,7 +1460,7 @@ Sincerely,
         return alerts
 
     @classmethod
-    def rephrase_block(cls, text, instruction, profile_data, api_key=None):
+    def rephrase_block(cls, text, instruction, profile_data, api_key=None, provider=None, model=None):
         profile_text = json.dumps(cls._clean_profile_for_ai(profile_data), default=str)
         system_prompt = (
             "You are an expert Resume Writer.\n"
@@ -1394,7 +1477,7 @@ Sincerely,
             f"Rephrased Output:"
         )
         
-        rephrased = cls.call_deepseek(system_prompt, user_content, api_key=api_key, temperature=0.3)
+        rephrased = cls.call_deepseek(system_prompt, user_content, api_key=api_key, temperature=0.3, provider=provider, model=model)
         if rephrased:
             return cls._strip_json_fences(rephrased).strip().strip('"')
             

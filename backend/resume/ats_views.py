@@ -10,6 +10,7 @@ class ATSScoreView(APIView):
         job_description = request.data.get('job_description', '')
         cv_details = request.data.get('cv_details', None)
         api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
+        ai_overrides = AIService.request_overrides(request)
 
         if not job_description or cv_details is None:
             return Response({
@@ -18,7 +19,7 @@ class ATSScoreView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            report = AIService.analyze_ats(cv_details, job_description, api_key=api_key)
+            report = AIService.analyze_ats(cv_details, job_description, api_key=api_key, **ai_overrides)
 
             return Response({
                 "success": True,
@@ -38,6 +39,7 @@ class ATSOptimizeView(APIView):
         job_description = request.data.get('job_description', '')
         cv_details = request.data.get('cv_details', {})
         api_key = request.headers.get('X-Deepseek-Key', '').strip() or None
+        ai_overrides = AIService.request_overrides(request)
 
         if not job_description or not cv_details:
             return Response({
@@ -46,7 +48,7 @@ class ATSOptimizeView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            report = AIService.analyze_ats(cv_details, job_description, api_key=api_key)
+            report = AIService.analyze_ats(cv_details, job_description, api_key=api_key, **ai_overrides)
             missing_kw = report.get("missing_keywords", [])
 
             proposals = []

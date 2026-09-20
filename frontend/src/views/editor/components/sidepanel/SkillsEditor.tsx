@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Code, Globe, Plus, Trash, ArrowUp, ArrowDown, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import styles from '../../../EditorNew.module.css';
+import { ConfirmPopover } from '../../../../components/ConfirmPopover';
 import { useCvDocumentStore } from '../../../../features/editor/state/cvDocumentStore';
 
 export interface SkillItem {
@@ -332,10 +333,11 @@ export const SkillsEditor: React.FC<SkillsEditorProps> = ({
     });
   };
 
-  const handleDeleteCategory = (catKey: string, displayName: string) => {
-    if (window.confirm(`Delete category "${displayName}" and all its skills?`)) {
-      setSkills(prev => prev.filter(s => (s.category || 'technical').toLowerCase().trim() !== catKey));
-    }
+  const [pendingDeleteCat, setPendingDeleteCat] = useState<{ catKey: string; displayName: string } | null>(null);
+
+  const handleDeleteCategory = (catKey: string) => {
+    setSkills(prev => prev.filter(s => (s.category || 'technical').toLowerCase().trim() !== catKey));
+    setPendingDeleteCat(null);
   };
 
   const handleCommitQuickAdd = (targetCat: string) => {
@@ -486,7 +488,7 @@ export const SkillsEditor: React.FC<SkillsEditorProps> = ({
               quickAddInput={quickAddInput}
               onToggleExpand={toggleCat}
               onMoveCategory={onMoveSkillCategory}
-              onDeleteCategory={handleDeleteCategory}
+              onDeleteCategory={(_catKey: string, displayName: string) => setPendingDeleteCat({ catKey: _catKey, displayName })}
               onRenameCategory={handleRenameCategory}
               onUpdateSkillName={handleUpdateSkillName}
               onDeleteSkill={handleDeleteSkill}
@@ -617,6 +619,13 @@ export const SkillsEditor: React.FC<SkillsEditorProps> = ({
           </div>
         )}
       </div>
+      {pendingDeleteCat && (
+        <ConfirmPopover
+          message={`Delete category "${pendingDeleteCat.displayName}" and all its skills?`}
+          onConfirm={() => handleDeleteCategory(pendingDeleteCat.catKey)}
+          onCancel={() => setPendingDeleteCat(null)}
+        />
+      )}
     </div>
   );
 };

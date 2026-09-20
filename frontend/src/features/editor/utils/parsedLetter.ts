@@ -64,6 +64,8 @@ export const normalizeLetterDate = (content: string): string => {
 
 export const getParsedLetter = (content: string, editablePersonalInfo: any): ParsedLetter => {
   if (!content) {
+    // No letter generated yet: every field stays honestly empty so the UI
+    // never shows a phantom sign-off as if a draft existed.
     return {
       sender_name: editablePersonalInfo.full_name || '',
       sender_address: editablePersonalInfo.location || '',
@@ -78,7 +80,7 @@ export const getParsedLetter = (content: string, editablePersonalInfo: any): Par
       subject: '',
       salutation: '',
       body: '',
-      closing_salutation: 'Mit freundlichen Grüßen',
+      closing_salutation: '',
       candidate_name: editablePersonalInfo.full_name || '',
       is_json: false
     };

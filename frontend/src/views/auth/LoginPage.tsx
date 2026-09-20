@@ -8,6 +8,26 @@ import { Footer } from '../../components/landing/Footer';
 import { navigateTo } from '../../utils/navigation';
 import styles from './AuthPages.module.css';
 
+/**
+ * Where to send the user after a successful login. Honors the ?next=
+ * parameter set by the App router when a logged-out user hits a protected
+ * page (e.g. /editor?appId=…); falls back to /dashboard. Only same-origin
+ * relative paths are accepted (open-redirect guard).
+ */
+const getPostLoginRedirect = (): string => {
+  try {
+    const next = new URLSearchParams(window.location.search).get('next');
+    if (
+      next && next.startsWith('/') && !next.startsWith('//')
+      && next !== '/login' && !next.startsWith('/login?')
+      && next !== '/register' && !next.startsWith('/register?')
+    ) return next;
+  } catch {
+    // ignore malformed query strings
+  }
+  return '/dashboard';
+};
+
 export const LoginPage: React.FC = () => {
   const { setAuth } = useAuthStore();
   const [email, setEmail] = useState('');
@@ -33,7 +53,7 @@ export const LoginPage: React.FC = () => {
       apiClient.get('/auth/account/profile')
         .then((res) => {
           setAuth(access, refresh, res.data.user, sessionKey || undefined);
-          navigateTo('/dashboard');
+          navigateTo(getPostLoginRedirect());
         })
         .catch(() => {
           setError('Failed to load user profile after social login.');
@@ -67,7 +87,7 @@ export const LoginPage: React.FC = () => {
         response.data.session_key
       );
 
-      navigateTo('/dashboard');
+      navigateTo(getPostLoginRedirect());
     } catch (err: any) {
       const msg = err.response?.data?.error || err.response?.data?.detail || 'Login failed. Please check your credentials.';
       setError(msg);
@@ -92,7 +112,7 @@ export const LoginPage: React.FC = () => {
         response.data.session_key
       );
 
-      navigateTo('/dashboard');
+      navigateTo(getPostLoginRedirect());
     } catch (err: any) {
       setError('Google login failed to authenticate with backend.');
     } finally {
