@@ -37,10 +37,14 @@ export function useCvPagination(
   const [pages, setPages] = useState<RenderableUnit[][]>([[]]);
 
   useEffect(() => {
-    const measureAndLayout = () => {
-      if (!hiddenCanvasRef.current) return;
+    let cancelled = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    const measureAndLayout = (attempt = 0): boolean => {
+      if (cancelled) return true;
+      if (!hiddenCanvasRef.current) return false;
       // Defer measurement while the canvas pane is hidden (mobile Editor mode) — zero-height reads would corrupt pagination
-      if (hiddenCanvasRef.current.getBoundingClientRect().width === 0) return;
+      if (hiddenCanvasRef.current.getBoundingClientRect().width === 0) return false;
 
       // Create flat elements stream based on sections order and visible elements
       const unitsList: RenderableUnit[] = [];
@@ -137,7 +141,7 @@ export function useCvPagination(
                   type: 'skills-category',
                   id: `skills-category-${cat}`,
                   sectionId: sec.id,
-                  category: cat,
+                  category: catSkills[0]?.category || cat,
                   skills: catSkills
                 });
               }
@@ -175,6 +179,10 @@ export function useCvPagination(
           measured[id] = el.getBoundingClientRect().height + marginTop + marginBottom;
         }
       });
+
+      // Nothing measurable yet (subtree still mounting after a
+      // skeleton -> canvas transition) — signal the caller to retry.
+      if (unitsList.length > 1 && Object.keys(measured).length === 0) return false;
 
       // Distribute stream across isolated pages
       const pageHeight = 1123;
@@ -264,11 +272,25 @@ export function useCvPagination(
       }
 
       setPages(newPages);
+      return true;
     };
 
-    measureAndLayout();
-    const timer = setTimeout(measureAndLayout, 60);
-    return () => clearTimeout(timer);
+    const attempt = (n: number) => {
+      if (cancelled) return;
+      const done = measureAndLayout(n);
+      // Retry with backoff while the measuring DOM isn't ready yet
+      // (mount races, hidden panes, font/layout settling) — capped so a
+      // genuinely empty document doesn't spin forever.
+      if (!done && n < 6) {
+        timers.push(setTimeout(() => attempt(n + 1), 60 * (n + 1)));
+      }
+    };
+
+    attempt(0);
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...recomputeKeys]);
 

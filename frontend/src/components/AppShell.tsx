@@ -4,6 +4,7 @@ import {
   LayoutDashboard, UserCircle, Wand2, Settings as SettingsIcon, LogOut, Sun, Moon, Eye, Sliders, ChevronLeft, ChevronRight, ShieldCheck
 } from 'lucide-react';
 import styles from './AppShell.module.css';
+import { Logo } from './Logo';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -59,7 +60,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
           {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
         </button>
         <div className={styles.logoContainer}>
-          <span className={styles.logoIcon}>📄</span>
+          <span className={styles.logoIcon}>
+            <Logo size={20} />
+          </span>
           <h1 className={styles.logoText}>LebenslaufAI</h1>
         </div>
         <button className={styles.logoutIconBtn} onClick={logout} aria-label="Logout" title="Logout">
@@ -82,7 +85,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
           </button>
 
           <div className={styles.sidebarLogo}>
-            <span className={styles.logoIconLarge}>📄</span>
+            <span className={styles.logoIconLarge}>
+              <Logo size={26} />
+            </span>
             <span className={styles.logoTitle}>LebenslaufAI</span>
           </div>
 

@@ -1,0 +1,21 @@
+/* Scoped light theme for the landing page. Redefining the tokens on this
+   wrapper overrides any [data-theme="dark"] values set on <html>, so the
+   page stays light no matter what the stored app theme is. */
+.light {
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+  --card-bg: rgba(255, 255, 255, 0.92);
+  --card-border: rgba(226, 232, 240, 0.9);
+  --primary: #6366F1;
+  --primary-hover: #4F46E5;
+  --secondary: #06B6D4;
+  --secondary-hover: #0891B2;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --muted: #64748B;
+  --muted-light: #E2E8F0;
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(226, 232, 240, 0.9);
+  --canvas-bg: #cbd5e1;
+}

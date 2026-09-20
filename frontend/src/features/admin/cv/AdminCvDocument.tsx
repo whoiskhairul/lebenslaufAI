@@ -159,7 +159,11 @@ export function prepareCvData(ver: any): CvDocData {
 }
 
 const localizedCategoryName = (catName: string): string =>
-  catName.charAt(0).toUpperCase() + catName.slice(1).replace(/_/g, ' ');
+  catName
+    .replace(/_/g, ' ')
+    .split(' ')
+    .map(word => (word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word))
+    .join(' ');
 
 const noop = () => {};
 

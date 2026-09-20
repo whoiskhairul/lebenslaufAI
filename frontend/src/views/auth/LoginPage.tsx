@@ -123,7 +123,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div style={{ background: '#0f0f12', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ background: '#F8FAFC', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar />
 
       <div className={styles.authContainer} style={{ flex: 1, padding: '7rem 1rem 4rem' }}>
@@ -168,7 +168,7 @@ export const LoginPage: React.FC = () => {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: '#cbd5e1' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: '#64748B' }}>
                   <input
                     type="checkbox"
                     checked={rememberMe}
@@ -176,7 +176,7 @@ export const LoginPage: React.FC = () => {
                   />
                   Remember this device
                 </label>
-                <a href="/reset-password" onClick={(e) => navigateTo('/reset-password', e)} style={{ color: '#818cf8', textDecoration: 'none' }}>
+                <a href="/reset-password" onClick={(e) => navigateTo('/reset-password', e)} style={{ color: '#4F46E5', textDecoration: 'none' }}>
                   Forgot Password?
                 </a>
               </div>

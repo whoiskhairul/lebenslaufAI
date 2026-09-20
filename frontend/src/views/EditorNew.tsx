@@ -222,6 +222,9 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const setTemplate = useCvDocumentStore((s) => s.setTemplate);
   const [isLoading, setIsLoading] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<ResumeVersion | null>(null);
+  // Bumped after async content arrives to force a pagination re-measure
+  // once the preview subtree has remounted (skeleton -> canvas race).
+  const [layoutNonce, setLayoutNonce] = useState(0);
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
   const [applicationTracked, setApplicationTracked] = useState(false);
   const [saveAutomatically, setSaveAutomatically] = useState(true);
@@ -958,16 +961,40 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     }
   };
 
-  // Sync category ordering on skills changes (preserving custom category order)
+  // Sync category ordering on skills changes (preserving custom category order).
+  // A rename looks like one category disappearing and a new one appearing at the
+  // same time — in that case the new name must take over the old name's slot
+  // instead of being appended at the end.
   useEffect(() => {
     const itSkills = editableSkills.filter(s => (s.category || '').toLowerCase().trim() !== 'languages');
     const uniqueCats = Array.from(new Set(itSkills.map(s => (s.category || 'technical').toLowerCase().trim())));
     setCategoryOrder(prev => {
       if (prev.length === 0) return uniqueCats;
       const normalizedPrev = prev.map(c => c.toLowerCase().trim());
-      const filteredPrev = normalizedPrev.filter(c => uniqueCats.includes(c));
-      const added = uniqueCats.filter(c => !filteredPrev.includes(c));
-      return [...filteredPrev, ...added];
+      const uniqueSet = new Set(uniqueCats);
+      const prevSet = new Set(normalizedPrev);
+      const added = uniqueCats.filter(c => !prevSet.has(c));
+      if (added.length === 0) {
+        return normalizedPrev.filter(c => uniqueSet.has(c));
+      }
+      const removedCount = normalizedPrev.filter(c => !uniqueSet.has(c)).length;
+      if (removedCount === 0) {
+        return [...normalizedPrev.filter(c => uniqueSet.has(c)), ...added];
+      }
+      // Rename (and/or delete+add): fill each removed slot with the next added
+      // category so renamed categories keep their position. Any leftover added
+      // categories (genuinely new ones) are appended at the end.
+      const addedQueue = [...added];
+      const result: string[] = [];
+      for (const c of normalizedPrev) {
+        if (uniqueSet.has(c)) {
+          result.push(c);
+        } else if (addedQueue.length > 0) {
+          result.push(addedQueue.shift()!);
+        }
+      }
+      result.push(...addedQueue);
+      return result;
     });
   }, [editableSkills]);
 
@@ -982,7 +1009,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     [
       editableSummary, editablePersonalInfo, editableExperiences, editableSkills,
       editableProjects, editableEducations, template, sections, customStyles, headerStyles,
-      languagesFirst, categoryOrder, mobileActivePane
+      languagesFirst, categoryOrder, mobileActivePane, layoutNonce
     ]
   );
 
@@ -1469,8 +1496,11 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       });
       if (res.data && res.data.success) {
         const ver = res.data.data as ResumeVersion;
-        setCurrentVersion(ver);
+        // Initialize editable canvas state BEFORE publishing the version:
+        // if initialization throws, we stay on the empty state with an
+        // error toast instead of a blank canvas with empty editables.
         initializeVersionFields(ver);
+        setCurrentVersion(ver);
         setApplicationTracked(!!ver.application);
         // Keep a linked tracking card in sync so the dashboard logo updates.
         const linkedAppId = (ver as any).application || initialJobParams?.application_id;
@@ -1491,9 +1521,14 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           setMobileActivePane('preview');
         }
         setEditorTab('resume');
+        // The preview subtree (hidden measuring canvas) remounts as the
+        // skeleton unmounts — force a pagination re-measure after mount
+        // so the fresh content is laid out even if the first pass raced it.
+        setTimeout(() => setLayoutNonce(n => n + 1), 150);
       }
     } catch (err) {
       console.error('Tailoring failed:', err);
+      setToast({ message: 'Tailoring failed. Please try again.', type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -1940,9 +1975,12 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
       finalCategories.forEach(cat => {
         const catSkills = itSkills.filter(sk => (sk.category || 'technical').toLowerCase().trim() === cat);
         if (catSkills.length > 0) {
+          // Pass the original casing so user capitalization (e.g. "DevOps")
+          // survives on the canvas instead of the lowercased order key.
+          const originalCasing = catSkills[0]?.category || cat;
           items.push(
             <div key={`skills-category-${cat}`} data-measuring-id={`skills-category-${cat}`} style={{ width: '100%' }}>
-              {renderUnit({ type: 'skills-category', id: `skills-category-${cat}`, sectionId: s.id, category: cat, skills: catSkills }, true)}
+              {renderUnit({ type: 'skills-category', id: `skills-category-${cat}`, sectionId: s.id, category: originalCasing, skills: catSkills }, true)}
             </div>
           );
         }

@@ -2896,8 +2896,8 @@
 }
 
 .dropdownItem:hover {
-  background-color: var(--muted-light, #f1f5f9) !important;
-  color: var(--accent, #6366f1) !important;
+  background-color: var(--muted-light) !important;
+  color: var(--primary) !important;
 }
 
 .downloadDropdown {
@@ -2928,7 +2928,7 @@
   text-align: left;
   cursor: pointer;
   font-size: 13px;
-  color: var(--text-main, #ffffff);
+  color: var(--foreground);
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
 }

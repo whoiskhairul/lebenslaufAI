@@ -101,11 +101,14 @@ export const SkillsCategoryUnit: React.FC<{ p: UnitRendererProps; ctx: UnitConte
             onChange={(val) => {
               const names = val.split(',').map(n => n.trim()).filter(Boolean);
               setEditableSkills(prev => {
-                const otherSkills = prev.filter(s => s.category.toLowerCase() !== cat.toLowerCase() && (s.category || '').toLowerCase().trim() !== 'languages');
+                const otherSkills = prev.filter(s => (s.category || '').toLowerCase().trim() !== cat.toLowerCase().trim() && (s.category || '').toLowerCase().trim() !== 'languages');
+                // Preserve the existing casing of the category instead of
+                // forcing it to lowercase (which broke user capitalization).
+                const existingCasing = prev.find(s => (s.category || '').toLowerCase().trim() === cat.toLowerCase().trim())?.category || cat;
                 const updatedSkills = names.map((name, i) => ({
                   id: `skill_${cat}_${i}_${Date.now()}`,
                   name,
-                  category: cat.toLowerCase()
+                  category: existingCasing
                 }));
                 const finalLangs = prev.filter(s => (s.category || '').toLowerCase().trim() === 'languages');
                 return [...finalLangs, ...otherSkills, ...updatedSkills];
