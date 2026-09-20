@@ -34,6 +34,16 @@ export const CvViewerModal: React.FC<CvViewerModalProps> = ({ resumeId, onClose 
     return () => window.removeEventListener('keydown', onKey);
   }, [resumeId, onClose]);
 
+  // Scope the print-hiding rules to this modal: CvViewerModal.module.css hides
+  // everything on the page via `body * { visibility: hidden }` under @media print,
+  // but compiled CSS Modules ship globally, so that rule also blanks the editor
+  // canvas unless it is gated on this body class.
+  useEffect(() => {
+    if (!resumeId) return;
+    document.body.classList.add('cv-viewer-print-open');
+    return () => document.body.classList.remove('cv-viewer-print-open');
+  }, [resumeId]);
+
   const docData = useMemo(() => (cv ? prepareCvData(cv) : null), [cv]);
 
   if (!resumeId) return null;
@@ -49,6 +59,32 @@ export const CvViewerModal: React.FC<CvViewerModalProps> = ({ resumeId, onClose 
           @page {
             size: 210mm 297mm !important;
             margin: 0 !important;
+          }
+          /* Print-hiding trick, scoped to this modal via a literal (unhashed)
+             body class + target class. CSS Modules selectors are hashed and
+             shipped globally, so an unscoped "body * visibility hidden" rule
+             in a module file blanks out the whole app (it broke the editor's
+             Print/PDF output this way). */
+          body.cv-viewer-print-open * {
+            visibility: hidden;
+          }
+          body.cv-viewer-print-open .cv-print-target,
+          body.cv-viewer-print-open .cv-print-target * {
+            visibility: visible;
+          }
+          body.cv-viewer-print-open .cv-print-target {
+            position: absolute !important;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+          }
+          body.cv-viewer-print-open .cv-print-target > div:first-child {
+            display: none !important;
           }
         }
       `}} />
@@ -79,7 +115,7 @@ export const CvViewerModal: React.FC<CvViewerModalProps> = ({ resumeId, onClose 
           </div>
         </div>
 
-        <div className={`${cs.canvas} ${cs.printRoot}`}>
+        <div className={`${cs.canvas} ${cs.printRoot} cv-print-target`}>
           {loading && (
             <div className="flex items-center justify-center gap-2 text-sm text-muted py-16">
               <Loader2 size={16} className="animate-spin" /> Rendering CV…

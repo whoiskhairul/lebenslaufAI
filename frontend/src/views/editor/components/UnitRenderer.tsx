@@ -83,7 +83,7 @@ export const UnitRenderer: React.FC<UnitRendererProps> = (p) => {
           : (langSkills.length > 0 ? 'languages' : finalCategories[finalCategories.length - 1]);
 
         if (unit.type === 'skills-languages') return lastCat === 'languages';
-        if (unit.type === 'skills-category') return lastCat === unit.category;
+        if (unit.type === 'skills-category') return lastCat === (unit.category || '').toLowerCase().trim();
       }
       return false;
     })();

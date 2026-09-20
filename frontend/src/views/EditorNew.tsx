@@ -41,6 +41,60 @@ import { StyleControlsPanel } from '../features/editor/panels/StyleControlsPanel
 import { TailorPanel } from '../features/editor/panels/TailorPanel';
 import { useSectionOps } from '../features/editor/hooks/useSectionOps';
 import { getParsedLetter, ParsedLetter, normalizeLetterDate } from '../features/editor/utils/parsedLetter';
+
+/* Print-safe form fields for the letter canvas: browsers do not print
+   textarea/input values (they are DOM properties, not text nodes), so each
+   field is paired with a print-only text mirror of the same typography. */
+const printMirrorStyle = (style?: React.CSSProperties): React.CSSProperties => ({
+  ...style,
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+  overflow: 'visible',
+  resize: undefined
+});
+
+const PrintSafeInput: React.FC<{
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  style?: React.CSSProperties;
+  placeholder?: string;
+}> = ({ value, onChange, style, placeholder }) => (
+  <>
+    <input
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      style={style}
+      className="print-hidden"
+    />
+    <div aria-hidden="true" className="print-only-block" style={printMirrorStyle(style)}>
+      {value || '\u00A0'}
+    </div>
+  </>
+);
+
+const PrintSafeTextarea: React.FC<{
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  style?: React.CSSProperties;
+  placeholder?: string;
+  rows?: number;
+}> = ({ value, onChange, style, placeholder, rows }) => (
+  <>
+    <textarea
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      rows={rows}
+      style={style}
+      className="print-hidden"
+    />
+    <div aria-hidden="true" className="print-only-block" style={printMirrorStyle(style)}>
+      {value || '\u00A0'}
+    </div>
+  </>
+);
+
 const ResizableSignature: React.FC<{ src: string; height: number; onChange: (h: number) => void }> = ({ src, height, onChange }) => {
   const [isSelected, setIsSelected] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -162,11 +216,15 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   // Main CV Parameters
   const [jobDescription, setJobDescription] = useState('');
   const [company, setCompany] = useState('');
+  const [companyDomain, setCompanyDomain] = useState('');
   const [position, setPosition] = useState('');
   const template = useCvDocumentStore((s) => s.template);
   const setTemplate = useCvDocumentStore((s) => s.setTemplate);
   const [isLoading, setIsLoading] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<ResumeVersion | null>(null);
+  // Bumped after async content arrives to force a pagination re-measure
+  // once the preview subtree has remounted (skeleton -> canvas race).
+  const [layoutNonce, setLayoutNonce] = useState(0);
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
   const [applicationTracked, setApplicationTracked] = useState(false);
   const [saveAutomatically, setSaveAutomatically] = useState(true);
@@ -903,16 +961,40 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     }
   };
 
-  // Sync category ordering on skills changes (preserving custom category order)
+  // Sync category ordering on skills changes (preserving custom category order).
+  // A rename looks like one category disappearing and a new one appearing at the
+  // same time — in that case the new name must take over the old name's slot
+  // instead of being appended at the end.
   useEffect(() => {
     const itSkills = editableSkills.filter(s => (s.category || '').toLowerCase().trim() !== 'languages');
     const uniqueCats = Array.from(new Set(itSkills.map(s => (s.category || 'technical').toLowerCase().trim())));
     setCategoryOrder(prev => {
       if (prev.length === 0) return uniqueCats;
       const normalizedPrev = prev.map(c => c.toLowerCase().trim());
-      const filteredPrev = normalizedPrev.filter(c => uniqueCats.includes(c));
-      const added = uniqueCats.filter(c => !filteredPrev.includes(c));
-      return [...filteredPrev, ...added];
+      const uniqueSet = new Set(uniqueCats);
+      const prevSet = new Set(normalizedPrev);
+      const added = uniqueCats.filter(c => !prevSet.has(c));
+      if (added.length === 0) {
+        return normalizedPrev.filter(c => uniqueSet.has(c));
+      }
+      const removedCount = normalizedPrev.filter(c => !uniqueSet.has(c)).length;
+      if (removedCount === 0) {
+        return [...normalizedPrev.filter(c => uniqueSet.has(c)), ...added];
+      }
+      // Rename (and/or delete+add): fill each removed slot with the next added
+      // category so renamed categories keep their position. Any leftover added
+      // categories (genuinely new ones) are appended at the end.
+      const addedQueue = [...added];
+      const result: string[] = [];
+      for (const c of normalizedPrev) {
+        if (uniqueSet.has(c)) {
+          result.push(c);
+        } else if (addedQueue.length > 0) {
+          result.push(addedQueue.shift()!);
+        }
+      }
+      result.push(...addedQueue);
+      return result;
     });
   }, [editableSkills]);
 
@@ -927,7 +1009,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     [
       editableSummary, editablePersonalInfo, editableExperiences, editableSkills,
       editableProjects, editableEducations, template, sections, customStyles, headerStyles,
-      languagesFirst, categoryOrder, mobileActivePane
+      languagesFirst, categoryOrder, mobileActivePane, layoutNonce
     ]
   );
 
@@ -1060,9 +1142,23 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           const ver = (res.data as any[]).find((v: any) => v.id === initialJobParams.version_id);
           if (ver) {
             setCompany(ver.target_company || '');
+            setCompanyDomain('');
             setPosition(ver.target_role || '');
             setCurrentVersion(ver);
             initializeVersionFields(ver);
+            // If this version is linked to a tracked application, pull its saved domain.
+            const linkedAppId = (ver as any).application;
+            if (linkedAppId) {
+              try {
+                const appRes = await api.get(`/applications/${linkedAppId}`);
+                if (appRes.data) {
+                  if (appRes.data.company) setCompany(appRes.data.company);
+                  setCompanyDomain(appRes.data.company_domain || '');
+                }
+              } catch (err) {
+                console.error('Failed to load linked application domain:', err);
+              }
+            }
           } else {
             setToast({ message: 'Linked CV version was not found.', type: 'error' });
           }
@@ -1078,6 +1174,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           const appRes = await api.get(`/applications/${initialJobParams.application_id}`);
           if (appRes.data) {
             setCompany(appRes.data.company || '');
+            setCompanyDomain(appRes.data.company_domain || '');
             setPosition(appRes.data.position || '');
             setJobDescription(appRes.data.job_description || '');
           }
@@ -1388,6 +1485,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       const res = await api.post('/resume/tailor', {
         job_description: jobDescription,
         company,
+        company_domain: companyDomain || null,
         position,
         template,
         application_id: initialJobParams?.application_id,
@@ -1398,17 +1496,39 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       });
       if (res.data && res.data.success) {
         const ver = res.data.data as ResumeVersion;
-        setCurrentVersion(ver);
+        // Initialize editable canvas state BEFORE publishing the version:
+        // if initialization throws, we stay on the empty state with an
+        // error toast instead of a blank canvas with empty editables.
         initializeVersionFields(ver);
+        setCurrentVersion(ver);
         setApplicationTracked(!!ver.application);
+        // Keep a linked tracking card in sync so the dashboard logo updates.
+        const linkedAppId = (ver as any).application || initialJobParams?.application_id;
+        if (linkedAppId) {
+          try {
+            await api.patch(`/applications/${linkedAppId}`, {
+              company,
+              company_domain: companyDomain || null,
+              position,
+              job_description: jobDescription,
+            });
+          } catch (syncErr) {
+            console.error('Failed to sync application domain:', syncErr);
+          }
+        }
         // On mobile, bring the fresh result into view immediately
         if (isMobileViewport && mobileActivePane === 'editor') {
           setMobileActivePane('preview');
         }
         setEditorTab('resume');
+        // The preview subtree (hidden measuring canvas) remounts as the
+        // skeleton unmounts — force a pagination re-measure after mount
+        // so the fresh content is laid out even if the first pass raced it.
+        setTimeout(() => setLayoutNonce(n => n + 1), 150);
       }
     } catch (err) {
       console.error('Tailoring failed:', err);
+      setToast({ message: 'Tailoring failed. Please try again.', type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -1419,8 +1539,9 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     setIsTrackingLoading(true);
     try {
       const appRes = await api.post('/applications', {
-        company: currentVersion.target_company,
-        position: currentVersion.target_role,
+        company: company || currentVersion.target_company,
+        company_domain: companyDomain || null,
+        position: position || currentVersion.target_role,
         status: 'preparing',
         job_description: jobDescription
       });
@@ -1854,9 +1975,12 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
       finalCategories.forEach(cat => {
         const catSkills = itSkills.filter(sk => (sk.category || 'technical').toLowerCase().trim() === cat);
         if (catSkills.length > 0) {
+          // Pass the original casing so user capitalization (e.g. "DevOps")
+          // survives on the canvas instead of the lowercased order key.
+          const originalCasing = catSkills[0]?.category || cat;
           items.push(
             <div key={`skills-category-${cat}`} data-measuring-id={`skills-category-${cat}`} style={{ width: '100%' }}>
-              {renderUnit({ type: 'skills-category', id: `skills-category-${cat}`, sectionId: s.id, category: cat, skills: catSkills }, true)}
+              {renderUnit({ type: 'skills-category', id: `skills-category-${cat}`, sectionId: s.id, category: originalCasing, skills: catSkills }, true)}
             </div>
           );
         }
@@ -2074,6 +2198,8 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               editorTabIsResume={editorTab === 'resume'}
               company={company}
               setCompany={setCompany}
+              companyDomain={companyDomain}
+              setCompanyDomain={setCompanyDomain}
               position={position}
               setPosition={setPosition}
               jobDescription={jobDescription}
@@ -3107,7 +3233,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                 />
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
-                                  <textarea
+                                  <PrintSafeTextarea
                                     value={letter.closing_salutation}
                                     onChange={(e) => updateField('closing_salutation', e.target.value)}
                                     rows={1}
@@ -3137,7 +3263,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                     />
                                   )}
 
-                                  <textarea
+                                  <PrintSafeTextarea
                                     value={letter.candidate_name}
                                     onChange={(e) => updateField('candidate_name', e.target.value)}
                                     rows={2}
@@ -3180,25 +3306,25 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                               {/* 1. Sender Info Header (Applicant details aligned to the top-right) */}
                               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '32px' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', textAlign: 'right', alignItems: 'flex-end', width: '280px' }}>
-                                  <input
+                                  <PrintSafeInput
                                     value={letter.sender_name}
                                     onChange={(e) => updateField('sender_name', e.target.value)}
                                     style={{ fontWeight: 'bold', fontSize: '15px', border: 'none', outline: 'none', background: 'transparent', width: '100%', textAlign: 'right', padding: 0 }}
                                     placeholder="Your Name"
                                   />
-                                  <input
+                                  <PrintSafeInput
                                     value={letter.sender_address}
                                     onChange={(e) => updateField('sender_address', e.target.value)}
                                     style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', textAlign: 'right', padding: 0, fontSize: '12px', color: '#64748b' }}
                                     placeholder="Your Address"
                                   />
-                                  <input
+                                  <PrintSafeInput
                                     value={letter.sender_phone}
                                     onChange={(e) => updateField('sender_phone', e.target.value)}
                                     style={{ border: 'none', outline: 'none', background: 'transparent', textAlign: 'right', padding: 0, fontSize: '12px', color: '#64748b', width: '100%' }}
                                     placeholder="Your Phone"
                                   />
-                                  <input
+                                  <PrintSafeInput
                                     value={letter.sender_email}
                                     onChange={(e) => updateField('sender_email', e.target.value)}
                                     style={{ border: 'none', outline: 'none', background: 'transparent', textAlign: 'right', padding: 0, fontSize: '12px', color: '#64748b', width: '100%' }}
@@ -3209,13 +3335,13 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                               {/* 2. Recipient Info (Company name first, then contact person, then address) */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '320px', marginBottom: '20px' }}>
-                                <input
+                                <PrintSafeInput
                                   value={letter.recipient_company}
                                   onChange={(e) => updateField('recipient_company', e.target.value)}
                                   style={{ fontWeight: 'bold', border: 'none', outline: 'none', background: 'transparent', width: '100%', padding: 0 }}
                                   placeholder="Company Name"
                                 />
-                                <input
+                                <PrintSafeInput
                                   value={
                                     letter.recipient_contact && letter.recipient_contact !== 'NOT PROVIDED'
                                       ? letter.recipient_contact
@@ -3227,7 +3353,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                   style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', padding: 0, color: '#475569' }}
                                   placeholder="Contact Person / Hiring Manager"
                                 />
-                                <textarea
+                                <PrintSafeTextarea
                                   value={letter.recipient_address}
                                   onChange={(e) => updateField('recipient_address', e.target.value)}
                                   rows={2}
@@ -3238,7 +3364,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                               {/* 3. Location and Date (to the right side, combined to prevent empty gaps) */}
                               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '28px' }}>
-                                <input
+                                <PrintSafeInput
                                   value={letter.location && letter.date ? `${letter.location}, ${letter.date}` : (letter.location || letter.date || '')}
                                   onChange={(e) => {
                                     const val = e.target.value;
@@ -3260,7 +3386,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                               {/* 4. Subject Line (Bold, Clean, No Bold Asterisks!) */}
                               <div style={{ marginBottom: '20px' }}>
-                                <textarea
+                                <PrintSafeTextarea
                                   value={letter.subject}
                                   onChange={(e) => updateField('subject', e.target.value)}
                                   rows={1}
@@ -3271,7 +3397,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                               {/* 5. Salutation */}
                               <div style={{ marginBottom: '16px' }}>
-                                <input
+                                <PrintSafeInput
                                   value={letter.salutation}
                                   onChange={(e) => updateField('salutation', e.target.value)}
                                   style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', lineHeight: 'inherit', color: 'inherit' }}
@@ -3304,7 +3430,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
                               {/* 7. Closing, Signature and Name */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <input
+                                <PrintSafeInput
                                   value={letter.closing_salutation}
                                   onChange={(e) => updateField('closing_salutation', e.target.value)}
                                   style={{ border: 'none', outline: 'none', background: 'transparent', width: '250px', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', lineHeight: 'inherit', color: 'inherit' }}
@@ -3319,7 +3445,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                                   />
                                 )}
 
-                                <input
+                                <PrintSafeInput
                                   value={letter.candidate_name}
                                   onChange={(e) => updateField('candidate_name', e.target.value)}
                                   style={{ fontWeight: 'bold', border: 'none', outline: 'none', background: 'transparent', width: '250px', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', lineHeight: 'inherit', color: 'inherit' }}

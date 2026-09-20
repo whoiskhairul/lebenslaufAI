@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Code, Globe, Plus, Trash, ArrowUp, ArrowDown, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import styles from '../../../EditorNew.module.css';
+import { useCvDocumentStore } from '../../../../features/editor/state/cvDocumentStore';
 
 export interface SkillItem {
   id: string;
@@ -299,16 +300,36 @@ export const SkillsEditor: React.FC<SkillsEditorProps> = ({
   const handleRenameCategory = (oldCatKey: string, newCatName: string) => {
     const trimmed = newCatName.trim();
     if (!trimmed) return;
-    const newCatKey = trimmed.toLowerCase();
+    const normalizedOld = oldCatKey.toLowerCase().trim();
+    const newCatKey = trimmed.toLowerCase().trim();
+    if (newCatKey === normalizedOld) {
+      // Case-only change (e.g. capitalizing the second word): just update the
+      // stored casing, order and expanded state stay untouched.
+      setSkills(prev => prev.map(s => (s.category || 'technical').toLowerCase().trim() === normalizedOld ? { ...s, category: trimmed } : s));
+      return;
+    }
     setExpandedCats(prev => {
       const next = { ...prev };
-      if (next[oldCatKey] !== undefined) {
+      if (next[normalizedOld] !== undefined) {
+        next[newCatKey] = next[normalizedOld];
+        delete next[normalizedOld];
+      } else if (next[oldCatKey] !== undefined) {
         next[newCatKey] = next[oldCatKey];
         delete next[oldCatKey];
       }
       return next;
     });
-    setSkills(prev => prev.map(s => (s.category || 'technical').toLowerCase().trim() === oldCatKey ? { ...s, category: trimmed } : s));
+    setSkills(prev => prev.map(s => (s.category || 'technical').toLowerCase().trim() === normalizedOld ? { ...s, category: trimmed } : s));
+    // Keep the category's position: swap the old key for the new one in place
+    // so the sync effect doesn't treat the rename as delete+add-at-end.
+    useCvDocumentStore.getState().setCategoryOrder(prev => {
+      const normalizedPrev = prev.map(c => c.toLowerCase().trim());
+      const idx = normalizedPrev.indexOf(normalizedOld);
+      if (idx === -1) return prev;
+      const next = [...prev];
+      next[idx] = trimmed;
+      return next;
+    });
   };
 
   const handleDeleteCategory = (catKey: string, displayName: string) => {
@@ -352,16 +373,18 @@ export const SkillsEditor: React.FC<SkillsEditorProps> = ({
     if (targetIdx < 0 || targetIdx >= catSkills.length) return;
 
     const targetItem = catSkills[targetIdx];
-    const currentItem = catSkills[idx];
 
-    // Reconstruct list
-    const updatedCatList = [...catSkills];
-    updatedCatList[idx] = targetItem;
-    updatedCatList[targetIdx] = currentItem;
-
+    // Swap in place within the global list so sibling categories keep their
+    // positions (previously the whole category block was moved to the end).
     setSkills(prev => {
-      const remaining = prev.filter(s => !catSkills.some(cs => cs.id === s.id));
-      return [...remaining, ...updatedCatList];
+      const realIdx1 = prev.findIndex(s => s.id === skillId);
+      const realIdx2 = prev.findIndex(s => s.id === targetItem.id);
+      if (realIdx1 === -1 || realIdx2 === -1) return prev;
+      const updated = [...prev];
+      const temp = updated[realIdx1];
+      updated[realIdx1] = updated[realIdx2];
+      updated[realIdx2] = temp;
+      return updated;
     });
   };
 

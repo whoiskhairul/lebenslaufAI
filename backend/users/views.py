@@ -43,6 +43,40 @@ def log_auth_event(user, event_type, request, details=None):
     )
 
 
+def issue_session_tokens(user, request, lifetime_days=7, device_info=None):
+    """Create a UserSession row and issue refresh/access tokens bound to it.
+
+    Both tokens carry a ``session_key`` claim enforced by
+    ``SessionBoundJWTAuthentication`` — deactivating the session row
+    (logout, per-session revoke, password reset/change) invalidates
+    the tokens.
+    """
+    session_key = str(uuid.uuid4())
+    UserSession.objects.create(
+        user=user,
+        session_key=session_key,
+        ip_address=getattr(request, 'client_ip', '127.0.0.1'),
+        user_agent=getattr(request, 'user_agent', 'Unknown'),
+        device_info=(device_info or request.headers.get('User-Agent', 'Web Browser'))[:250]
+    )
+    refresh = RefreshToken.for_user(user)
+    refresh.set_exp(lifetime=timedelta(days=lifetime_days))
+    refresh['session_key'] = session_key
+    access = refresh.access_token
+    access['session_key'] = session_key
+    return refresh, session_key
+
+
+def register_failed_attempt(user, request, reason):
+    """Count a failed auth attempt toward brute-force lockout (5 → 15 min)."""
+    user.login_attempts_count += 1
+    if user.login_attempts_count >= 5:
+        user.account_locked_until = timezone.now() + timedelta(minutes=15)
+        log_auth_event(user, 'LOCKOUT', request, {"reason": "5 consecutive failed attempts"})
+    user.save(update_fields=['login_attempts_count', 'account_locked_until'])
+    log_auth_event(user, 'LOGIN_FAILED', request, {"reason": reason} if reason else None)
+
+
 class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -143,22 +177,15 @@ class LoginView(APIView):
         except User.DoesNotExist:
             return Response({"error": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Check brute force lockout
+        # Check brute force lockout — generic message so locked accounts
+        # are indistinguishable from bad credentials (no enumeration).
         if user.account_locked_until and user.account_locked_until > timezone.now():
-            minutes_left = int((user.account_locked_until - timezone.now()).total_seconds() // 60) + 1
-            return Response(
-                {"error": f"Account is temporarily locked due to failed login attempts. Try again in {minutes_left} minutes."},
-                status=status.HTTP_429_TOO_MANY_REQUESTS
-            )
+            log_auth_event(user, 'LOGIN_FAILED', request, {"reason": "locked account attempt"})
+            return Response({"error": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
 
         authenticated_user = authenticate(username=email, password=password)
         if not authenticated_user:
-            user.login_attempts_count += 1
-            if user.login_attempts_count >= 5:
-                user.account_locked_until = timezone.now() + timedelta(minutes=15)
-                log_auth_event(user, 'LOCKOUT', request, {"reason": "5 consecutive failed attempts"})
-            user.save(update_fields=['login_attempts_count', 'account_locked_until'])
-            log_auth_event(user, 'LOGIN_FAILED', request)
+            register_failed_attempt(user, request, reason="bad password")
             return Response({"error": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
 
         # Reset failed login count
@@ -175,26 +202,23 @@ class LoginView(APIView):
                 }, status=status.HTTP_200_OK)
 
             totp = pyotp.TOTP(user.two_factor_secret)
-            is_valid = totp.verify(totp_code) or (totp_code in (user.two_factor_recovery_codes or []))
-            if not is_valid:
-                log_auth_event(user, 'LOGIN_FAILED', request, {"reason": "Invalid 2FA code"})
-                return Response({"error": "Invalid 2FA verification code."}, status=status.HTTP_401_UNAUTHORIZED)
+            if totp.verify(totp_code, valid_window=1):
+                pass  # TOTP accepted
+            elif totp_code in (user.two_factor_recovery_codes or []):
+                # Recovery codes are single-use: consume immediately.
+                user.two_factor_recovery_codes = [
+                    c for c in (user.two_factor_recovery_codes or []) if c != totp_code
+                ]
+                user.save(update_fields=['two_factor_recovery_codes'])
+            else:
+                # Failed 2FA codes count toward lockout — TOTP is only
+                # ~1M combinations and must not be freely brute-forced.
+                register_failed_attempt(user, request, reason="Invalid 2FA code")
+                return Response({"error": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Create JWT Tokens
-        refresh = RefreshToken.for_user(user)
-        if remember_me:
-            refresh.set_exp(lifetime=timedelta(days=30))
-        else:
-            refresh.set_exp(lifetime=timedelta(days=7))
-
-        # Track active session
-        session_key = str(uuid.uuid4())
-        UserSession.objects.create(
-            user=user,
-            session_key=session_key,
-            ip_address=getattr(request, 'client_ip', '127.0.0.1'),
-            user_agent=getattr(request, 'user_agent', 'Unknown'),
-            device_info=request.headers.get('User-Agent', 'Web Browser')[:250]
+        # Create session-bound JWT Tokens
+        refresh, session_key = issue_session_tokens(
+            user, request, lifetime_days=30 if remember_me else 7
         )
 
         log_auth_event(user, 'LOGIN_SUCCESS', request, {"remember_me": remember_me})
@@ -352,7 +376,7 @@ class TwoFactorVerifyView(APIView):
             return Response({"error": "2FA setup is not initialized."}, status=status.HTTP_400_BAD_REQUEST)
 
         totp = pyotp.TOTP(user.two_factor_secret)
-        if totp.verify(code):
+        if totp.verify(code, valid_window=1):
             user.two_factor_enabled = True
             user.save(update_fields=['two_factor_enabled'])
             log_auth_event(user, '2FA_ENABLED', request)
@@ -445,7 +469,78 @@ class AccountDeleteView(APIView):
 import requests
 
 class SocialLoginView(APIView):
+    """OAuth login that ONLY trusts provider-verified identities.
+
+    The client must supply a provider ``access_token`` which we verify
+    live against the provider's userinfo API. Email/name/avatar are taken
+    exclusively from the verified provider response — self-asserted
+    request fields are never trusted (they previously allowed
+    impersonation of any account).
+    """
     permission_classes = [permissions.AllowAny]
+
+    def _verify_with_provider(self, provider, access_token):
+        """Return (email, full_name, avatar, email_verified) or None."""
+        headers = {'Authorization': f'Bearer {access_token}'}
+        try:
+            if provider == 'google':
+                resp = requests.get(
+                    'https://www.googleapis.com/oauth2/v3/userinfo',
+                    headers=headers, timeout=10,
+                )
+                if resp.status_code != 200:
+                    return None
+                data = resp.json()
+                if not data.get('email'):
+                    return None
+                return (
+                    data.get('email'),
+                    data.get('name') or '',
+                    data.get('picture') or '',
+                    data.get('email_verified', True),
+                )
+            if provider == 'github':
+                resp = requests.get(
+                    'https://api.github.com/user', headers=headers, timeout=10,
+                )
+                if resp.status_code != 200:
+                    return None
+                data = resp.json()
+                emails_resp = requests.get(
+                    'https://api.github.com/user/emails', headers=headers, timeout=10,
+                )
+                email = None
+                if emails_resp.status_code == 200:
+                    for entry in emails_resp.json():
+                        if entry.get('primary') and entry.get('verified'):
+                            email = entry.get('email')
+                            break
+                if not email:
+                    return None
+                return (
+                    email,
+                    data.get('name') or data.get('login') or '',
+                    data.get('avatar_url') or '',
+                    True,
+                )
+            if provider == 'linkedin_oauth2':
+                resp = requests.get(
+                    'https://api.linkedin.com/v2/userinfo', headers=headers, timeout=10,
+                )
+                if resp.status_code != 200:
+                    return None
+                data = resp.json()
+                if not data.get('email'):
+                    return None
+                return (
+                    data.get('email'),
+                    data.get('name') or '',
+                    data.get('picture') or '',
+                    data.get('email_verified', True),
+                )
+        except Exception:
+            return None
+        return None
 
     def post(self, request):
         serializer = SocialLoginSerializer(data=request.data)
@@ -454,45 +549,25 @@ class SocialLoginView(APIView):
 
         provider = serializer.validated_data['provider']
         access_token = serializer.validated_data.get('access_token') or request.data.get('access_token')
-        email = request.data.get('email')
-        full_name = request.data.get('full_name', '')
-        avatar = None
+        if not access_token:
+            return Response(
+                {"error": "Provider access token is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        # Live verification with provider if access_token is supplied
-        if access_token:
-            if provider == 'google':
-                try:
-                    resp = requests.get(
-                        'https://www.googleapis.com/oauth2/v3/userinfo',
-                        headers={'Authorization': f'Bearer {access_token}'},
-                        timeout=10
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        email = data.get('email') or email
-                        full_name = data.get('name') or full_name
-                        avatar = data.get('picture')
-                except Exception as e:
-                    pass
-
-            elif provider == 'github':
-                try:
-                    resp = requests.get(
-                        'https://api.github.com/user',
-                        headers={'Authorization': f'Bearer {access_token}'},
-                        timeout=10
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        email = data.get('email') or email
-                        full_name = data.get('name') or data.get('login') or full_name
-                        avatar = data.get('avatar_url')
-                except Exception as e:
-                    pass
-
-        if not email:
-            provider_id = request.data.get('provider_id', str(uuid.uuid4()))
-            email = f"{provider}_{provider_id[:8]}@oauth.lebenslauf.ai"
+        verified = self._verify_with_provider(provider, access_token)
+        if not verified:
+            log_auth_event(None, 'LOGIN_FAILED', request, {"reason": f"Invalid {provider} token"})
+            return Response(
+                {"error": "Could not verify identity with the OAuth provider."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        email, full_name, avatar, email_verified = verified
+        if not email_verified:
+            return Response(
+                {"error": "OAuth email address is not verified with the provider."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
         user, created = User.objects.get_or_create(
             email=email,
@@ -508,16 +583,9 @@ class SocialLoginView(APIView):
             user.avatar = avatar
             user.save(update_fields=['avatar'])
 
-        refresh = RefreshToken.for_user(user)
-        refresh.set_exp(lifetime=timedelta(days=7))
-
-        session_key = str(uuid.uuid4())
-        UserSession.objects.create(
-            user=user,
-            session_key=session_key,
-            ip_address=getattr(request, 'client_ip', '127.0.0.1'),
-            user_agent=getattr(request, 'user_agent', 'Unknown'),
-            device_info=f'Social OAuth ({provider}) Web Session'
+        refresh, session_key = issue_session_tokens(
+            user, request, lifetime_days=7,
+            device_info=f'Social OAuth ({provider}) Web Session',
         )
 
         log_auth_event(user, 'SOCIAL_LOGIN', request, {"provider": provider, "flow": "client_api"})
@@ -557,16 +625,9 @@ class SocialCallbackRedirectView(APIView):
     def get(self, request):
         if hasattr(request, 'user') and request.user.is_authenticated:
             user = request.user
-            refresh = RefreshToken.for_user(user)
-            refresh.set_exp(lifetime=timedelta(days=7))
-
-            session_key = str(uuid.uuid4())
-            UserSession.objects.create(
-                user=user,
-                session_key=session_key,
-                ip_address=getattr(request, 'client_ip', '127.0.0.1'),
-                user_agent=getattr(request, 'user_agent', 'Unknown'),
-                device_info='Social OAuth Web Session'
+            refresh, session_key = issue_session_tokens(
+                user, request, lifetime_days=7,
+                device_info='Social OAuth Web Session',
             )
 
             log_auth_event(user, 'SOCIAL_LOGIN', request, {"auth_method": "OAuth2"})
@@ -579,4 +640,39 @@ class SocialCallbackRedirectView(APIView):
             return redirect(frontend_redirect)
 
         return redirect(f"{settings.FRONTEND_URL}/login?error=OAuthAuthenticationFailed")
+
+
+from rest_framework_simplejwt.views import TokenRefreshView
+
+
+class SessionTokenRefreshView(TokenRefreshView):
+    """Refresh rotation that also enforces the session binding.
+
+    The stock view only checks signature/expiry, so a refresh token from
+    a revoked session could mint fresh access tokens indefinitely.
+    Here the presented refresh token must carry a live ``session_key``;
+    revoked/missing sessions are rejected and the token is blacklisted.
+    """
+
+    def post(self, request, *args, **kwargs):
+        raw = request.data.get('refresh')
+        if raw:
+            try:
+                candidate = RefreshToken(raw)
+                session_key = candidate.get('session_key')
+                session_ok = bool(session_key) and UserSession.objects.filter(
+                    session_key=session_key, is_active=True
+                ).exists()
+                if not session_ok:
+                    try:
+                        candidate.blacklist()
+                    except Exception:
+                        pass
+                    return Response(
+                        {"detail": "Session has been revoked."},
+                        status=status.HTTP_401_UNAUTHORIZED,
+                    )
+            except TokenError:
+                pass  # fall through to the stock handler for the standard error
+        return super().post(request, *args, **kwargs)
 

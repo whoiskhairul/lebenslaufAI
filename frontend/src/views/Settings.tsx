@@ -428,7 +428,7 @@ export const Settings: React.FC = () => {
                   <Shield size={22} className={styles.headerIcon} />
                   <div>
                     <h3>AI Engine Credentials</h3>
-                    <p className={styles.sectionDesc}>Configure your personal DeepSeek API key for live AI tailoring.</p>
+                    <p className={styles.sectionDesc}>Configure your personal LLM API key for live AI tailoring.</p>
                   </div>
                 </div>
 
@@ -442,7 +442,7 @@ export const Settings: React.FC = () => {
                 <form onSubmit={handleSavePreferences} className={styles.form}>
                   <div className={styles.inputWrapper}>
                     <InputField
-                      label="DeepSeek API Key"
+                      label="LLM API Key"
                       id="settingsApiKey"
                       type={showKey ? 'text' : 'password'}
                       placeholder="sk-..."

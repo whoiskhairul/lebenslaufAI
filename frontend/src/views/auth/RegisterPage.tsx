@@ -21,7 +21,7 @@ export const RegisterPage: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const pwdScore = password ? zxcvbn(password).score : 0;
-  const strengthColors = ['#ef4444', '#f97316', '#eab308', '#3b82f6', '#22c55e'];
+  const strengthColors = ['#DC2626', '#EA580C', '#CA8A04', '#2563EB', '#16A34A'];
   const strengthLabels = ['Too Weak', 'Weak', 'Fair', 'Good', 'Strong'];
 
   const handleGoogleSuccess = async (tokenResponse: any) => {
@@ -103,7 +103,7 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div style={{ background: '#0f0f12', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ background: '#F8FAFC', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar />
 
       <div className={styles.authContainer} style={{ flex: 1, padding: '7rem 1rem 4rem' }}>
@@ -222,7 +222,7 @@ export const RegisterPage: React.FC = () => {
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-              <CheckCircle2 style={{ width: '48px', height: '48px', color: '#22c55e', margin: '0 auto 1rem' }} />
+              <CheckCircle2 style={{ width: '48px', height: '48px', color: '#16A34A', margin: '0 auto 1rem' }} />
               <a href="/login" onClick={(e) => navigateTo('/login', e)} className={styles.primaryBtn} style={{ display: 'inline-block', textDecoration: 'none' }}>
                 Proceed to Sign In
               </a>

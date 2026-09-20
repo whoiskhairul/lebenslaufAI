@@ -489,7 +489,14 @@ export function useSectionOps(deps: SectionOpsDeps) {
       if (norm === 'soft_skills' || norm === 'soft skills') return 'Methodische & Soziale Kompetenzen';
       if (norm === 'other' || norm === 'sonstige' || norm === 'weitere') return 'Weitere Kenntnisse';
     }
-    return catName.charAt(0).toUpperCase() + catName.slice(1).replace(/_/g, ' ');
+    // Title-case every word while preserving the rest of each word's casing,
+    // so user capitals like "DevOps" survive and the second word can be
+    // capitalized too ("programming languages" -> "Programming Languages").
+    const withSpaces = catName.replace(/_/g, ' ');
+    return withSpaces
+      .split(' ')
+      .map(word => (word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word))
+      .join(' ');
   };
 
   const handleMoveSkillInCategory = (skillId: string, direction: 'up' | 'down') => {

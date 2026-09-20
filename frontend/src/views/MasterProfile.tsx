@@ -4,7 +4,7 @@ import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { MasterProfileSkeleton } from '../components/skeleton/MasterProfileSkeleton';
-import { User, Briefcase, FolderGit2, Dumbbell, GraduationCap, Trash2, Plus, Edit3, Check, X, Upload, Brain, Wand2, Sparkles, Lock, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { User, Briefcase, FolderGit2, Dumbbell, GraduationCap, Trash2, Plus, Edit3, Check, X, Upload, Brain, Wand2, Sparkles, Lock, AlertCircle, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
 import { Toast } from '../components/Toast';
 
 // Tailwind class map -------- replaces the former MasterProfile.module.css (mobile-first, md: = desktop)
@@ -481,6 +481,17 @@ export const MasterProfile: React.FC = () => {
   const [deletedSkillIds, setDeletedSkillIds] = useState<string[]>([]);
   const [dragSkillId, setDragSkillId] = useState<string | null>(null);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
+  // Category display order (categories are labels, not DB rows — persisted per browser)
+  const [categoryOrder, setCategoryOrder] = useState<string[] | null>(() => {
+    try {
+      const raw = localStorage.getItem('mp_skill_category_order');
+      const parsed = raw ? JSON.parse(raw) : null;
+      return Array.isArray(parsed) ? parsed.filter((c: any) => typeof c === 'string') : null;
+    } catch {
+      return null;
+    }
+  });
+  const [dragCategory, setDragCategory] = useState<string | null>(null);
   const [animatingSkillId, setAnimatingSkillId] = useState<string | null>(null);
   const [animatingPartnerSkillId, setAnimatingPartnerSkillId] = useState<string | null>(null);
   const [animationDirection, setAnimationDirection] = useState<'left' | 'right' | null>(null);
@@ -686,20 +697,31 @@ export const MasterProfile: React.FC = () => {
     return { ...skill, ...res.data };
   };
 
-  const persistCategoryOrders = (categoryName: string, skills: Skill[]) => {
-    const catSkills = skills.filter(s => s.category === categoryName);
-    catSkills.forEach((s, idx) => {
-      if (s.id && !s.id.startsWith('temp_') && (s.order || 0) !== idx) {
-        api.patch(`/master-profile/skills/${s.id}`, { order: idx }).catch(err =>
-          console.error('Failed to persist skill order:', err)
-        );
-      }
-    });
+  const persistCategoryOrders = async (categoryName: string, skills: Skill[]) => {
+    // Sort by intended order, then write every row's position to the DB.
+    // NOTE: this must write unconditionally — callers pass the NEW order
+    // already assigned, so diffing order-vs-position here would always
+    // look "clean" and persist nothing (the reload-revert bug).
+    const catSkills = skills
+      .filter(s => s.category === categoryName)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    const patches = catSkills
+      .filter(s => s.id && !s.id.startsWith('temp_'))
+      .map((s, idx) =>
+        api.patch(`/master-profile/skills/${s.id}`, { order: idx }).catch(err => {
+          console.error('Failed to persist skill order:', err);
+          throw err;
+        })
+      );
+    if (patches.length > 0) {
+      await Promise.all(patches);
+    }
   };
 
-  const handleMoveSkill = (skillId: string, direction: 'left' | 'right') => {
+  const handleMoveSkill = async (skillId: string, direction: 'left' | 'right') => {
     const skillToMove = localSkills.find(s => s.id === skillId);
-    if (!skillToMove) return;
+    if (!skillToMove || !skillToMove.id) return;
+    if (skillToMove.id.startsWith('temp_')) return;
 
     const catSkills = localSkills
       .filter(s => s.category === skillToMove.category)
@@ -712,52 +734,93 @@ export const MasterProfile: React.FC = () => {
     if (targetIdx < 0 || targetIdx >= catSkills.length) return;
 
     const targetSkill = catSkills[targetIdx];
+    if (!targetSkill.id || targetSkill.id.startsWith('temp_')) return;
 
     // Trigger the fade animation
     setAnimatingSkillId(skillId);
     setAnimatingPartnerSkillId(targetSkill.id!);
 
+    // Snapshot for rollback on persistence failure
+    const previousSkills = localSkills;
+
     // Wait for the fade-out to complete before updating state
-    setTimeout(() => {
-      let updatedSkills: Skill[] = [];
-      setLocalSkills(prev => {
-        const updated = prev.map(s => {
-          if (s.id === skillId) {
-            return { ...s, order: targetIdx };
-          } else if (s.id === targetSkill.id) {
-            return { ...s, order: idx };
-          }
-          if (s.category === skillToMove.category) {
-            const indexInCat = catSkills.findIndex(cs => cs.id === s.id);
-            if (indexInCat !== idx && indexInCat !== targetIdx) {
-              return { ...s, order: indexInCat };
-            }
-          }
-          return s;
-        });
-        updatedSkills = updated;
-        return updated;
+    setTimeout(async () => {
+      const updatedSkills = previousSkills.map(s => {
+        if (s.id === skillId) return { ...s, order: targetIdx };
+        if (s.id === targetSkill.id) return { ...s, order: idx };
+        return s;
       });
+      setLocalSkills(updatedSkills);
 
-      // Persist new ordering immediately
-      setTimeout(() => persistCategoryOrders(skillToMove.category, updatedSkills), 0);
-
-      // Clear animation states (fades back in)
-      setAnimatingSkillId(null);
-      setAnimatingPartnerSkillId(null);
+      // Persist the swapped orders directly — both PATCHes must succeed.
+      try {
+        await Promise.all([
+          api.patch(`/master-profile/skills/${skillId}`, { order: targetIdx }),
+          api.patch(`/master-profile/skills/${targetSkill.id}`, { order: idx }),
+        ]);
+      } catch (err) {
+        console.error('Failed to persist skill order:', err);
+        setToast({ message: 'Failed to save new skill order.', type: 'error' });
+        setLocalSkills(previousSkills);
+      } finally {
+        // Clear animation states (fades back in)
+        setAnimatingSkillId(null);
+        setAnimatingPartnerSkillId(null);
+      }
     }, 120);
   };
 
+  // Drag-onto-card reorder within the same category (drop before target card).
+  const handleReorderWithinCategory = async (draggedId: string, targetId: string) => {
+    if (draggedId === targetId) return;
+    const dragged = localSkills.find(s => s.id === draggedId);
+    const target = localSkills.find(s => s.id === targetId);
+    if (!dragged || !target || !dragged.id || !target.id) return;
+    if (dragged.category !== target.category) return;
+    if (dragged.id.startsWith('temp_') || target.id.startsWith('temp_')) return;
+
+    const categoryName = dragged.category;
+    const ordered = localSkills
+      .filter(s => s.category === categoryName)
+      .sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
+    const withoutDragged = ordered.filter(s => s.id !== draggedId);
+    const targetPos = withoutDragged.findIndex(s => s.id === targetId);
+    if (targetPos === -1) return;
+    const reordered = [
+      ...withoutDragged.slice(0, targetPos),
+      dragged,
+      ...withoutDragged.slice(targetPos),
+    ];
+
+    const previousSkills = localSkills;
+    const orderById = new Map(reordered.map((s, i) => [s.id, i]));
+    setLocalSkills(prev => prev.map(s => {
+      const next = orderById.get(s.id);
+      return next !== undefined ? { ...s, order: next } : s;
+    }));
+
+    try {
+      await persistCategoryOrders(categoryName, reordered.map((s, i) => ({ ...s, order: i })));
+    } catch (err) {
+      console.error('Failed to persist reordered skills:', err);
+      setToast({ message: 'Failed to save new skill order.', type: 'error' });
+      setLocalSkills(previousSkills);
+    }
+  };
+
   const handleSaveInlineSkill = async (categoryName: string) => {
-    if (!inlineSkillName.trim()) return;
+    const trimmed = inlineSkillName.trim();
+    if (!trimmed) return;
     const catSkills = localSkills.filter(s => s.category === categoryName);
     const newSkill: Skill = {
       id: `temp_${Date.now()}_${Math.random()}`,
-      name: inlineSkillName.trim(),
+      name: trimmed,
       category: categoryName,
       level: categoryName.toLowerCase() === 'languages' ? '' : 'intermediate',
       order: catSkills.length
     };
+    // Optimistically insert so the skill is visible immediately on Enter.
+    setLocalSkills(prev => [...prev, newSkill]);
     setInlineSkillName('');
     setInlineCategoryInput(null);
     try {
@@ -827,6 +890,65 @@ export const MasterProfile: React.FC = () => {
     }
   };
 
+  // Default (first-run) category ranking, preserved for categories
+  // the user hasn't manually ordered yet.
+  const defaultCategoryScore = (cat: string): number => {
+    const order = [
+      'Programming Languages',
+      'Frameworks & Libraries',
+      'Databases',
+      'Cloud & DevOps',
+      'Development Tools',
+      'Testing'
+    ];
+    const idx = order.indexOf(cat);
+    if (idx !== -1) return idx;
+    if (cat === 'Languages') return 999;
+    return 100;
+  };
+
+  const categoryRank = (cat: string): number => {
+    if (categoryOrder) {
+      const i = categoryOrder.indexOf(cat);
+      if (i !== -1) return i;
+    }
+    return (categoryOrder?.length || 0) + defaultCategoryScore(cat);
+  };
+
+  const getOrderedCategories = (): string[] => {
+    const cats = Array.from(new Set(localSkills.map(s => s.category || 'Other')));
+    return cats.sort((a, b) => categoryRank(a) - categoryRank(b));
+  };
+
+  const saveCategoryOrder = (order: string[]) => {
+    setCategoryOrder(order);
+    try {
+      localStorage.setItem('mp_skill_category_order', JSON.stringify(order));
+    } catch {
+      // Private-mode storage may throw — order still applies for this session.
+    }
+  };
+
+  const moveCategory = (cat: string, direction: 'up' | 'down') => {
+    const list = getOrderedCategories();
+    const idx = list.indexOf(cat);
+    if (idx === -1) return;
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+    const next = [...list];
+    [next[idx], next[targetIdx]] = [next[targetIdx], next[idx]];
+    saveCategoryOrder(next);
+  };
+
+  const dropCategoryOnto = (dragged: string, target: string) => {
+    if (dragged === target) return;
+    const list = getOrderedCategories().filter(c => c !== dragged);
+    const targetPos = list.indexOf(target);
+    if (targetPos === -1) return;
+    list.splice(targetPos, 0, dragged);
+    saveCategoryOrder(list);
+  };
+
   const handleRenameCategory = (oldCategoryName: string) => {
     setPromptValue(oldCategoryName);
     setPromptModal({
@@ -838,6 +960,15 @@ export const MasterProfile: React.FC = () => {
         const affected = localSkills.filter(s => s.category === oldCategoryName);
         // Optimistic rename
         setLocalSkills(prev => prev.map(s => (s.category === oldCategoryName ? { ...s, category: newName.trim() } : s)));
+        // Keep the manual category order pointing at the new name
+        setCategoryOrder(prev => {
+          if (!prev || !prev.includes(oldCategoryName)) return prev;
+          const next = prev.map(c => (c === oldCategoryName ? newName.trim() : c));
+          try {
+            localStorage.setItem('mp_skill_category_order', JSON.stringify(next));
+          } catch { /* ignore storage failures */ }
+          return next;
+        });
         try {
           for (const s of affected) {
             if (s.id && !s.id.startsWith('temp_')) {
@@ -866,20 +997,24 @@ export const MasterProfile: React.FC = () => {
     setLocalSkills(prev => prev.map(s => (s.id === skillId ? { ...s, category: newCategory, order: catSkills.length } : s)));
     // Renumber the source category so no gaps remain
     const sourceCat = skill.category;
-    setTimeout(() => {
-      setLocalSkills(prev => {
-        const renumbered = prev.map(s => {
-          if (s.category === sourceCat) {
-            const siblings = prev.filter(x => x.category === sourceCat);
-            const idx = siblings.findIndex(x => x.id === s.id);
-            return { ...s, order: idx };
-          }
-          return s;
-        });
-        persistCategoryOrders(sourceCat, renumbered);
-        return renumbered;
-      });
-    }, 0);
+    const afterMove = localSkills.map(s =>
+      s.id === skillId ? { ...s, category: newCategory, order: catSkills.length } : s
+    );
+    const renumbered = afterMove.map(s => {
+      if (s.category === sourceCat) {
+        const siblings = afterMove
+          .filter(x => x.category === sourceCat)
+          .sort((a, b) => (a.order || 0) - (b.order || 0));
+        return { ...s, order: siblings.findIndex(x => x.id === s.id) };
+      }
+      return s;
+    });
+    setLocalSkills(renumbered);
+    try {
+      await persistCategoryOrders(sourceCat, renumbered);
+    } catch (err) {
+      console.error('Failed to renumber source category:', err);
+    }
 
     try {
       await persistSkill(updatedSkill);
@@ -1697,32 +1832,27 @@ export const MasterProfile: React.FC = () => {
                         return acc;
                       }, {} as Record<string, Skill[]>)
                     )
-                      .sort(([catA], [catB]) => {
-                        const getCategoryOrderScore = (cat: string) => {
-                          const order = [
-                            'Programming Languages',
-                            'Frameworks & Libraries',
-                            'Databases',
-                            'Cloud & DevOps',
-                            'Development Tools',
-                            'Testing'
-                          ];
-                          const idx = order.indexOf(cat);
-                          if (idx !== -1) return idx;
-                          if (cat === 'Languages') return 999;
-                          return 100;
-                        };
-                        return getCategoryOrderScore(catA) - getCategoryOrderScore(catB);
-                      })
-                      .map(([category, skills]) => {
+                      .sort(([catA], [catB]) => categoryRank(catA) - categoryRank(catB))
+                      .map(([category, skills], catIdx, allCats) => {
                         const sortedSkills = [...skills].sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
-                        const isDropTarget = dragOverCategory === category && dragSkillId !== null;
+                        const isDropTarget = (dragOverCategory === category && dragSkillId !== null) || (dragCategory !== null && dragCategory !== category && dragOverCategory === category);
                         return (
                           <div
                             key={category}
                             className={cls.skillCategoryBlock}
-                            style={isDropTarget ? { outline: '2px dashed var(--primary-color, #4f46e5)', outlineOffset: '4px', borderRadius: '8px', background: 'rgba(99, 102, 241, 0.04)' } : undefined}
+                            style={{
+                              ...(isDropTarget ? { outline: '2px dashed var(--primary-color, #4f46e5)', outlineOffset: '4px', borderRadius: '8px', background: 'rgba(99, 102, 241, 0.04)' } : undefined),
+                              ...(dragCategory === category ? { opacity: 0.5 } : undefined),
+                            }}
                             onDragOver={(e) => {
+                              if (dragCategory && dragCategory !== category) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                e.dataTransfer.dropEffect = 'move';
+                                if (dragOverCategory !== category) setDragOverCategory(category);
+                                return;
+                              }
+                              if (!dragSkillId) return;
                               e.preventDefault();
                               e.dataTransfer.dropEffect = 'move';
                               if (dragOverCategory !== category) setDragOverCategory(category);
@@ -1734,11 +1864,55 @@ export const MasterProfile: React.FC = () => {
                             }}
                             onDrop={(e) => {
                               e.preventDefault();
+                              if (dragCategory) {
+                                dropCategoryOnto(dragCategory, category);
+                                setDragCategory(null);
+                                setDragOverCategory(null);
+                                return;
+                              }
                               handleDropSkillToCategory(dragSkillId, category);
                             }}
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '12px' }}>
+                              <span
+                                draggable
+                                onDragStart={(e) => {
+                                  setDragCategory(category);
+                                  e.dataTransfer.effectAllowed = 'move';
+                                  e.dataTransfer.setData('text/plain', `category:${category}`);
+                                }}
+                                onDragEnd={() => {
+                                  setDragCategory(null);
+                                  setDragOverCategory(null);
+                                }}
+                                title="Drag to reorder category"
+                                style={{ cursor: 'grab', display: 'inline-flex', alignItems: 'center', color: 'var(--muted, #94a3b8)', padding: '2px' }}
+                              >
+                                <GripVertical size={14} />
+                              </span>
                               <h4 className={cls.categoryTitle} style={{ marginBottom: 0 }}>{category}</h4>
+                              <span style={{ display: 'inline-flex', gap: '2px', marginLeft: '2px' }}>
+                                <button
+                                  type="button"
+                                  className={cls.categoryActionBtn}
+                                  onClick={() => moveCategory(category, 'up')}
+                                  disabled={catIdx === 0}
+                                  title="Move category up"
+                                  style={catIdx === 0 ? { opacity: 0.3, cursor: 'default' } : undefined}
+                                >
+                                  <ChevronUp size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className={cls.categoryActionBtn}
+                                  onClick={() => moveCategory(category, 'down')}
+                                  disabled={catIdx === allCats.length - 1}
+                                  title="Move category down"
+                                  style={catIdx === allCats.length - 1 ? { opacity: 0.3, cursor: 'default' } : undefined}
+                                >
+                                  <ChevronDown size={14} />
+                                </button>
+                              </span>
                               <button
                                 type="button"
                                 className={cls.categoryActionBtn}
@@ -1768,7 +1942,28 @@ export const MasterProfile: React.FC = () => {
                                       setDragSkillId(null);
                                       setDragOverCategory(null);
                                     }}
-                                    title="Drag to another category"
+                                    onDragOver={(e) => {
+                                      // Allow dropping onto a card to reorder within the same category
+                                      if (dragSkillId && dragSkillId !== s.id) {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        e.dataTransfer.dropEffect = 'move';
+                                      }
+                                    }}
+                                    onDrop={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const fromId = dragSkillId || e.dataTransfer.getData('text/plain') || null;
+                                      if (fromId && fromId !== s.id) {
+                                        const fromSkill = localSkills.find(x => x.id === fromId);
+                                        if (fromSkill && fromSkill.category === s.category) {
+                                          handleReorderWithinCategory(fromId, s.id!);
+                                        }
+                                      }
+                                      setDragSkillId(null);
+                                      setDragOverCategory(null);
+                                    }}
+                                    title="Drag onto another card to reorder, or to another category to move"
                                   >
                                     <span>{s.name}</span>
                                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>

@@ -1,0 +1,90 @@
+/* 404 error page, adjusted to the app theme.
+   Inside the authenticated shell it is centered in the content pane next to
+   the sidebar; standalone (unauthenticated) it fills the whole viewport. */
+.container {
+  min-height: calc(100vh - 4rem); /* fill the pane, minus its 2rem padding */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background: var(--background);
+}
+
+.standalone {
+  min-height: 100vh;
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-6);
+}
+
+.logo {
+  color: var(--foreground);
+  margin-bottom: var(--space-2);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0;
+  font-family: var(--font-headers);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.code {
+  color: var(--foreground);
+  letter-spacing: 0.02em;
+}
+
+.divider {
+  width: 1px;
+  height: 1.6em;
+  background: var(--card-border);
+}
+
+.message {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.backBtn {
+  margin-top: var(--space-2);
+  padding: 0.65rem 1.4rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--foreground);
+  color: var(--background);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.backBtn:hover {
+  opacity: 0.85;
+}
+
+.backBtn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .row {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .divider {
+    width: 40px;
+    height: 1px;
+  }
+}
