@@ -72,12 +72,13 @@ class AuthSystemTests(TestCase):
         user.refresh_from_db()
         self.assertIsNotNone(user.account_locked_until)
 
-        # Attempt login after lockout
+        # Locked accounts are indistinguishable from bad credentials (401).
         response = self.client.post(self.login_url, {
             "email": self.user_data['email'],
             "password": self.user_data['password']
         }, format='json')
-        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data.get('error'), "Invalid credentials.")
 
     def test_2fa_setup_and_verification(self):
         user = User.objects.create_user(
@@ -131,3 +132,87 @@ class AuthSystemTests(TestCase):
         refresh_url = reverse('auth_refresh')
         ref_res = self.client.post(refresh_url, {"refresh": refresh_token}, format='json')
         self.assertEqual(ref_res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_social_login_rejects_unverified_identity(self):
+        social_url = reverse('auth_social_login')
+
+        # No provider token at all — must be rejected, no account created.
+        res = self.client.post(social_url, {
+            "provider": "google",
+            "email": "victim@lebenslauf.ai",
+            "full_name": "Victim",
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(email="victim@lebenslauf.ai").exists())
+
+        # Bogus provider token — must be rejected, no account created.
+        res = self.client.post(social_url, {
+            "provider": "google",
+            "access_token": "bogus-token",
+            "email": "victim@lebenslauf.ai",
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(User.objects.filter(email="victim@lebenslauf.ai").exists())
+
+    def test_revoked_session_invalidates_tokens(self):
+        user = User.objects.create_user(
+            username=self.user_data['email'],
+            email=self.user_data['email'],
+            password=self.user_data['password']
+        )
+        login_res = self.client.post(self.login_url, {
+            "email": self.user_data['email'],
+            "password": self.user_data['password']
+        }, format='json')
+        access_token = login_res.data['access']
+        refresh_token = login_res.data['refresh']
+        session_key = login_res.data['session_key']
+
+        # Sanity: bound tokens work while the session is active.
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
+        ok_res = self.client.get(reverse('account_profile'))
+        self.assertEqual(ok_res.status_code, status.HTTP_200_OK)
+
+        # Revoke the session (as logout / per-session revoke / reset does).
+        UserSession.objects.filter(
+            user=user, session_key=session_key).update(is_active=False)
+
+        # Access token must now be rejected.
+        denied_res = self.client.get(reverse('account_profile'))
+        self.assertEqual(denied_res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        # Refresh token must not mint new access tokens either.
+        self.client.credentials()
+        refresh_url = reverse('auth_refresh')
+        ref_res = self.client.post(refresh_url, {"refresh": refresh_token}, format='json')
+        self.assertEqual(ref_res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_recovery_code_is_single_use(self):
+        user = User.objects.create_user(
+            username=self.user_data['email'],
+            email=self.user_data['email'],
+            password=self.user_data['password']
+        )
+        user.two_factor_secret = pyotp.random_base32()
+        user.two_factor_recovery_codes = ["abcd1234", "efgh5678"]
+        user.two_factor_enabled = True
+        user.save()
+
+        # First use of the recovery code succeeds.
+        first = self.client.post(self.login_url, {
+            "email": self.user_data['email'],
+            "password": self.user_data['password'],
+            "totp_code": "abcd1234",
+        }, format='json')
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertIn('access', first.data)
+        user.refresh_from_db()
+        self.assertNotIn("abcd1234", user.two_factor_recovery_codes)
+
+        # Reusing the same code fails.
+        second = self.client.post(self.login_url, {
+            "email": self.user_data['email'],
+            "password": self.user_data['password'],
+            "totp_code": "abcd1234",
+        }, format='json')
+        self.assertEqual(second.status_code, status.HTTP_401_UNAUTHORIZED)

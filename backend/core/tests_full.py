@@ -176,8 +176,8 @@ class RegistrationLoginTests(AuthTestBase):
         res = c.post(f'{AUTH}/auth/login',
                      {'email': 'lock@test.dev', 'password': 'Str0ng!Passw0rd!'},
                      format='json')
-        self.assertEqual(res.status_code, 429 if hasattr(res, 'status_code') else res.status_code)
-        self.assertIn(res.status_code, (400, 401, 403, 423, 429))
+        # Locked accounts are indistinguishable from bad credentials.
+        self.assertEqual(res.status_code, 401)
         user = User.objects.get(email='lock@test.dev')
         self.assertIsNotNone(user.account_locked_until)
 
