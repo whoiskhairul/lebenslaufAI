@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Briefcase, Plus, Trash, ArrowUp, ArrowDown, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { ConfirmPopover } from '../../../../components/ConfirmPopover';
 import { parseDate } from '../../utils/dateUtils';
 import styles from '../../../EditorNew.module.css';
 
@@ -58,10 +59,11 @@ export const ExperienceEditor: React.FC<ExperienceEditorProps> = ({
     setExperiences(prev => prev.map((exp, i) => i === index ? { ...exp, ...updates } : exp));
   };
 
+  const [pendingDeleteIndex, setPendingDeleteIndex] = useState<number | null>(null);
+
   const handleDeleteExp = (index: number) => {
-    if (window.confirm('Delete this experience entry?')) {
-      setExperiences(prev => prev.filter((_, i) => i !== index));
-    }
+    setExperiences(prev => prev.filter((_, i) => i !== index));
+    setPendingDeleteIndex(null);
   };
 
   const handleMoveExp = (index: number, dir: 'up' | 'down') => {
@@ -252,7 +254,7 @@ export const ExperienceEditor: React.FC<ExperienceEditorProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDeleteExp(eIdx)}
+                    onClick={() => setPendingDeleteIndex(eIdx)}
                     className={`${styles.sideIconBtn} ${styles.sideIconBtnDanger}`}
                     title="Delete Position"
                   >
@@ -427,6 +429,13 @@ export const ExperienceEditor: React.FC<ExperienceEditorProps> = ({
             <Plus size={13} /> Add First Experience
           </button>
         </div>
+      )}
+      {pendingDeleteIndex !== null && (
+        <ConfirmPopover
+          message="Delete this experience entry?"
+          onConfirm={() => handleDeleteExp(pendingDeleteIndex)}
+          onCancel={() => setPendingDeleteIndex(null)}
+        />
       )}
     </div>
   );

@@ -23,6 +23,16 @@ api.interceptors.request.use(
     if (deepseekKey) {
       config.headers['X-Deepseek-Key'] = deepseekKey;
     }
+    // Per-user LLM routing (Settings page). Only sent when explicitly saved,
+    // otherwise the server default applies. Backend validates both values.
+    const aiProvider = localStorage.getItem('ai_provider');
+    if (aiProvider) {
+      config.headers['X-AI-Provider'] = aiProvider;
+    }
+    const aiModel = localStorage.getItem('ai_model');
+    if (aiModel) {
+      config.headers['X-AI-Model'] = aiModel;
+    }
     return config;
   },
   (error) => {

@@ -123,12 +123,18 @@ export const App: React.FC = () => {
     if (isNotFound) return;
     const { pathname, search, hash } = window.location;
     if (pathname === `/${activeView}`) return;
-    // Stale query params of a protected page are dropped on the login redirect.
     const isAuthRedirect = !isAuthenticated && !publicPaths.includes(currentPath);
+    if (isAuthRedirect) {
+      // Remember where the user wanted to go so login can send them back
+      // (e.g. /editor?appId=… instead of always /dashboard).
+      const original = `${pathname}${search}${hash}`;
+      window.history.replaceState({}, '', `/login?next=${encodeURIComponent(original)}`);
+      return;
+    }
     // Carry over query params, including those that arrived inside a
     // hash-route (e.g. "/#editor?appId=1" opened by the extension).
     const hashQuery = hash.includes('?') ? `?${hash.split('?')[1]}` : '';
-    window.history.replaceState({}, '', `/${activeView}${isAuthRedirect ? '' : (search || hashQuery)}`);
+    window.history.replaceState({}, '', `/${activeView}${search || hashQuery}`);
   }, [isAuthenticated, activeView, currentPath, isNotFound]);
 
   // 1. Unknown paths → 404 (sidebar stays available when logged in)

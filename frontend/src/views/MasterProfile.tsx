@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/Button';
+import { ConfirmPopover } from '../components/ConfirmPopover';
 import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
@@ -607,8 +608,9 @@ export const MasterProfile: React.FC = () => {
     setIsAdding(true);
   };
 
+  const [pendingConfirm, setPendingConfirm] = useState<{ message: string; action: () => void } | null>(null);
+
   const handleDeleteExperience = async (id: string) => {
-    if (!window.confirm('Delete this work experience?')) return;
     try {
       await api.delete(`/master-profile/experience/${id}`);
       fetchProfile();
@@ -670,7 +672,6 @@ export const MasterProfile: React.FC = () => {
   };
 
   const handleDeleteEducation = async (id: string) => {
-    if (!window.confirm('Delete this education?')) return;
     try {
       await api.delete(`/master-profile/education/${id}`);
       fetchProfile();
@@ -1072,7 +1073,6 @@ export const MasterProfile: React.FC = () => {
   };
 
   const handleDeleteProject = async (id: string) => {
-    if (!window.confirm('Delete this project?')) return;
     try {
       await api.delete(`/master-profile/projects/${id}`);
       fetchProfile();
@@ -1624,7 +1624,7 @@ export const MasterProfile: React.FC = () => {
                             <button type="button" onClick={() => handleStartEditExperience(exp)} className={cls.deleteBtn} style={{ color: 'var(--primary-color, #4f46e5)' }} title="Edit experience">
                               <Edit3 size={16} />
                             </button>
-                            <button type="button" onClick={() => handleDeleteExperience(exp.id!)} className={cls.deleteBtn}>
+                            <button type="button" onClick={() => setPendingConfirm({ message: 'Delete this work experience?', action: () => handleDeleteExperience(exp.id!) })} className={cls.deleteBtn}>
                               <Trash2 size={16} />
                             </button>
                           </div>
@@ -1701,7 +1701,7 @@ export const MasterProfile: React.FC = () => {
                             <button type="button" onClick={() => handleStartEditProject(proj)} className={cls.deleteBtn} style={{ color: 'var(--primary-color, #4f46e5)' }} title="Edit project">
                               <Edit3 size={16} />
                             </button>
-                            <button type="button" onClick={() => handleDeleteProject(proj.id!)} className={cls.deleteBtn}>
+                            <button type="button" onClick={() => setPendingConfirm({ message: 'Delete this project?', action: () => handleDeleteProject(proj.id!) })} className={cls.deleteBtn}>
                               <Trash2 size={16} />
                             </button>
                           </div>
@@ -2109,7 +2109,7 @@ export const MasterProfile: React.FC = () => {
                             <button type="button" onClick={() => handleStartEditEducation(edu)} className={cls.deleteBtn} style={{ color: 'var(--primary-color, #4f46e5)' }} title="Edit education">
                               <Edit3 size={16} />
                             </button>
-                            <button type="button" onClick={() => handleDeleteEducation(edu.id!)} className={cls.deleteBtn}>
+                            <button type="button" onClick={() => setPendingConfirm({ message: 'Delete this education?', action: () => handleDeleteEducation(edu.id!) })} className={cls.deleteBtn}>
                               <Trash2 size={16} />
                             </button>
                           </div>
@@ -2512,6 +2512,17 @@ export const MasterProfile: React.FC = () => {
             )}
           </div>
         </div>
+      )}
+      {pendingConfirm && (
+        <ConfirmPopover
+          message={pendingConfirm.message}
+          onConfirm={() => {
+            const action = pendingConfirm.action;
+            setPendingConfirm(null);
+            action();
+          }}
+          onCancel={() => setPendingConfirm(null)}
+        />
       )}
     </div>
   );

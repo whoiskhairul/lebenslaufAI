@@ -4,7 +4,9 @@ import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { navigateTo } from '../utils/navigation';
 import { CompanyAutocomplete } from '../components/CompanyAutocomplete';
+import { ConfirmPopover } from '../components/ConfirmPopover';
 import { CompanyLogo } from '../components/CompanyLogo';
+import { ApplicationDetailsPopover, type ApplicationStatus } from '../components/ApplicationDetailsPopover';
 import { KanbanCardSkeleton } from '../components/skeleton/DashboardSkeleton';
 import { Skeleton } from '../components/skeleton/Skeleton';
 import { Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, ExternalLink, Sparkles, Info, FileText, Archive, Undo2, Search } from 'lucide-react';
@@ -13,28 +15,23 @@ import { Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, Exte
 const iconBtnBase = 'w-[26px] h-[26px] rounded-md flex items-center justify-center text-muted transition-colors';
 const fieldLabelCls = 'font-header text-xs font-bold uppercase tracking-wide text-muted';
 
-// Truncate long job titles to keep kanban cards compact (full text on hover / click)
-const TITLE_MAX_WORDS = 6;
-const truncateTitle = (text: string): { display: string; truncated: boolean } => {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  if (words.length <= TITLE_MAX_WORDS) return { display: text, truncated: false };
-  return { display: words.slice(0, TITLE_MAX_WORDS).join(' ') + ' …', truncated: true };
-};
-
 
 interface Application {
   id: string;
   company: string;
   company_domain?: string | null;
   position: string;
-  status: 'wishlist' | 'preparing' | 'applied' | 'interview' | 'offer' | 'rejected' | 'archived';
+  status: ApplicationStatus;
   url?: string;
   salary?: string;
   location?: string;
   notes?: string;
   job_description?: string;
+  contact_name?: string | null;
+  contact_email?: string | null;
   deadline?: string;
   status_history?: Array<{ status: string; date: string }>;
+  created_at?: string;
   updated_at: string;
 }
 
@@ -62,20 +59,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
   const [activeView, setActiveView] = useState<'board' | 'archived'>('board');
   const [archivedSearch, setArchivedSearch] = useState('');
 
-  // Job titles expanded in place (kanban cards)
-  const [expandedTitles, setExpandedTitles] = useState<Record<string, boolean>>({});
-
   // Form Fields
   const [company, setCompany] = useState('');
   const [companyDomain, setCompanyDomain] = useState('');
   const [position, setPosition] = useState('');
-  const [status, setStatus] = useState<'wishlist' | 'preparing' | 'applied' | 'interview' | 'offer' | 'rejected'>('wishlist');
+  const [status, setStatus] = useState<ApplicationStatus>('wishlist');
   const [url, setUrl] = useState('');
   const [salary, setSalary] = useState('');
   const [location, setLocation] = useState('');
   const [deadline, setDeadline] = useState('');
   const [notes, setNotes] = useState('');
   const [jobDescription, setJobDescription] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  // When set, the Track modal edits this application instead of creating one.
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const fetchApplications = async () => {
     try {
@@ -135,7 +133,52 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
     }
   }, [activeAppId, applications]);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const resetForm = () => {
+    setCompany('');
+    setCompanyDomain('');
+    setPosition('');
+    setStatus('wishlist');
+    setUrl('');
+    setSalary('');
+    setLocation('');
+    setDeadline('');
+    setNotes('');
+    setJobDescription('');
+    setContactName('');
+    setContactEmail('');
+    setEditingId(null);
+  };
+
+  const openEdit = (app: Application) => {
+    setCompany(app.company || '');
+    setCompanyDomain(app.company_domain || '');
+    setPosition(app.position || '');
+    setStatus(app.status === 'archived' ? previousStatusFor(app) : app.status);
+    setUrl(app.url || '');
+    setSalary(app.salary || '');
+    setLocation(app.location || '');
+    setDeadline(app.deadline || '');
+    setNotes(app.notes || '');
+    setJobDescription(app.job_description || '');
+    setContactName(app.contact_name || '');
+    setContactEmail(app.contact_email || '');
+    setEditingId(app.id);
+    setErrorMsg('');
+    setIsModalOpen(true);
+  };
+
+  // Partial inline update (notes / description tabs in the details popover).
+  const handlePatchFields = async (appId: string, fields: Partial<Application>) => {
+    try {
+      await api.patch(`/applications/${appId}`, fields);
+      await fetchApplications();
+      setSelectedApp((prev) => (prev && prev.id === appId ? { ...prev, ...fields } : prev));
+    } catch (err) {
+      console.error('Failed to update application:', err);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!company || !position) {
       setErrorMsg('Company and Position are required fields.');
@@ -144,27 +187,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
     setIsLoading(true);
     setErrorMsg('');
 
+    const payload = {
+      company,
+      company_domain: companyDomain || null,
+      position,
+      status,
+      url,
+      salary,
+      location,
+      deadline,
+      notes,
+      job_description: jobDescription,
+      contact_name: contactName || null,
+      contact_email: contactEmail || null,
+    };
+
     try {
-      await api.post('/applications', {
-        company, company_domain: companyDomain || null, position, status, url, salary, location, deadline, notes, job_description: jobDescription
-      });
+      if (editingId) {
+        await api.patch(`/applications/${editingId}`, payload);
+        setSelectedApp((prev) => (prev && prev.id === editingId ? { ...prev, ...payload } as Application : prev));
+      } else {
+        await api.post('/applications', payload);
+      }
       setIsModalOpen(false);
-      // Reset form
-      setCompany('');
-      setCompanyDomain('');
-      setPosition('');
-      setStatus('wishlist');
-      setUrl('');
-      setSalary('');
-      setLocation('');
-      setDeadline('');
-      setNotes('');
-      setJobDescription('');
+      resetForm();
       fetchApplications();
       fetchAtsScores();
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.response?.data?.error?.message || 'Failed to create job tracking card.');
+      setErrorMsg(err.response?.data?.error?.message || 'Failed to save job tracking card.');
     } finally {
       setIsLoading(false);
     }
@@ -202,8 +253,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
     await handleUpdateStatus(appId, target);
   };
 
+  const [pendingConfirm, setPendingConfirm] = useState<{ message: string; action: () => void } | null>(null);
+
   const handleDelete = async (appId: string) => {
-    if (!window.confirm('Are you sure you want to remove this job tracking card?')) return;
     try {
       await api.delete(`/applications/${appId}`);
       setIsDetailsOpen(false);
@@ -217,7 +269,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
   };
 
   const handleDeleteVersion = async (versionId: string) => {
-    if (!window.confirm('Are you sure you want to delete this tailored CV version?')) return;
     try {
       await api.delete(`/resume/versions/${versionId}`);
       fetchAtsScores();
@@ -244,14 +295,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
   const archivedApplications = applications.filter(a => a.status === 'archived');
   const totalApps = activeApplications.length;
   const interviewApps = activeApplications.filter(a => a.status === 'interview').length;
-  const offerApps = activeApplications.filter(a => a.status === 'offer').length;
+  // Conversion = reached interview or beyond. Denominator = every card that
+  // went through "applied" (applied + rejected + interview + offer — the
+  // latter two count as applied since they got there via applying).
+  // Wishlist / preparing never entered the pipeline; archived is already
+  // excluded via activeApplications.
+  const convertedApps = activeApplications.filter(a => a.status === 'interview' || a.status === 'offer').length;
+  const conversionBaseApps = activeApplications.filter(
+    a => a.status === 'applied' || a.status === 'rejected' || a.status === 'interview' || a.status === 'offer'
+  ).length;
 
   const scoreValues = Object.values(atsScores);
   const avgMatchScore = scoreValues.length > 0
     ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
     : '--';
 
-  const conversionRate = totalApps > 0 ? Math.round((offerApps / totalApps) * 100) : 0;
+  const conversionRate = conversionBaseApps > 0 ? Math.round((convertedApps / conversionBaseApps) * 100) : 0;
 
   const columns = [
     { id: 'wishlist', label: 'Wishlist', color: '#94A3B8' },
@@ -294,7 +353,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
           </div>
           <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 justify-center">
             <Plus size={18} />
-            <span>Track Application</span>
+            <span>Create New Application</span>
           </Button>
         </div>
       </div>
@@ -335,431 +394,290 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
 
       {/* Kanban Board Container - Board layout & headers render immediately */}
       {activeView === 'board' ? (
-      <div className="flex-1 overflow-x-auto overflow-y-hidden p-1 pb-4 snap-x snap-proximity md:snap-none thin-scrollbar">
-        <div className="flex gap-3.5 h-full min-w-[1000px]">
-          {columns.map((col) => {
-            const colApps = activeApplications.filter((app) => app.status === col.id);
-            const isDragOver = dragOverCol === col.id;
-            return (
-              <div
-                key={col.id}
-                style={{ '--col-accent': col.color } as React.CSSProperties}
-                className={`relative overflow-hidden flex-1 flex flex-col bg-card border border-cardline rounded-[14px] p-3 min-w-[240px] h-full transition-all duration-200
+        <div className="relative h-[calc(100dvh-400px)] min-h-[340px] md:h-auto md:flex-1 overflow-x-auto overflow-y-hidden p-1 pb-4 snap-x snap-mandatory md:snap-none thin-scrollbar">
+          <div className="flex gap-3.5 h-full w-max md:w-full min-w-full">
+            {columns.map((col) => {
+              const colApps = activeApplications.filter((app) => app.status === col.id);
+              const isDragOver = dragOverCol === col.id;
+              return (
+                <div
+                  key={col.id}
+                  style={{ '--col-accent': col.color } as React.CSSProperties}
+                  className={`relative overflow-hidden flex flex-col bg-card border border-cardline rounded-[14px] p-3 w-[82vw] sm:w-[320px] md:w-auto md:flex-1 md:min-w-[220px] shrink-0 md:shrink snap-start h-full transition-all duration-200
                   before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-[3px] before:bg-[var(--col-accent,var(--primary))] before:opacity-85
                   ${isDragOver ? 'border-[var(--col-accent,var(--primary))] shadow-[0_0_0_2px_var(--col-accent,var(--primary))] scale-[1.01]' : ''}`}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  if (dragOverCol !== col.id) {
-                    setDragOverCol(col.id);
-                  }
-                }}
-                onDragLeave={() => setDragOverCol(null)}
-                onDrop={(e) => {
-                  handleDrop(e, col.id);
-                  setDragOverCol(null);
-                }}
-              >
-                <div className="flex justify-between items-center mb-3 pb-2 border-b border-cardline shrink-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-[var(--col-accent,var(--primary))] shadow-[0_0_6px_var(--col-accent,transparent)] shrink-0"></span>
-                    <h3 className="font-header text-sm font-bold text-foreground truncate">{col.label}</h3>
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (dragOverCol !== col.id) {
+                      setDragOverCol(col.id);
+                    }
+                  }}
+                  onDragLeave={() => setDragOverCol(null)}
+                  onDrop={(e) => {
+                    handleDrop(e, col.id);
+                    setDragOverCol(null);
+                  }}
+                >
+                  <div className="flex justify-between items-center mb-3 pb-2 border-b border-cardline shrink-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-[var(--col-accent,var(--primary))] shadow-[0_0_6px_var(--col-accent,transparent)] shrink-0"></span>
+                      <h3 className="font-header text-sm font-bold text-foreground truncate">{col.label}</h3>
+                    </div>
+                    <span className="text-xs font-bold text-muted bg-mutedlight px-2 py-0.5 rounded-full shrink-0">
+                      {isInitialLoading ? <Skeleton variant="text" width={16} height={14} /> : colApps.length}
+                    </span>
                   </div>
-                  <span className="text-xs font-bold text-muted bg-mutedlight px-2 py-0.5 rounded-full shrink-0">
-                    {isInitialLoading ? <Skeleton variant="text" width={16} height={14} /> : colApps.length}
-                  </span>
-                </div>
 
-                <div className="flex-1 flex flex-col gap-2.5 overflow-y-auto px-0.5 pb-1.5 thin-scrollbar">
-                  {isInitialLoading ? (
-                    <>
-                      <KanbanCardSkeleton />
-                      <KanbanCardSkeleton />
-                    </>
-                  ) : colApps.length === 0 ? (
-                    <div className="flex justify-center items-center h-[72px] text-muted text-xs border-[1.5px] border-dashed border-cardline rounded-[10px] opacity-80">No items</div>
-                  ) : (
-                    colApps.map((app) => {
-                      const score = atsScores[app.id];
-                      return (
-                        <div
-                          key={app.id}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, app.id)}
-                          onClick={() => {
-                            setSelectedApp(app);
-                            setIsDetailsOpen(true);
-                            navigateTo(`/dashboard?appId=${app.id}`);
-                          }}
-                          className="px-4 py-3 text-left flex flex-col bg-card border border-cardline rounded-xl shadow-sm animate-cardSlideIn cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--col-accent,var(--primary))] active:scale-[0.98]"
-                        >
+                  <div className="flex flex-col gap-2.5 flex-1 min-h-0 overflow-y-auto px-0.5 pb-1.5 thin-scrollbar">
+                    {isInitialLoading ? (
+                      <>
+                        <KanbanCardSkeleton />
+                        <KanbanCardSkeleton />
+                      </>
+                    ) : colApps.length === 0 ? (
+                      <div className="flex justify-center items-center h-[72px] text-muted text-xs border-[1.5px] border-dashed border-cardline rounded-[10px] opacity-80">No items</div>
+                    ) : (
+                      colApps.map((app) => {
+                        const score = atsScores[app.id];
+                        return (
+                          <div
+                            key={app.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, app.id)}
+                            onClick={() => {
+                              setSelectedApp(app);
+                              setIsDetailsOpen(true);
+                              navigateTo(`/dashboard?appId=${app.id}`);
+                            }}
+                            className="min-w-0 shrink-0 overflow-hidden px-3.5 py-3 text-left flex flex-col gap-2 bg-card border border-cardline rounded-xl shadow-sm animate-cardSlideIn cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--col-accent,var(--primary))] active:scale-[0.98]"
+                          >
 
 
-                          <div>
-                            <div className="flex justify-between items-start gap-2">
-                              {(() => {
-                                const t = truncateTitle(app.position);
-                                const isExpanded = !!expandedTitles[app.id];
-                                return (
-                                  <h4
-                                    className={`font-header text-sm font-bold text-foreground mb-0.5 break-words ${t.truncated ? 'cursor-pointer' : ''}`}
-                                    title={app.position}
-                                    onClick={t.truncated ? (e) => {
-                                      e.stopPropagation();
-                                      setExpandedTitles(prev => ({ ...prev, [app.id]: !isExpanded }));
-                                    } : undefined}
-                                  >
-                                    {!t.truncated ? app.position : (
-                                      <span>
-                                        {isExpanded ? app.position : t.display}{' '}
-                                        <span className="text-primary font-semibold text-xs">{isExpanded ? '(less)' : '(more)'}</span>
-                                      </span>
-                                    )}
-                                  </h4>
-                                );
-                              })()}
-                              {score !== undefined && (
-                                <span
-                                  className={`text-[10px] font-bold px-[5px] py-px rounded shrink-0 ${score > 80 ? 'bg-emerald-500/10 text-success' : 'bg-amber-500/10 text-warning'}`}
+                            <div className="min-w-0">
+                              <div className="flex justify-between items-start gap-2 min-w-0">
+                                <h4
+                                  className="min-w-0 flex-1 font-header text-sm font-bold text-foreground break-words line-clamp-2"
+                                  title={app.position}
                                 >
-                                  {score}%
+                                  {app.position}
+                                </h4>
+                                {score !== undefined && (
+                                  <span
+                                    className={`text-[10px] font-bold px-[5px] py-px rounded shrink-0 ${score > 80 ? 'bg-emerald-500/10 text-success' : 'bg-amber-500/10 text-warning'}`}
+                                  >
+                                    {score}%
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-1 min-w-0">
+                                <CompanyLogo company={app.company} domain={app.company_domain} size={24} />
+                                <p className="min-w-0 flex-1 text-xs text-muted font-medium truncate">{app.company}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-1.5 min-w-0">
+                              {app.location && (
+                                <span className="inline-flex items-center gap-1 max-w-full min-w-0 text-[11px] text-muted bg-mutedlight px-2 py-0.5 rounded-full">
+                                  <MapPin size={11} className="shrink-0" />
+                                  <span className="truncate">{app.location}</span>
+                                </span>
+                              )}
+                              {app.salary && (
+                                <span className="inline-flex items-center gap-1 max-w-full min-w-0 text-[11px] text-muted bg-mutedlight px-2 py-0.5 rounded-full">
+                                  <DollarSign size={11} className="shrink-0" />
+                                  <span className="truncate">{app.salary}</span>
+                                </span>
+                              )}
+                              {app.deadline && (
+                                <span className="inline-flex items-center gap-1 max-w-full min-w-0 text-[11px] text-muted bg-mutedlight px-2 py-0.5 rounded-full">
+                                  <Calendar size={11} className="shrink-0" />
+                                  <span className="truncate">{app.deadline}</span>
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 mt-1">
-                              <CompanyLogo company={app.company} domain={app.company_domain} size={24} />
-                              <p className="text-xs text-muted font-medium truncate">{app.company}</p>
+
+                            {app.notes && (
+                              <p className="min-w-0 text-[11px] text-muted leading-snug break-words line-clamp-2 bg-black/[0.03] px-2 py-1.5 rounded-md m-0">
+                                {app.notes}
+                              </p>
+                            )}
+
+                            <div className="flex justify-between items-center mt-auto border-t border-cardline pt-2" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => {
+                                    const idx = columns.findIndex(c => c.id === app.status);
+                                    if (idx > 0) handleUpdateStatus(app.id, columns[idx - 1].id);
+                                  }}
+                                  disabled={app.status === 'wishlist'}
+                                  title="Move left"
+                                  className={`${iconBtnBase} hover:bg-mutedlight hover:text-foreground disabled:opacity-30`}
+                                >
+                                  <ArrowLeft size={14} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const idx = columns.findIndex(c => c.id === app.status);
+                                    if (idx < columns.length - 1) handleUpdateStatus(app.id, columns[idx + 1].id);
+                                  }}
+                                  disabled={app.status === 'rejected'}
+                                  title="Move right"
+                                  className={`${iconBtnBase} hover:bg-mutedlight hover:text-foreground disabled:opacity-30`}
+                                >
+                                  <ArrowRight size={14} />
+                                </button>
+                              </div>
+
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => onNavigateToEditor({
+                                    company: app.company,
+                                    position: app.position,
+                                    desc: app.job_description || app.notes || '',
+                                    application_id: app.id
+                                  })}
+                                  title="Open Tailoring Canvas"
+                                  className={`${iconBtnBase} hover:bg-mutedlight hover:text-primary`}
+                                >
+                                  <ExternalLink size={14} />
+                                </button>
+                                <button onClick={() => setPendingConfirm({ message: 'Are you sure you want to remove this job tracking card?', action: () => handleDelete(app.id) })} title="Delete card" className={`${iconBtnBase} hover:bg-mutedlight`}>
+                                  <Trash2 size={14} className="text-danger" />
+                                </button>
+                              </div>
                             </div>
                           </div>
-
-                          <div className="flex flex-wrap gap-2 my-3">
-                            {app.location && (
-                              <span className="inline-flex items-center gap-1 text-xs text-muted">
-                                <MapPin size={12} /> {app.location}
-                              </span>
-                            )}
-                            {app.salary && (
-                              <span className="inline-flex items-center gap-1 text-xs text-muted">
-                                <DollarSign size={12} /> {app.salary}
-                              </span>
-                            )}
-                            {app.deadline && (
-                              <span className="inline-flex items-center gap-1 text-xs text-muted">
-                                <Calendar size={12} /> {app.deadline}
-                              </span>
-                            )}
-                          </div>
-
-                          {app.notes && <p className="text-xs text-muted leading-normal mb-3 bg-black/[0.03] px-2 py-2 rounded-md max-h-[50px] overflow-hidden text-ellipsis whitespace-nowrap">{app.notes}</p>}
-
-                          <div className="flex justify-between items-center mt-auto border-t border-cardline pt-2" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex gap-1">
-                              <button
-                                onClick={() => {
-                                  const idx = columns.findIndex(c => c.id === app.status);
-                                  if (idx > 0) handleUpdateStatus(app.id, columns[idx - 1].id);
-                                }}
-                                disabled={app.status === 'wishlist'}
-                                title="Move left"
-                                className={`${iconBtnBase} hover:bg-mutedlight hover:text-foreground disabled:opacity-30`}
-                              >
-                                <ArrowLeft size={14} />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  const idx = columns.findIndex(c => c.id === app.status);
-                                  if (idx < columns.length - 1) handleUpdateStatus(app.id, columns[idx + 1].id);
-                                }}
-                                disabled={app.status === 'rejected'}
-                                title="Move right"
-                                className={`${iconBtnBase} hover:bg-mutedlight hover:text-foreground disabled:opacity-30`}
-                              >
-                                <ArrowRight size={14} />
-                              </button>
-                            </div>
-
-                            <div className="flex gap-1">
-                              <button
-                                onClick={() => onNavigateToEditor({
-                                  company: app.company,
-                                  position: app.position,
-                                  desc: app.job_description || app.notes || '',
-                                  application_id: app.id
-                                })}
-                                title="Open Tailoring Canvas"
-                                className={`${iconBtnBase} hover:bg-mutedlight hover:text-primary`}
-                              >
-                                <ExternalLink size={14} />
-                              </button>
-                              <button onClick={() => handleArchive(app.id)} title="Archive card" className={`${iconBtnBase} hover:bg-mutedlight hover:text-foreground`}>
-                                <Archive size={14} />
-                              </button>
-                              <button onClick={() => handleDelete(app.id)} title="Delete card" className={`${iconBtnBase} hover:bg-mutedlight`}>
-                                <Trash2 size={14} className="text-danger" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      ) : (
-      /* Archived list view — compact rows, not a kanban board */
-      <div className="flex-1 overflow-y-auto p-1 pb-4 thin-scrollbar">
-        <div className="glass-card p-4 md:p-6 max-w-[900px] mx-auto w-full">
-          <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
-            <div>
-              <h3 className="font-header text-base font-bold text-foreground">Archived Applications</h3>
-              <p className="text-xs text-muted">Cards you archived stay here — restore them to their previous column or delete permanently.</p>
-            </div>
-            <div className="relative md:ml-auto w-full md:w-[280px]">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <input
-                value={archivedSearch}
-                onChange={(e) => setArchivedSearch(e.target.value)}
-                placeholder="Search company or position…"
-                className="w-full pl-9 pr-3 py-2 rounded-lg border border-cardline bg-card text-foreground text-sm outline-none focus:border-primary"
-              />
-            </div>
-          </div>
-          {isInitialLoading ? (
-            <>
-              <KanbanCardSkeleton />
-              <KanbanCardSkeleton />
-            </>
-          ) : (() => {
-            const q = archivedSearch.trim().toLowerCase();
-            const rows = archivedApplications.filter(a =>
-              !q || a.company.toLowerCase().includes(q) || a.position.toLowerCase().includes(q)
-            );
-            if (rows.length === 0) {
-              return (
-                <div className="flex justify-center items-center h-[120px] text-muted text-sm border-[1.5px] border-dashed border-cardline rounded-[10px]">
-                  {archivedApplications.length === 0 ? 'Nothing archived yet. Use the archive icon on any card.' : 'No archived cards match your search.'}
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               );
-            }
-            return (
-              <div className="flex flex-col gap-2">
-                {rows.map((app) => (
-                  <div
-                    key={app.id}
-                    onClick={() => {
-                      setSelectedApp(app);
-                      setIsDetailsOpen(true);
-                      navigateTo(`/dashboard?appId=${app.id}`);
-                    }}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-cardline bg-card hover:border-primary hover:shadow-sm cursor-pointer transition-all"
-                  >
-                    <CompanyLogo company={app.company} domain={app.company_domain} size={32} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-foreground truncate">{app.position}</p>
-                      <p className="text-xs text-muted truncate">{app.company}{app.location ? ` • ${app.location}` : ''}</p>
-                    </div>
-                    <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-wide text-muted bg-mutedlight px-2 py-1 rounded-full shrink-0">
-                      was: {previousStatusFor(app)}
-                    </span>
-                    <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => handleRestore(app.id)}
-                        title={`Restore to ${previousStatusFor(app)}`}
-                        className={`${iconBtnBase} hover:bg-mutedlight hover:text-success`}
-                      >
-                        <Undo2 size={14} />
-                      </button>
-                      <button onClick={() => handleDelete(app.id)} title="Delete permanently" className={`${iconBtnBase} hover:bg-mutedlight`}>
-                        <Trash2 size={14} className="text-danger" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
+            })}
+          </div>
+          {/* Right-edge fade: hints at more boards off-screen (mobile only) */}
+          <div aria-hidden="true" className="md:hidden pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[var(--background)] to-transparent" />
         </div>
-      </div>
-      )}
-
-      {/* Slide-out Application Details Side Panel */}
-      {isDetailsOpen && selectedApp && (
-        <div className="fixed inset-0 z-[800] bg-black/50 backdrop-blur-sm flex items-center justify-center" onClick={() => { setIsDetailsOpen(false); setSelectedApp(null); navigateTo('/dashboard'); }}>
-          <div className="absolute top-0 right-0 w-full max-w-[480px] h-auto md:h-full bottom-[calc(76px+env(safe-area-inset-bottom,0px))] md:bottom-0 bg-card border-l border-cardline shadow-lg flex flex-col z-[800] animate-panelSlideIn text-left" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center px-4 md:px-6 py-3 md:py-4 border-b border-cardline">
-              <h3 className="text-base text-foreground">Application Command Center</h3>
-              <Button variant="ghost" onClick={() => { setIsDetailsOpen(false); setSelectedApp(null); navigateTo('/dashboard'); }} className="w-[30px] h-[30px] flex items-center justify-center p-0">
-                X
-              </Button>
+      ) : (
+        /* Archived list view — compact rows, not a kanban board */
+        <div className="flex-1 overflow-y-auto p-1 pb-4 thin-scrollbar">
+          <div className="glass-card p-4 md:p-6 max-w-[900px] mx-auto w-full">
+            <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+              <div>
+                <h3 className="font-header text-base font-bold text-foreground">Archived Applications</h3>
+                <p className="text-xs text-muted">Cards you archived stay here — restore them to their previous column or delete permanently.</p>
+              </div>
+              <div className="relative md:ml-auto w-full md:w-[280px]">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                <input
+                  value={archivedSearch}
+                  onChange={(e) => setArchivedSearch(e.target.value)}
+                  placeholder="Search company or position…"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-cardline bg-card text-foreground text-sm outline-none focus:border-primary"
+                />
+              </div>
             </div>
-
-
-            <div className="flex-1 px-4 md:px-6 py-4 md:py-6 overflow-y-auto flex flex-col gap-4 md:gap-6">
-              <div className="flex items-center gap-3">
-                <CompanyLogo company={selectedApp.company} domain={selectedApp.company_domain} size={44} />
-                <div className="flex flex-col gap-1 min-w-0">
-                  <h2 className="truncate">{selectedApp.position}</h2>
-                  <h3 className="text-primary text-lg font-semibold truncate">{selectedApp.company}</h3>
-                  {selectedApp.company_domain && (
-                    <span className="text-xs text-muted">{selectedApp.company_domain}</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 bg-slate-500/5 p-4 rounded-lg">
-                <div className="flex items-center gap-2 text-muted">
-                  <MapPin size={16} />
-                  <div>
-                    <label className={fieldLabelCls}>Location</label>
-                    <p className="text-foreground text-sm font-semibold m-0">{selectedApp.location || 'Not Specified'}</p>
+            {isInitialLoading ? (
+              <>
+                <KanbanCardSkeleton />
+                <KanbanCardSkeleton />
+              </>
+            ) : (() => {
+              const q = archivedSearch.trim().toLowerCase();
+              const rows = archivedApplications.filter(a =>
+                !q || a.company.toLowerCase().includes(q) || a.position.toLowerCase().includes(q)
+              );
+              if (rows.length === 0) {
+                return (
+                  <div className="flex justify-center items-center h-[120px] text-muted text-sm border-[1.5px] border-dashed border-cardline rounded-[10px]">
+                    {archivedApplications.length === 0 ? 'Nothing archived yet. Use the archive icon on any card.' : 'No archived cards match your search.'}
                   </div>
-                </div>
-                <div className="flex items-center gap-2 text-muted">
-                  <DollarSign size={16} />
-                  <div>
-                    <label className={fieldLabelCls}>Salary</label>
-                    <p className="text-foreground text-sm font-semibold m-0">{selectedApp.salary || 'Not Specified'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-muted">
-                  <Calendar size={16} />
-                  <div>
-                    <label className={fieldLabelCls}>Deadline</label>
-                    <p className="text-foreground text-sm font-semibold m-0">{selectedApp.deadline || 'Not Specified'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-muted">
-                  <Info size={16} />
-                  <div>
-                    <label className={fieldLabelCls}>Status</label>
-                    <p style={{ textTransform: 'capitalize' }} className="text-foreground text-sm font-semibold m-0">{selectedApp.status}</p>
-                  </div>
-                </div>
-              </div>
-
-              {selectedApp.url && (
-                <div className="flex flex-col gap-1">
-                  <label className={fieldLabelCls}>Job Listing URL</label>
-                  <a href={selectedApp.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-secondary hover:text-secondaryhover text-sm break-all">
-                    {selectedApp.url} <ExternalLink size={12} />
-                  </a>
-                </div>
-              )}
-
-              {selectedApp.job_description && (
-                <div className="flex flex-col gap-1">
-                  <label className={fieldLabelCls}>Raw Job Description</label>
-                  <pre className="bg-slate-500/5 p-4 rounded-lg font-body text-xs text-foreground whitespace-pre-wrap max-h-[200px] overflow-y-auto border border-cardline">{selectedApp.job_description}</pre>
-                </div>
-              )}
-
-              {selectedApp.notes && (
-                <div className="flex flex-col gap-1">
-                  <label className={fieldLabelCls}>Progress Notes</label>
-                  <p className="text-sm text-foreground leading-relaxed m-0">{selectedApp.notes}</p>
-                </div>
-              )}
-
-
-              {/* Tailored Document Reference */}
-              {resumeVersions.filter(v => v.application === selectedApp.id).length > 0 && (
-                <div className="flex flex-col gap-1">
-                  <label className={fieldLabelCls}>Tailored Document</label>
-                  <div className="flex flex-col gap-2 mt-2">
-                    {resumeVersions.filter(v => v.application === selectedApp.id).map((v) => (
-                      <div key={v.id} className="flex justify-between items-center bg-slate-500/5 border border-cardline px-3 py-2 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <FileText size={16} className="text-primary shrink-0" />
-                          <div>
-                            <p className="text-xs font-bold text-foreground m-0">Tailored Resume</p>
-                            <span className="text-[10px] text-muted">
-                              Score: <strong style={{ color: v.ats_score > 80 ? 'var(--success)' : 'var(--warning)' }}>{v.ats_score}%</strong> • {new Date(v.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                          <Button
-                            variant="ghost"
-                            onClick={() => {
-                              setIsDetailsOpen(false);
-                              onNavigateToEditor({
-                                company: selectedApp.company,
-                                position: selectedApp.position,
-                                desc: selectedApp.job_description || selectedApp.notes || '',
-                                application_id: selectedApp.id
-                              });
-                            }}
-                            style={{ padding: '6px 12px', fontSize: '12px' }}
-                          >
-                            Open
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            onClick={() => handleDeleteVersion(v.id)}
-                            style={{ color: 'var(--danger)', padding: '6px 8px' }}
-                            title="Delete CV version"
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
+                );
+              }
+              return (
+                <div className="flex flex-col gap-2">
+                  {rows.map((app) => (
+                    <div
+                      key={app.id}
+                      onClick={() => {
+                        setSelectedApp(app);
+                        setIsDetailsOpen(true);
+                        navigateTo(`/dashboard?appId=${app.id}`);
+                      }}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-cardline bg-card hover:border-primary hover:shadow-sm cursor-pointer transition-all"
+                    >
+                      <CompanyLogo company={app.company} domain={app.company_domain} size={32} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-foreground truncate">{app.position}</p>
+                        <p className="text-xs text-muted truncate">{app.company}{app.location ? ` • ${app.location}` : ''}</p>
                       </div>
-                    ))}
-                  </div>
+                      <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-wide text-muted bg-mutedlight px-2 py-1 rounded-full shrink-0">
+                        was: {previousStatusFor(app)}
+                      </span>
+                      <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => handleRestore(app.id)}
+                          title={`Restore to ${previousStatusFor(app)}`}
+                          className={`${iconBtnBase} hover:bg-mutedlight hover:text-success`}
+                        >
+                          <Undo2 size={14} />
+                        </button>
+                        <button onClick={() => setPendingConfirm({ message: 'Are you sure you want to permanently delete this job tracking card?', action: () => handleDelete(app.id) })} title="Delete permanently" className={`${iconBtnBase} hover:bg-mutedlight`}>
+                          <Trash2 size={14} className="text-danger" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
-
-              <div className="flex flex-col gap-3 mt-auto pt-4 border-t border-cardline">
-                <Button
-                  onClick={() => {
-                    setIsDetailsOpen(false);
-                    onNavigateToEditor({
-                      company: selectedApp.company,
-                      position: selectedApp.position,
-                      desc: selectedApp.job_description || selectedApp.notes || '',
-                      application_id: selectedApp.id
-                    });
-                  }}
-                  className="w-full"
-                >
-                  <Sparkles size={16} />
-                  <span>Launch Tailoring Canvas</span>
-                </Button>
-
-                {selectedApp.status === 'archived' ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() => handleRestore(selectedApp.id)}
-                    className="w-full"
-                  >
-                    <Undo2 size={16} />
-                    <span>Restore to {previousStatusFor(selectedApp)}</span>
-                  </Button>
-                ) : (
-                  <Button
-                    variant="secondary"
-                    onClick={() => handleArchive(selectedApp.id)}
-                    className="w-full"
-                  >
-                    <Archive size={16} />
-                    <span>Archive Tracking Card</span>
-                  </Button>
-                )}
-
-                <Button
-                  variant="secondary"
-                  onClick={() => handleDelete(selectedApp.id)}
-                  className="w-full text-danger"
-                >
-                  <Trash2 size={16} />
-                  <span>Delete Tracking Card</span>
-                </Button>
-              </div>
-            </div>
+              );
+            })()}
           </div>
         </div>
+      )}
+
+      {/* Application Details Popover (replaces the old slide-out sidebar) */}
+      {isDetailsOpen && selectedApp && (
+        <ApplicationDetailsPopover
+          app={selectedApp}
+          statusOptions={[...columns.map((c) => ({ id: c.id, label: c.label })), { id: 'archived' as const, label: 'Archived' }]}
+          resumeVersions={resumeVersions
+            .filter((v) => v.application === selectedApp.id)
+            .map((v) => ({ id: v.id, ats_score: v.ats_score, created_at: v.created_at }))}
+          coverLetters={coverLetters
+            .filter((l: any) => l.application === selectedApp.id || (!l.application && l.target_company === selectedApp.company))
+            .map((l: any) => ({ id: l.id, tone: l.tone, length: l.length, content: l.content, created_at: l.created_at }))}
+          previousStatusLabel={previousStatusFor(selectedApp)}
+          onClose={() => {
+            setIsDetailsOpen(false);
+            setSelectedApp(null);
+            navigateTo('/dashboard');
+          }}
+          onStatusChange={handleUpdateStatus}
+          onDelete={(id) => setPendingConfirm({ message: 'Are you sure you want to remove this job tracking card?', action: () => handleDelete(id) })}
+          onEdit={openEdit}
+          onRestore={handleRestore}
+          onArchive={handleArchive}
+          onOpenEditor={() => {
+            setIsDetailsOpen(false);
+            onNavigateToEditor({
+              company: selectedApp.company,
+              position: selectedApp.position,
+              desc: selectedApp.job_description || selectedApp.notes || '',
+              application_id: selectedApp.id,
+            });
+          }}
+          onOpenVersion={() => {
+            setIsDetailsOpen(false);
+            onNavigateToEditor({
+              company: selectedApp.company,
+              position: selectedApp.position,
+              desc: selectedApp.job_description || selectedApp.notes || '',
+              application_id: selectedApp.id,
+            });
+          }}
+          onDeleteVersion={(versionId) => setPendingConfirm({ message: 'Are you sure you want to delete this tailored CV version?', action: () => handleDeleteVersion(versionId) })}
+          onPatchFields={handlePatchFields}
+        />
       )}
 
       {/* Creation Modal Overlay */}
@@ -767,15 +685,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
         <div className="fixed inset-0 z-[800] bg-black/50 backdrop-blur-sm flex items-center justify-center">
           <div className="w-full max-w-[580px] mx-3 md:mx-0 bg-card border border-cardline rounded-2xl md:rounded-3xl p-4 md:p-6 max-h-[85vh] md:max-h-[90vh] overflow-y-auto shadow-lg">
             <div className="flex justify-between items-center mb-4 border-b border-cardline pb-2">
-              <h3 className="text-base md:text-lg text-foreground">Track Job Application</h3>
-              <Button variant="ghost" onClick={() => setIsModalOpen(false)} className="w-[30px] h-[30px] flex items-center justify-center p-0">
+              <h3 className="text-base md:text-lg text-foreground">{editingId ? 'Edit Job Application' : 'Track Job Application'}</h3>
+              <Button variant="ghost" onClick={() => { setIsModalOpen(false); resetForm(); }} className="w-[30px] h-[30px] flex items-center justify-center p-0">
                 X
               </Button>
             </div>
 
             {errorMsg && <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm mb-4">{errorMsg}</div>}
 
-            <form onSubmit={handleCreate} className="flex flex-col gap-1">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-1">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <CompanyAutocomplete
                   id="modalCompany"
@@ -838,6 +756,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InputField
+                  label="Contact Name"
+                  id="modalContactName"
+                  placeholder="e.g. Jane Doe (Recruiter)"
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                />
+                <InputField
+                  label="Contact Email"
+                  id="modalContactEmail"
+                  placeholder="e.g. jane@company.com"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                />
+              </div>
+
               <InputField
                 label="Job Posting URL"
                 id="modalUrl"
@@ -865,16 +800,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
               />
 
               <div className="flex flex-col-reverse md:flex-row md:justify-end gap-3 mt-4 border-t border-cardline pt-4 [&>button]:w-full md:[&>button]:w-auto">
-                <Button variant="secondary" type="button" onClick={() => setIsModalOpen(false)}>
+                <Button variant="secondary" type="button" onClick={() => { setIsModalOpen(false); resetForm(); }}>
                   Cancel
                 </Button>
                 <Button type="submit" isLoading={isLoading}>
-                  Save Card
+                  {editingId ? 'Save Changes' : 'Save Card'}
                 </Button>
               </div>
             </form>
           </div>
         </div>
+      )}
+      {pendingConfirm && (
+        <ConfirmPopover
+          message={pendingConfirm.message}
+          onConfirm={() => {
+            const action = pendingConfirm.action;
+            setPendingConfirm(null);
+            action();
+          }}
+          onCancel={() => setPendingConfirm(null)}
+        />
       )}
     </div>
   );

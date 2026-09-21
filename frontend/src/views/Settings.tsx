@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
+import inputStyles from '../components/InputField.module.css';
 import api from '../services/api';
 import { SettingsSkeleton } from '../components/skeleton/SettingsSkeleton';
 import { User as UserIcon, Shield, Key, Moon, Sun, Eye, EyeOff, Sparkles, CheckCircle2, AlertTriangle, LogOut, Laptop, Check, Trash2 } from 'lucide-react';
@@ -30,6 +31,8 @@ export const Settings: React.FC = () => {
 
   // Preferences (AI Key) states
   const [apiKey, setApiKey] = useState('');
+  const [aiProvider, setAiProvider] = useState<'deepseek' | 'gemini'>('deepseek');
+  const [aiModel, setAiModel] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [prefMsg, setPrefMsg] = useState({ type: '', text: '' });
 
@@ -49,6 +52,9 @@ export const Settings: React.FC = () => {
       setIsLoading(true);
       const key = localStorage.getItem('deepseek_api_key') || '';
       setApiKey(key);
+      const provider = localStorage.getItem('ai_provider');
+      setAiProvider(provider === 'gemini' ? 'gemini' : 'deepseek');
+      setAiModel(localStorage.getItem('ai_model') || '');
       await fetchSessions();
       setIsLoading(false);
     };
@@ -123,6 +129,8 @@ export const Settings: React.FC = () => {
     e.preventDefault();
     try {
       localStorage.setItem('deepseek_api_key', apiKey.trim());
+      localStorage.setItem('ai_provider', aiProvider);
+      localStorage.setItem('ai_model', aiModel.trim());
       setPrefMsg({ type: 'success', text: 'Preferences updated successfully!' });
     } catch (err) {
       setPrefMsg({ type: 'error', text: 'Failed to save preferences.' });
@@ -459,10 +467,34 @@ export const Settings: React.FC = () => {
                     </button>
                   </div>
 
+                  <div className={styles.inputWrapper}>
+                    <label htmlFor="settingsAiProvider" className={inputStyles.label}>LLM Provider</label>
+                    <select
+                      id="settingsAiProvider"
+                      className={inputStyles.input}
+                      value={aiProvider}
+                      onChange={(e) => setAiProvider(e.target.value === 'gemini' ? 'gemini' : 'deepseek')}
+                    >
+                      <option value="deepseek">DeepSeek</option>
+                      <option value="gemini">Gemini</option>
+                    </select>
+                  </div>
+
+                  <InputField
+                    label="Model (optional)"
+                    id="settingsAiModel"
+                    type="text"
+                    placeholder={aiProvider === 'gemini' ? 'gemini-2.5-flash' : 'deepseek-chat'}
+                    value={aiModel}
+                    onChange={(e) => setAiModel(e.target.value)}
+                  />
+
                   <div className={styles.infoBox}>
                     <Sparkles size={16} className={styles.infoIcon} />
                     <p>
-                      If no API key is specified, LebenslaufAI falls back to our realistic local AI Engine mock mode.
+                      Your key is sent with every AI request and must match the selected provider.
+                      Leave the model empty to use the default ({aiProvider === 'gemini' ? 'gemini-2.5-flash' : 'deepseek-chat'}).
+                      Without any key, AI features are unavailable.
                     </p>
                   </div>
 

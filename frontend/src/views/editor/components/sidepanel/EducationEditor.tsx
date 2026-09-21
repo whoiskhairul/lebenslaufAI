@@ -3,6 +3,7 @@ import {
   GraduationCap, Plus, Trash, ArrowUp, ArrowDown, Sparkles, MapPin, Calendar,
   ChevronDown, ChevronUp
 } from 'lucide-react';
+import { ConfirmPopover } from '../../../../components/ConfirmPopover';
 import styles from '../../../EditorNew.module.css';
 
 export interface EducationItem {
@@ -61,10 +62,11 @@ export const EducationEditor: React.FC<EducationEditorProps> = ({
     setEducations(prev => prev.map((edu, i) => i === index ? { ...edu, ...updates } : edu));
   };
 
+  const [pendingDeleteIndex, setPendingDeleteIndex] = useState<number | null>(null);
+
   const handleDeleteEdu = (index: number) => {
-    if (window.confirm('Delete this education entry?')) {
-      setEducations(prev => prev.filter((_, i) => i !== index));
-    }
+    setEducations(prev => prev.filter((_, i) => i !== index));
+    setPendingDeleteIndex(null);
   };
 
   const handleMoveEdu = (index: number, dir: 'up' | 'down') => {
@@ -226,7 +228,7 @@ export const EducationEditor: React.FC<EducationEditorProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDeleteEdu(eIdx)}
+                    onClick={() => setPendingDeleteIndex(eIdx)}
                     className={`${styles.sideIconBtn} ${styles.sideIconBtnDanger}`}
                     title="Delete Education"
                   >
@@ -433,6 +435,13 @@ export const EducationEditor: React.FC<EducationEditorProps> = ({
             <Plus size={13} /> Add First Education
           </button>
         </div>
+      )}
+      {pendingDeleteIndex !== null && (
+        <ConfirmPopover
+          message="Delete this education entry?"
+          onConfirm={() => handleDeleteEdu(pendingDeleteIndex)}
+          onCancel={() => setPendingDeleteIndex(null)}
+        />
       )}
     </div>
   );

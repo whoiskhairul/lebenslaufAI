@@ -5,6 +5,11 @@ import { useEffect, useRef, useState } from 'react';
  * Recomputes on window resize and whenever `recomputeKeys` change
  * (e.g. tab switches, page size changes or mobile pane visibility).
  *
+ * `manualZoom` is a user-controlled multiplier from the canvas toolbar
+ * (1 = fit). The returned `scale` is the clamped effective scale and the
+ * height compensation is derived from it, so manual zoom never leaves
+ * stray whitespace behind the CSS transform.
+ *
  * Also measures the scaled page-stack wrapper and returns the negative
  * bottom-margin needed to cancel the flow height left behind by the
  * CSS transform scale.
@@ -12,9 +17,10 @@ import { useEffect, useRef, useState } from 'react';
 export function useCanvasZoom(
   viewportRef: React.RefObject<HTMLDivElement | null>,
   recomputeKeys: unknown[],
-  compensationKeys: unknown[]
+  compensationKeys: unknown[],
+  manualZoom = 1
 ) {
-  const [scale, setScale] = useState(1);
+  const [autoScale, setAutoScale] = useState(1);
 
   useEffect(() => {
     const handleResize = () => {
@@ -22,7 +28,7 @@ export function useCanvasZoom(
         const viewportWidth = viewportRef.current.clientWidth - 40;
         if (viewportWidth <= 0) return;
         const pageWidth = 794;
-        setScale(Math.min(1, viewportWidth / pageWidth));
+        setAutoScale(Math.min(1, viewportWidth / pageWidth));
       }
     };
     window.addEventListener('resize', handleResize);
@@ -34,6 +40,8 @@ export function useCanvasZoom(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, recomputeKeys);
+
+  const scale = Math.min(1.5, Math.max(0.35, autoScale * manualZoom));
 
   // Compensate the layout height of the scaled page stack (transform does not affect flow size)
   const scaledWrapperRef = useRef<HTMLDivElement>(null);
@@ -58,5 +66,5 @@ export function useCanvasZoom(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scale, ...compensationKeys]);
 
-  return { scale, setScale, scaledWrapperRef, wrapperHeightCompensation };
+  return { scale, setScale: setAutoScale, autoScale, scaledWrapperRef, wrapperHeightCompensation };
 }

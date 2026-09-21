@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Layers, Sliders, LayoutGrid, Minimize2, Check, User, FileText,
   Briefcase, Code, GraduationCap, Globe, Eye, EyeOff, Sparkles,
   RotateCcw, Settings, Plus, Trash
 } from 'lucide-react';
+import { ConfirmPopover } from '../../../components/ConfirmPopover';
 import ed from '../../../views/editorStyles';
 import { SectionDetailEditor } from '../../../views/editor/components/sidepanel/SectionDetailEditor';
 import { useCvDocumentStore } from '../state/cvDocumentStore';
@@ -62,6 +63,8 @@ export const StyleControlsPanel: React.FC<StyleControlsPanelProps> = ({
     categoryOrder,
     languagesTitle, setLanguagesTitle
   } = useCvDocumentStore();
+
+  const [pendingDeleteSection, setPendingDeleteSection] = useState<{ id: string; name: string } | null>(null);
 
   return (
     <div className={`${styles.styleControlsForm} glass-card`}>
@@ -504,11 +507,7 @@ export const StyleControlsPanel: React.FC<StyleControlsPanelProps> = ({
                       <button
                         type="button"
                         className={styles.sectionDeleteBtn}
-                        onClick={() => {
-                          if (window.confirm(`Delete section "${secItem.name}"?`)) {
-                            setSections(prev => prev.filter(s => s.id !== secItem.id));
-                          }
-                        }}
+                        onClick={() => setPendingDeleteSection({ id: secItem.id, name: secItem.name })}
                         title="Delete Custom Section"
                       >
                         <Trash size={12} />
@@ -563,6 +562,17 @@ export const StyleControlsPanel: React.FC<StyleControlsPanelProps> = ({
             </button>
           </>
         )
+      )}
+      {pendingDeleteSection && (
+        <ConfirmPopover
+          message={`Delete section "${pendingDeleteSection.name}"?`}
+          onConfirm={() => {
+            const id = pendingDeleteSection.id;
+            setPendingDeleteSection(null);
+            setSections(prev => prev.filter(s => s.id !== id));
+          }}
+          onCancel={() => setPendingDeleteSection(null)}
+        />
       )}
     </div>
   );
