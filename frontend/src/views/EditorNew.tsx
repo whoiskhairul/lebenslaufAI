@@ -43,6 +43,8 @@ import { StyleControlsPanel } from '../features/editor/panels/StyleControlsPanel
 import { TailorPanel } from '../features/editor/panels/TailorPanel';
 import { useSectionOps } from '../features/editor/hooks/useSectionOps';
 import { getParsedLetter, ParsedLetter, normalizeLetterDate } from '../features/editor/utils/parsedLetter';
+import { CanvasToolbar } from './editor/components/CanvasToolbar';
+import { useDocumentHistory } from '../features/editor/hooks/useDocumentHistory';
 
 /* Print-safe form fields for the letter canvas: browsers do not print
    textarea/input values (they are DOM properties, not text nodes), so each
@@ -921,9 +923,86 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     const t = setTimeout(() => {
       baselinePendingRef.current = false;
       setSavedSignature(documentSignature);
+      // Bulk content just replaced the document — reseed undo history so
+      // load stages never pollute it and redo starts from a clean baseline.
+      docHistoryReset(documentSignature);
     }, 900);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentSignature]);
+
+  // ---- Full-document undo/redo (toolbar + Ctrl+Z / Ctrl+Shift+Z) ----
+  // Restores every field covered by documentSignature. Personal-info `id`
+  // is intentionally excluded from the signature, so the current id is
+  // preserved to keep the save identity stable across undo/redo.
+  const restoreDocumentSnapshot = (snap: any) => {
+    if (!snap || typeof snap !== 'object') return;
+    if (typeof snap.summary === 'string') setEditableSummary(snap.summary);
+    if (Array.isArray(snap.experiences)) setEditableExperiences(snap.experiences);
+    if (Array.isArray(snap.skills)) setEditableSkills(snap.skills);
+    if (Array.isArray(snap.projects)) setEditableProjects(snap.projects);
+    if (Array.isArray(snap.educations)) setEditableEducations(snap.educations);
+    if (snap.personalInfo && typeof snap.personalInfo === 'object') {
+      const currentId = useCvDocumentStore.getState().editablePersonalInfo.id;
+      setEditablePersonalInfo({ ...snap.personalInfo, id: currentId });
+    }
+    if (Array.isArray(snap.sections)) setSections(snap.sections);
+    if (snap.customStyles && typeof snap.customStyles === 'object') {
+      setCustomStyles((s) => ({ ...snap.customStyles, pageSize: snap.customStyles.pageSize || s.pageSize || 'A4' }));
+    }
+    if (snap.headerStyles && typeof snap.headerStyles === 'object') setHeaderStyles(snap.headerStyles);
+    if (Array.isArray(snap.categoryOrder)) setCategoryOrder(snap.categoryOrder);
+    if (typeof snap.languagesFirst === 'boolean') setLanguagesFirst(snap.languagesFirst);
+    if (typeof snap.languagesTitle === 'string') setLanguagesTitle(snap.languagesTitle);
+    if (snap.letterStyles && typeof snap.letterStyles === 'object') {
+      setLetterStyles((s) => ({ ...s, ...snap.letterStyles }));
+    }
+    if (typeof snap.template === 'string') setTemplate(snap.template);
+    if (Array.isArray(snap.dismissed_ats)) setDismissedAts(snap.dismissed_ats);
+    if (typeof snap.letterContent === 'string') setLetterContent(snap.letterContent);
+    if (typeof snap.letterTone === 'string') setLetterTone(snap.letterTone);
+  };
+
+  const {
+    canUndo,
+    canRedo,
+    undo: handleUndo,
+    redo: handleRedo,
+    reset: docHistoryReset,
+  } = useDocumentHistory({
+    signature: documentSignature,
+    onRestore: restoreDocumentSnapshot,
+    isBulkLoading: () => baselinePendingRef.current,
+  });
+
+  // Keyboard shortcuts: Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z or Ctrl+Y = redo.
+  // Inside text fields the browser's native undo is left alone.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const key = e.key.toLowerCase();
+      if (key !== 'z' && key !== 'y') return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleUndo, handleRedo]);
 
   // While bulk loads are still settling, don't flash "Unsaved".
   const isDirty = !!currentVersion && !baselinePendingRef.current && documentSignature !== savedSignature;
@@ -1054,6 +1133,8 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   // Canvas viewport scale settings
   const viewportRef = useRef<HTMLDivElement>(null);
+  const previewCanvasRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const MOBILE_BREAKPOINT = 1024;
   const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT);
@@ -1132,11 +1213,49 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     ]
   );
 
+  // Manual zoom multiplier on top of the auto-fit scale (toolbar controls).
+  const [manualZoom, setManualZoom] = useState(1);
+
   const { scale, scaledWrapperRef, wrapperHeightCompensation } = useCanvasZoom(
     viewportRef,
     [currentVersion, editorTab, customStyles.pageSize, mobileActivePane],
-    [editorTab, pages, customStyles]
+    [editorTab, pages, customStyles],
+    manualZoom
   );
+  const zoomPct = Math.round(scale * 100);
+
+  // Fullscreen preview (toolbar toggle; Esc exits natively and syncs back).
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      previewCanvasRef.current?.requestFullscreen().catch(() => {});
+    }
+  };
+
+  const densityId: 'standard' | 'tight' | 'ultra' | 'custom' =
+    customStyles.fontSize === 13 && customStyles.sectionSpacing === 20
+      ? 'standard'
+      : customStyles.fontSize === 12 && customStyles.sectionSpacing === 14
+        ? 'tight'
+        : customStyles.fontSize === 11 && customStyles.sectionSpacing === 10
+          ? 'ultra'
+          : 'custom';
+
+  const applyDensityPreset = (id: 'standard' | 'tight' | 'ultra') => {
+    const presets = {
+      standard: { fontSize: 13, headingSize: 1.4, lineHeight: 1.4, sectionSpacing: 20, bulletSpacing: 4 },
+      tight: { fontSize: 12, headingSize: 1.3, lineHeight: 1.3, sectionSpacing: 14, bulletSpacing: 3 },
+      ultra: { fontSize: 11, headingSize: 1.2, lineHeight: 1.2, sectionSpacing: 10, bulletSpacing: 2 },
+    } as const;
+    setCustomStyles((s) => ({ ...s, ...presets[id] }));
+  };
 
   // Trigger DOM layout engine re-calculation when styling changes
   useEffect(() => {
@@ -2408,26 +2527,26 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             editorTab === 'resume' ? (
               // CV Design & Layout Options
 
-            <StyleControlsPanel
-              activeStyleSubTab={activeStyleSubTab}
-              setActiveStyleSubTab={setActiveStyleSubTab}
-              activeDetailSectionId={activeDetailSectionId}
-              targetLanguage={targetLanguage}
-              animatingHideSectionId={animatingHideSectionId}
-              onOpenSectionDetail={handleOpenSectionDetail}
-              onCloseSectionDetail={() => setActiveDetailSectionId(null)}
-              onAddExperience={handleAddExperience}
-              onAddProject={handleAddProject}
-              onAddEducation={handleAddEducation}
-              onMoveSkillCategory={handleMoveSkillCategory}
-              getLocalizedCategoryName={getLocalizedCategoryName}
-              onPolishBullet={handlePolishInlineText}
-              onToggleSectionVersion={handleToggleSectionVersion}
-              onResetToMasterProfile={handleResetSectionToMasterProfile}
-              toggleSectionVisibility={toggleSectionVisibility}
-              onOpenAiModal={setOpenSectionAiModalId}
-              onOpenAddCustomSection={() => setIsAddCustomSectionOpen(true)}
-            />
+              <StyleControlsPanel
+                activeStyleSubTab={activeStyleSubTab}
+                setActiveStyleSubTab={setActiveStyleSubTab}
+                activeDetailSectionId={activeDetailSectionId}
+                targetLanguage={targetLanguage}
+                animatingHideSectionId={animatingHideSectionId}
+                onOpenSectionDetail={handleOpenSectionDetail}
+                onCloseSectionDetail={() => setActiveDetailSectionId(null)}
+                onAddExperience={handleAddExperience}
+                onAddProject={handleAddProject}
+                onAddEducation={handleAddEducation}
+                onMoveSkillCategory={handleMoveSkillCategory}
+                getLocalizedCategoryName={getLocalizedCategoryName}
+                onPolishBullet={handlePolishInlineText}
+                onToggleSectionVersion={handleToggleSectionVersion}
+                onResetToMasterProfile={handleResetSectionToMasterProfile}
+                toggleSectionVisibility={toggleSectionVisibility}
+                onOpenAiModal={setOpenSectionAiModalId}
+                onOpenAddCustomSection={() => setIsAddCustomSectionOpen(true)}
+              />
             ) : (
               // Cover Letter Design Options
               <div className={`${styles.styleControlsForm} glass-card`}>
@@ -2788,7 +2907,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
         </div>
 
         {/* Right Preview Area */}
-        <div className={styles.previewCanvas}>
+        <div ref={previewCanvasRef} className={styles.previewCanvas}>
           {isLoading ? (
             <div className={styles.skeletonContainer}>
               <div className={styles.skeletonLoaderBanner} style={{ width: `${794 * scale}px` }}>
@@ -2957,7 +3076,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                     }
                   >
                     <Save size={16} />
-                    <span>{currentVersion.id.startsWith('unsaved_') ? 'Save as New Version' : isDirty ? '● Unsaved Changes' : 'Saved ✓'}</span>
+                    <span>{currentVersion.id.startsWith('unsaved_') ? 'Save as New Version' : isDirty ? '● Save Changes' : 'Saved ✓'}</span>
                   </Button>
                   <div style={{ position: 'relative' }}>
                     <Button variant="secondary" onClick={() => setIsDownloadOpen(!isDownloadOpen)}>
@@ -2994,6 +3113,48 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 </div>
               </div>
 
+              <CanvasToolbar
+                editorTab={editorTab === 'job' ? 'resume' : editorTab}
+                hasVersion={!!currentVersion}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                atsScore={typeof activeAtsScore === 'number' ? activeAtsScore : null}
+                isAtsChecking={isAtsChecking}
+                onCheckAts={handleRecheckAtsScore}
+                template={template}
+                onTemplateChange={setTemplate}
+                fontSize={editorTab === 'letter' ? letterStyles.fontSize : customStyles.fontSize}
+                onFontSizeStep={(delta) => {
+                  if (editorTab === 'letter') {
+                    setLetterStyles((s) => ({ ...s, fontSize: Math.min(18, Math.max(11, Math.round((s.fontSize + delta) * 10) / 10)) }));
+                  } else {
+                    setCustomStyles((s) => ({ ...s, fontSize: Math.min(18, Math.max(10, Math.round((s.fontSize + delta) * 10) / 10)) }));
+                  }
+                }}
+                densityId={densityId}
+                onDensityChange={applyDensityPreset}
+                fontFamily={editorTab === 'letter' ? letterStyles.fontFamily : customStyles.fontFamily || ''}
+                onFontFamilyChange={(v) => {
+                  if (editorTab === 'letter') {
+                    setLetterStyles((s) => ({ ...s, fontFamily: v }));
+                  } else {
+                    setCustomStyles((s) => ({ ...s, fontFamily: v }));
+                  }
+                }}
+                zoomPct={zoomPct}
+                onZoomIn={() => setManualZoom((z) => Math.min(2, Math.round((z + 0.1) * 100) / 100))}
+                onZoomOut={() => setManualZoom((z) => Math.max(0.4, Math.round((z - 0.1) * 100) / 100))}
+                onZoomFit={() => setManualZoom(1)}
+                isFullscreen={isFullscreen}
+                onToggleFullscreen={toggleFullscreen}
+                onAddExperience={handleAddExperience}
+                onAddProject={handleAddProject}
+                onAddEducation={handleAddEducation}
+                onAddCustom={() => setIsAddCustomSectionOpen(true)}
+              />
+
               {/* Multi-page warning banner (dismissable; reappears if the
                   page count changes or another version is opened) */}
               {editorTab === 'resume' && pages.length > 1 && !(
@@ -3001,35 +3162,35 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 && dismissedLayoutNotice.versionId === (currentVersion as any)?.id
                 && dismissedLayoutNotice.pages === pages.length
               ) && (
-                <div className={`${styles.pageWarningBanner} no-print`}>
-                  <ShieldAlert size={16} />
-                  <span style={{ flex: 1 }}>
-                    <strong>Layout Notice:</strong> Your CV occupies {pages.length} pages. Fit your details on fewer pages if possible to keep it compact.
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setDismissedLayoutNotice({
-                      versionId: (currentVersion as any)?.id ?? null,
-                      pages: pages.length
-                    })}
-                    title="Dismiss"
-                    aria-label="Dismiss layout notice"
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'inherit',
-                      opacity: 0.6,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      padding: '2px',
-                      flexShrink: 0
-                    }}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              )}
+                  <div className={`${styles.pageWarningBanner} no-print`}>
+                    <ShieldAlert size={16} />
+                    <span style={{ flex: 1 }}>
+                      <strong>Layout Notice:</strong> Your CV occupies {pages.length} pages. Fit your details on fewer pages if possible to keep it compact.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDismissedLayoutNotice({
+                        versionId: (currentVersion as any)?.id ?? null,
+                        pages: pages.length
+                      })}
+                      title="Dismiss"
+                      aria-label="Dismiss layout notice"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'inherit',
+                        opacity: 0.6,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '2px',
+                        flexShrink: 0
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
 
               {/* Hidden off-screen unscaled layout for DOM measurements */}
               {editorTab === 'resume' && (
@@ -3357,16 +3518,23 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                           </div>
                         ) : !letterContent ? (
                           <div
-                            className={styles.sideEmptyState}
-                            style={{ height: '100%', justifyContent: 'center', padding: '48px 24px' }}
+                            className={`${styles.sideEmptyState} ${styles.letterEmptyState}`}
+                            style={{
+                              height: '100%',
+                              justifyContent: 'center',
+                              padding: '48px 24px',
+                              background: '#ffffff',
+                              border: '1px dashed #cbd5e1',
+                              color: '#1e293b'
+                            }}
                           >
                             <Mail size={30} className={styles.sideEmptyStateIcon} />
-                            <p style={{ fontWeight: 700, fontSize: '1rem' }}>No cover letter yet</p>
-                            <p style={{ fontSize: '0.82rem', maxWidth: '340px' }}>
+                            <p style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b' }}>No cover letter yet</p>
+                            <p style={{ fontSize: '0.82rem', maxWidth: '340px', color: '#64748b' }}>
                               Generate a tailored cover letter from your CV and the job description.
                             </p>
                             {!jobDescription.trim() && (
-                              <p style={{ fontSize: '0.78rem', maxWidth: '340px', opacity: 0.75 }}>
+                              <p style={{ fontSize: '0.78rem', maxWidth: '340px', opacity: 0.75, color: '#64748b' }}>
                                 Tip: paste the job description in the AI Tailoring tab first.
                               </p>
                             )}

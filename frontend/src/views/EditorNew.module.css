@@ -4286,6 +4286,27 @@
   color: var(--muted, #64748b);
 }
 
+/* Cover-letter blank state lives inside the white A4 paper — it must keep
+   the light-theme paper look even when the app is in dark mode. Otherwise
+   var(--card-bg) renders a dark box overlapping the white page. */
+.letterEmptyState {
+  background: #ffffff !important;
+  border: 1px dashed #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+.letterEmptyState p {
+  color: #64748b !important;
+}
+
+.letterEmptyState p:first-of-type {
+  color: #1e293b !important;
+}
+
+.letterEmptyState .sideEmptyStateIcon {
+  color: #94a3b8 !important;
+}
+
 /* Add Custom Section Modal (Single Column) */
 .addCustomSectionModalCard {
   background: var(--card-bg, #ffffff);
@@ -4734,6 +4755,342 @@
 @media (max-width: 480px) {
   .sideInlineOrgLocationRow {
     flex-direction: column;
+  }
+}
+
+/* Canvas toolbar (sticky above the A4 viewport) */
+.canvasToolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--card-border, #e2e8f0);
+  border-radius: var(--radius-md, 10px);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+  position: sticky;
+  top: 0;
+  z-index: 120;
+}
+
+.toolbarGroup {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.toolbarDivider {
+  width: 1px;
+  align-self: stretch;
+  min-height: 20px;
+  background: var(--card-border, #e2e8f0);
+  opacity: 0.9;
+}
+
+.toolbarSpacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+
+.toolbarBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: var(--font-headers, inherit);
+  color: var(--foreground, #0f172a);
+  background: var(--background, #f8fafc);
+  border: 1px solid var(--card-border, #e2e8f0);
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.toolbarBtn:hover:not(:disabled) {
+  border-color: var(--primary, #6366f1);
+  color: var(--primary, #4f46e5);
+  transform: translateY(-1px);
+}
+
+.toolbarBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.toolbarBtnPrimary {
+  background: var(--primary, #6366f1);
+  border-color: var(--primary, #6366f1);
+  color: #ffffff;
+}
+
+.toolbarBtnPrimary:hover:not(:disabled) {
+  background: var(--primary-hover, #4f46e5);
+  border-color: var(--primary-hover, #4f46e5);
+  color: #ffffff;
+}
+
+.toolbarBadge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: transparent;
+  line-height: 1.5;
+}
+
+.toolbarIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted, #64748b);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toolbarIconBtn:hover:not(:disabled) {
+  color: var(--primary, #4f46e5);
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.25);
+}
+
+.toolbarIconBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toolbarIconBtnActive {
+  color: var(--primary, #4f46e5);
+  background: rgba(99, 102, 241, 0.12);
+  border-color: var(--primary, #6366f1);
+}
+
+.toolbarSeg {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 1px 2px;
+  background: var(--muted-light, #f1f5f9);
+  border: 1px solid var(--card-border, #e2e8f0);
+  border-radius: 8px;
+}
+
+.toolbarStepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 1px 2px;
+  background: var(--muted-light, #f1f5f9);
+  border: 1px solid var(--card-border, #e2e8f0);
+  border-radius: 8px;
+}
+
+.toolbarStepperValue {
+  min-width: 26px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--foreground, #0f172a);
+  font-variant-numeric: tabular-nums;
+}
+
+.toolbarSelect {
+  height: 26px;
+  padding: 0 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--foreground, #0f172a);
+  background: var(--background, #f8fafc);
+  border: 1px solid var(--card-border, #e2e8f0);
+  border-radius: 7px;
+  cursor: pointer;
+  outline: none;
+  max-width: 132px;
+}
+
+.toolbarSelect:hover:not(:disabled) {
+  border-color: var(--primary, #6366f1);
+}
+
+.toolbarSelect:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbarSwatches {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  background: var(--muted-light, #f1f5f9);
+  border: 1px solid var(--card-border, #e2e8f0);
+  border-radius: 9px;
+}
+
+.toolbarSwatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+  padding: 0;
+}
+
+.toolbarSwatch:hover:not(:disabled) {
+  transform: scale(1.15);
+}
+
+.toolbarSwatchActive {
+  border-color: var(--primary, #6366f1);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+}
+
+.toolbarSwatch:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toolbarColorInput {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px dashed var(--card-border, #cbd5e1);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.toolbarMenuWrap {
+  position: relative;
+}
+
+.toolbarMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 170px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--card-border, #e2e8f0);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
+  z-index: 200;
+}
+
+.toolbarMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground, #0f172a);
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.toolbarMenuItem:hover {
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--primary, #4f46e5);
+}
+
+.toolbarZoomLabel {
+  min-width: 42px;
+  height: 26px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--foreground, #0f172a);
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.toolbarZoomLabel:hover {
+  color: var(--primary, #4f46e5);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.toolbarLangBtn {
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--muted, #64748b);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.toolbarLangBtnActive {
+  color: var(--primary, #4f46e5);
+  background: var(--card-bg, #ffffff);
+  border-color: var(--primary, #6366f1);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+}
+
+.toolbarHint {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+  white-space: nowrap;
+}
+
+.previewCanvas:fullscreen {
+  background: var(--background, #f8fafc);
+  padding: 16px 20px;
+  overflow-y: auto;
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .toolbarDivider {
+    display: none;
+  }
+
+  .canvasToolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .canvasToolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .toolbarGroup {
+    flex-wrap: nowrap;
+    flex-shrink: 0;
   }
 }
 
