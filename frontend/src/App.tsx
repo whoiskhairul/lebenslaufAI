@@ -68,11 +68,11 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  const handleNavigateToEditor = (params?: { application_id?: string }) => {
+  const handleNavigateToEditor = (params?: { application_id?: string; tab?: string }) => {
     if (params?.application_id) {
-      navigateTo(`/editor?appId=${params.application_id}`);
+      navigateTo(`/editor?appId=${params.application_id}${params.tab ? `&tab=${params.tab}` : ''}`);
     } else {
-      navigateTo('/editor');
+      navigateTo(params?.tab ? `/editor?tab=${params.tab}` : '/editor');
     }
   };
 

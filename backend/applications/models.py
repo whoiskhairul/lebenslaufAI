@@ -28,6 +28,11 @@ class Application(models.Model):
     contact_email = models.EmailField(blank=True, null=True)
     deadline = models.CharField(max_length=100, blank=True, null=True)
     
+    # Manual board position within a status column (fractional indexing:
+    # dropping between two cards stores their midpoint, so a move only
+    # ever rewrites the moved card).
+    order = models.FloatField(default=0)
+    
     # Store dynamic history tracking
     status_history = models.JSONField(default=list, blank=True) # list of {"status": "...", "date": "..."}
     

@@ -1156,9 +1156,19 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   // Sync route param hashes
   const updateTabHash = (newTab: 'resume' | 'letter' | 'job') => {
     setEditorTab(newTab);
-    if (initialJobParams?.application_id) {
-      window.location.hash = `editor?appId=${initialJobParams.application_id}&tab=${newTab}`;
+    // Persist the tab in the real query string — NOT location.hash. A hash
+    // fragment both corrupts the address bar (…#editor?appId=…&tab=…) and
+    // drops `tab` on re-parse, which used to retrigger the full version
+    // reload below on every tab click.
+    const params = new URLSearchParams(window.location.search);
+    if (initialJobParams?.application_id && !params.get('appId')) {
+      params.set('appId', initialJobParams.application_id);
     }
+    params.set('tab', newTab);
+    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+    // Keep App's route state truthful; data loaders below are keyed on the
+    // application/version id, so a tab-only change refetches nothing.
+    window.dispatchEvent(new Event('popstate'));
   };
 
   // Sync category ordering on skills changes (preserving custom category order).
@@ -1273,6 +1283,13 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   const [masterProfileData, setMasterProfileData] = useState<any>(null);
 
+  // Data loaders below must NOT rerun on tab-only route changes (tab clicks
+  // update the query string). Key them on the target document instead, and
+  // read the latest params through a ref so fresh navigations still load.
+  const routeDataKey = `${initialJobParams?.application_id || ''}|${initialJobParams?.version_id || ''}`;
+  const initialJobParamsRef = useRef(initialJobParams);
+  initialJobParamsRef.current = initialJobParams;
+
   // Load master profile projects and info for tailoring selection & diagnostics
   useEffect(() => {
     const fetchMasterProfile = async () => {
@@ -1308,7 +1325,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           }
 
           // Only set default editable fields if no existing version/application is loaded
-          if (!initialJobParams?.application_id) {
+          if (!initialJobParamsRef.current?.application_id) {
             if (profileObj.personal_info) {
               setEditablePersonalInfo({
                 id: profileObj.personal_info.id,
@@ -1348,7 +1365,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       }
     };
     fetchMasterProfile();
-  }, [initialJobParams]);
+  }, [routeDataKey]);
 
 
   // Keyboard focus relocation hook for bullet list manipulation
@@ -1363,23 +1380,25 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     }
   }, [focusedBulletInfo]);
 
-  // Load resume application version on startup
+  // Load resume application version on startup (or when the target
+  // application/version changes — tab-only route changes must not refetch).
   useEffect(() => {
-    if (initialJobParams) {
-      if (initialJobParams.tab && ['resume', 'letter', 'job'].includes(initialJobParams.tab)) {
-        setEditorTab(initialJobParams.tab as any);
+    const params = initialJobParamsRef.current;
+    if (params) {
+      if (params.tab && ['resume', 'letter', 'job'].includes(params.tab)) {
+        setEditorTab(params.tab as any);
       }
-      if (initialJobParams.company) setCompany(initialJobParams.company);
-      if (initialJobParams.position) setPosition(initialJobParams.position);
-      if (initialJobParams.desc) setJobDescription(initialJobParams.desc);
+      if (params.company) setCompany(params.company);
+      if (params.position) setPosition(params.position);
+      if (params.desc) setJobDescription(params.desc);
     }
 
     const fetchExistingVersion = async () => {
       // Chrome-extension deep link: /editor?versionId=<uuid>
-      if (initialJobParams?.version_id) {
+      if (params?.version_id) {
         try {
           const res = await api.get('/resume/versions');
-          const ver = (res.data as any[]).find((v: any) => v.id === initialJobParams.version_id);
+          const ver = (res.data as any[]).find((v: any) => v.id === params.version_id);
           if (ver) {
             setCompany(ver.target_company || '');
             setCompanyDomain('');
@@ -1409,9 +1428,9 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         return;
       }
 
-      if (initialJobParams?.application_id) {
+      if (params?.application_id) {
         try {
-          const appRes = await api.get(`/applications/${initialJobParams.application_id}`);
+          const appRes = await api.get(`/applications/${params.application_id}`);
           if (appRes.data) {
             setCompany(appRes.data.company || '');
             setCompanyDomain(appRes.data.company_domain || '');
@@ -1427,7 +1446,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           const sortedVersions = [...res.data].sort((a: any, b: any) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           );
-          const matched = sortedVersions.find((v: any) => v.application === initialJobParams.application_id);
+          const matched = sortedVersions.find((v: any) => v.application === params.application_id);
           if (matched) {
             const ver = matched as ResumeVersion;
             setCurrentVersion(ver);
@@ -1437,7 +1456,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
             const sortedLetters = [...letterRes.data].sort((a: any, b: any) =>
               new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             );
-            const matchedLetter = sortedLetters.find((l: any) => l.application === initialJobParams.application_id);
+            const matchedLetter = sortedLetters.find((l: any) => l.application === params.application_id);
             if (matchedLetter) {
               // Late async arrival (dashboard-card flow) — not a user edit.
               markBulkLoad();
@@ -1451,7 +1470,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       }
     };
     fetchExistingVersion();
-  }, [initialJobParams]);
+  }, [routeDataKey]);
 
   // Helper to initialize fields from version object
   const initializeVersionFields = (ver: ResumeVersion) => {
@@ -2378,12 +2397,6 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
           }
         }
       `}} />
-      <div className={`${styles.headerRow} no-print`}>
-        <div>
-          <h2 className={styles.title}>Premium CV Rebuilder</h2>
-          <p className={styles.subtitle}>Audit ATS match scores, approve real-time tailored variations and edit canvas inline.</p>
-        </div>
-      </div>
 
       {showSaveBanner && (
         <div className={styles.saveBanner}>

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Undo2,
   Redo2,
@@ -65,16 +66,51 @@ const FONT_OPTIONS: Array<{ value: string; label: string }> = [
 
 export const CanvasToolbar: React.FC<CanvasToolbarProps> = (p) => {
   const [addOpen, setAddOpen] = useState(false);
+  const [addPos, setAddPos] = useState<{ top: number; left: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const addBtnRef = useRef<HTMLButtonElement>(null);
+  const addMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!addOpen) return;
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setAddOpen(false);
+      const t = e.target as Node;
+      if (rootRef.current?.contains(t) || addMenuRef.current?.contains(t)) return;
+      setAddOpen(false);
     };
+    const onDismiss = () => setAddOpen(false);
     document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
+    window.addEventListener('resize', onDismiss);
+    // Toolbar scroll / page scroll would detach the fixed menu from its button.
+    window.addEventListener('scroll', onDismiss, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('resize', onDismiss);
+      window.removeEventListener('scroll', onDismiss, true);
+    };
   }, [addOpen]);
+
+  const toggleAdd = () => {
+    if (addOpen) {
+      setAddOpen(false);
+      return;
+    }
+    // Anchor the menu to the button at open time so it never gets clipped
+    // by the toolbar's scroll container (notably on mobile, where the
+    // toolbar scrolls horizontally and would cut an in-flow dropdown off).
+    const r = addBtnRef.current?.getBoundingClientRect();
+    if (r) {
+      const menuWidth = 200;
+      const menuHeight = 190;
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - menuWidth - 8));
+      const openUp = r.bottom + menuHeight + 8 > window.innerHeight;
+      const top = openUp ? Math.max(8, r.top - menuHeight - 6) : r.bottom + 6;
+      setAddPos({ top, left });
+    }
+    setAddOpen(true);
+  };
+
+  const closeAdd = () => setAddOpen(false);
 
   const disabled = !p.hasVersion;
   const atsColor =
@@ -209,9 +245,10 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = (p) => {
         {p.editorTab === 'resume' && (
           <div className={styles.toolbarMenuWrap}>
             <button
+              ref={addBtnRef}
               type="button"
               className={styles.toolbarBtn}
-              onClick={() => setAddOpen((v) => !v)}
+              onClick={toggleAdd}
               disabled={disabled}
               title="Add experience, project, education or custom section"
               aria-haspopup="menu"
@@ -221,26 +258,6 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = (p) => {
               <span>Add</span>
               <ChevronDown size={12} />
             </button>
-            {addOpen && (
-              <div className={styles.toolbarMenu} role="menu">
-                <button type="button" className={styles.toolbarMenuItem} onClick={() => { setAddOpen(false); p.onAddExperience(); }}>
-                  <Briefcase size={14} />
-                  <span>Experience</span>
-                </button>
-                <button type="button" className={styles.toolbarMenuItem} onClick={() => { setAddOpen(false); p.onAddProject(); }}>
-                  <Code size={14} />
-                  <span>Project</span>
-                </button>
-                <button type="button" className={styles.toolbarMenuItem} onClick={() => { setAddOpen(false); p.onAddEducation(); }}>
-                  <GraduationCap size={14} />
-                  <span>Education</span>
-                </button>
-                <button type="button" className={styles.toolbarMenuItem} onClick={() => { setAddOpen(false); p.onAddCustom(); }}>
-                  <FolderPlus size={14} />
-                  <span>Custom section…</span>
-                </button>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -265,6 +282,41 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = (p) => {
           )}
         </button>
       </div>
+
+      {/* Add menu renders in a body portal with fixed positioning so no
+          scroll container (mobile toolbar, canvas viewport) can clip it. */}
+      {addOpen && addPos && createPortal(
+        <div
+          ref={addMenuRef}
+          className={styles.toolbarMenu}
+          role="menu"
+          style={{
+            position: 'fixed',
+            top: addPos.top,
+            left: addPos.left,
+            zIndex: 500,
+            minWidth: '190px',
+          }}
+        >
+          <button type="button" className={styles.toolbarMenuItem} onClick={() => { closeAdd(); p.onAddExperience(); }}>
+            <Briefcase size={14} />
+            <span>Experience</span>
+          </button>
+          <button type="button" className={styles.toolbarMenuItem} onClick={() => { closeAdd(); p.onAddProject(); }}>
+            <Code size={14} />
+            <span>Project</span>
+          </button>
+          <button type="button" className={styles.toolbarMenuItem} onClick={() => { closeAdd(); p.onAddEducation(); }}>
+            <GraduationCap size={14} />
+            <span>Education</span>
+          </button>
+          <button type="button" className={styles.toolbarMenuItem} onClick={() => { closeAdd(); p.onAddCustom(); }}>
+            <FolderPlus size={14} />
+            <span>Custom section…</span>
+          </button>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

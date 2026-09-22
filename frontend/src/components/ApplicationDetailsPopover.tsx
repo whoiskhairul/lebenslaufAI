@@ -77,6 +77,7 @@ interface Props {
   onArchive: (appId: string) => void;
   onOpenEditor: () => void;
   onOpenVersion: () => void;
+  onOpenLetter: () => void;
   onDeleteVersion: (versionId: string) => void;
   onPatchFields: (appId: string, fields: Partial<DetailsApplication>) => Promise<void>;
 }
@@ -518,8 +519,8 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
                         <div className="flex flex-col gap-2">
                           <p className="text-[11px] font-bold uppercase tracking-wide text-muted">Cover Letters</p>
                           {p.coverLetters.map((l) => (
-                            <details key={l.id} className="bg-mutedlight/60 border border-cardline px-3 py-2 rounded-lg">
-                              <summary className="flex items-center gap-2 cursor-pointer list-none">
+                            <div key={l.id} className="flex justify-between items-center bg-mutedlight/60 border border-cardline px-3 py-2 rounded-lg">
+                              <div className="flex items-center gap-2 min-w-0">
                                 <Mail size={16} className="text-primary shrink-0" />
                                 <div className="min-w-0">
                                   <p className="text-xs font-bold text-foreground m-0 capitalize">{l.tone} Letter</p>
@@ -527,11 +528,13 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
                                     {l.length} • {new Date(l.created_at).toLocaleDateString()}
                                   </span>
                                 </div>
-                              </summary>
-                              <p className="text-xs text-muted leading-relaxed whitespace-pre-wrap mt-2 max-h-[160px] overflow-y-auto thin-scrollbar">
-                                {l.content.length > 600 ? `${l.content.slice(0, 600)}…` : l.content}
-                              </p>
-                            </details>
+                              </div>
+                              <div className="shrink-0">
+                                <Button variant="ghost" onClick={p.onOpenLetter} style={{ padding: '6px 12px', fontSize: '12px' }}>
+                                  Open
+                                </Button>
+                              </div>
+                            </div>
                           ))}
                         </div>
                       )}
