@@ -82,7 +82,7 @@ export const ExperienceEditor: React.FC<ExperienceEditorProps> = ({
     setExperiences(prev => prev.map((exp, i) => {
       if (i !== expIndex) return exp;
       const bullets = Array.isArray(exp.bullets) ? [...exp.bullets] : [];
-      bullets.push('Spearheaded key initiatives to improve system scalability and performance.');
+      bullets.push('');
       return { ...exp, bullets };
     }));
   };

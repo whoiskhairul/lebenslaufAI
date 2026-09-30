@@ -18,7 +18,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
 
   // Key-Value Layout
   if (format === 'keyvalue') {
-    const pairs = sec?.keyValuePairs || [{ key: 'Label', value: 'Detail Description' }];
+    const pairs = sec?.keyValuePairs || [{ key: '', value: '' }];
     return (
       <div
         className={isSectionHovered ? styles.sectionHoverActive : ''}
@@ -36,6 +36,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
               <strong style={{ color: 'var(--accent-color, #0f172a)' }}>
                 <AutoSizeTextarea
                   value={pair.key}
+                  placeholder="Key / Category"
                   onChange={(val) => {
                     setSections(prev => prev.map(s => {
                       if (s.id === unit.sectionId) {
@@ -52,6 +53,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
             <div className={isPP ? styles.ppRightCol : styles.germanRightCol}>
               <AutoSizeTextarea
                 value={pair.value}
+                placeholder="Value / Detail description..."
                 onChange={(val) => {
                   setSections(prev => prev.map(s => {
                     if (s.id === unit.sectionId) {
@@ -73,7 +75,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
   // Structured Entries Layout
   if (format === 'entries') {
     const entries = sec?.entries || [
-      { id: 'entry_1', title: 'Position or Project', subtitle: 'Organization', date: '2024', location: 'Location', bullets: ['Accomplishment detail...'] }
+      { id: 'entry_1', title: '', subtitle: '', date: '', location: '', bullets: [''] }
     ];
     return (
       <div
@@ -94,6 +96,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                   <h4 className={isPP ? styles.ppRoleTitle : styles.germanRole}>
                     <AutoSizeTextarea
                       value={entry.title || ''}
+                      placeholder="Role / Title"
                       onChange={(val) => {
                         setSections(prev => prev.map(s => {
                           if (s.id === unit.sectionId) {
@@ -108,6 +111,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                   <span className={isPP ? styles.ppDateRange : styles.germanDateRange}>
                     <AutoSizeTextarea
                       value={entry.date || ''}
+                      placeholder="2024 - Present"
                       onChange={(val) => {
                         setSections(prev => prev.map(s => {
                           if (s.id === unit.sectionId) {
@@ -125,6 +129,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                     <div className={isPP ? styles.ppCompany : styles.germanCompany}>
                       <AutoSizeTextarea
                         value={entry.subtitle || ''}
+                        placeholder="Organization / Company"
                         onChange={(val) => {
                           setSections(prev => prev.map(s => {
                             if (s.id === unit.sectionId) {
@@ -140,6 +145,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                     <div style={{ fontSize: '0.85em', color: '#64748b', opacity: 0.85 }}>
                       <AutoSizeTextarea
                         value={entry.location || ''}
+                        placeholder="Location"
                         onChange={(val) => {
                           setSections(prev => prev.map(s => {
                             if (s.id === unit.sectionId) {
@@ -159,6 +165,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                         <div className={styles.bulletContent}>
                           <AutoSizeTextarea
                             value={bullet}
+                            placeholder="Accomplishment / Key contribution..."
                             onChange={(val) => {
                               setSections(prev => prev.map(s => {
                                 if (s.id === unit.sectionId) {
@@ -185,6 +192,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                   <h4 style={{ margin: 0, fontWeight: 700, fontSize: '1em', color: 'var(--accent-color, #0f172a)' }}>
                     <AutoSizeTextarea
                       value={entry.title || ''}
+                      placeholder="Role / Title"
                       onChange={(val) => {
                         setSections(prev => prev.map(s => {
                           if (s.id === unit.sectionId) {
@@ -199,6 +207,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                   <span style={{ fontSize: '0.85em', color: '#64748b' }}>
                     <AutoSizeTextarea
                       value={entry.date || ''}
+                      placeholder="2024 - Present"
                       onChange={(val) => {
                         setSections(prev => prev.map(s => {
                           if (s.id === unit.sectionId) {
@@ -216,6 +225,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                     {entry.subtitle && (
                       <AutoSizeTextarea
                         value={entry.subtitle || ''}
+                        placeholder="Organization / Company"
                         onChange={(val) => {
                           setSections(prev => prev.map(s => {
                             if (s.id === unit.sectionId) {
@@ -232,6 +242,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                       <div style={{ fontSize: '0.95em', color: '#64748b' }}>
                         <AutoSizeTextarea
                           value={entry.location || ''}
+                          placeholder="Location"
                           onChange={(val) => {
                             setSections(prev => prev.map(s => {
                               if (s.id === unit.sectionId) {
@@ -253,6 +264,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                       <div className={styles.bulletContent}>
                         <AutoSizeTextarea
                           value={bullet}
+                          placeholder="Accomplishment / Key contribution..."
                           onChange={(val) => {
                             setSections(prev => prev.map(s => {
                               if (s.id === unit.sectionId) {
@@ -281,7 +293,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
 
   // Paragraph Narrative Layout
   if (format === 'paragraph') {
-    const pText = sec?.paragraphText ?? ((sec?.bullets || []).join(' ') || 'Add continuous narrative statement...');
+    const pText = sec?.paragraphText ?? ((sec?.bullets || []).join(' ') || '');
     return (
       <div
         className={isSectionHovered ? styles.sectionHoverActive : ''}
@@ -291,6 +303,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
       >
         <AutoSizeTextarea
           value={pText}
+          placeholder="Write section narrative or statement..."
           onChange={(val) => {
             setSections(prev => prev.map(s => s.id === unit.sectionId ? { ...s, paragraphText: val } : s));
           }}
@@ -300,7 +313,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
   }
 
   // Default Bullet Points List
-  const bullets = sec?.bullets || unit.bullets || ['Add detail or credential...'];
+  const bullets = sec?.bullets || unit.bullets || [''];
   return (
     <div
       className={isSectionHovered ? styles.sectionHoverActive : ''}
@@ -315,6 +328,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
             <div className={styles.bulletContent}>
               <AutoSizeTextarea
                 value={bullet}
+                placeholder="Add bullet point / detail..."
                 onChange={(val) => {
                   setSections(prev => prev.map(s => {
                     if (s.id === unit.sectionId) {

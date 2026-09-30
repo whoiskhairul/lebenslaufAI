@@ -46,6 +46,7 @@ export const SkillsLanguagesUnit: React.FC<{ p: UnitRendererProps; ctx: UnitCont
             ) : (
               <AutoSizeTextarea
                 value={rawLangs}
+                placeholder="e.g. English (Native), German (B2)"
                 onChange={(val) => {
                   const names = val.split(',').map(n => n.trim()).filter(Boolean);
                   setEditableSkills(prev => {
@@ -98,6 +99,7 @@ export const SkillsCategoryUnit: React.FC<{ p: UnitRendererProps; ctx: UnitConte
         <div style={{ flex: 1 }}>
           <AutoSizeTextarea
             value={skillsList.map(s => s.name).join(', ')}
+            placeholder="e.g. React, TypeScript, Node.js"
             onChange={(val) => {
               const names = val.split(',').map(n => n.trim()).filter(Boolean);
               setEditableSkills(prev => {

@@ -85,7 +85,7 @@ export const EducationEditor: React.FC<EducationEditorProps> = ({
     setEducations(prev => prev.map((edu, i) => {
       if (i !== eduIndex) return edu;
       const bullets = Array.isArray(edu.bullets) ? [...edu.bullets] : [];
-      bullets.push('Graduated with Honors (Top 5% of class) • Relevant Coursework: Algorithms & AI Systems.');
+      bullets.push('');
       return { ...edu, bullets };
     }));
   };

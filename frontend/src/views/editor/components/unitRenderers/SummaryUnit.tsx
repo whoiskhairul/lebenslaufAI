@@ -38,6 +38,7 @@ export const SummaryUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> =
       ) : (
         <AutoSizeTextarea
           value={editableSummary}
+          placeholder="A brief summary of your professional background, strengths, and career focus..."
           onChange={(val) => setEditableSummary(val)}
         />
       )}

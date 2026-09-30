@@ -148,6 +148,7 @@ export const SectionTitleUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext
               <AutoSizeTextarea
                 autoFocus
                 value={unit.titleText || ''}
+                placeholder="Section Title"
                 onChange={(val) => setSections(prev => prev.map(s => s.id === unit.sectionId ? { ...s, name: val } : s))}
                 onBlur={() => setEditingSectionTitleId(null)}
               />

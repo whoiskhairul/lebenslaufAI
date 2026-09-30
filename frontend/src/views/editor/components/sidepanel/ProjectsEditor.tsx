@@ -83,7 +83,7 @@ export const ProjectsEditor: React.FC<ProjectsEditorProps> = ({
     setProjects(prev => prev.map((proj, i) => {
       if (i !== projIndex) return proj;
       const bullets = Array.isArray(proj.bullets) ? [...proj.bullets] : [];
-      bullets.push('Architected resilient microservices handling high transaction throughput.');
+      bullets.push('');
       return { ...proj, bullets };
     }));
   };

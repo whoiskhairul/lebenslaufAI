@@ -38,6 +38,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
             <h4 className={isPP ? styles.ppProjectTitle : styles.germanDegree}>
               <AutoSizeTextarea
                 value={proj.title || ''}
+                placeholder="Project Title"
                 onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? { ...p, title: val } : p))}
               />
             </h4>
@@ -157,6 +158,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
                         <AutoSizeTextarea
                           id={inputId}
                           value={bullet}
+                          placeholder="Describe project deliverables and results..."
                           onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
                             ...p,
                             bullets: p.bullets.map((b: string, bI: number) => bI === bulletIdx ? val : b)
@@ -177,6 +179,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
             <strong>
               <AutoSizeTextarea
                 value={proj.title || ''}
+                placeholder="Project Title"
                 onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, title: val } : p))}
               />
             </strong>
@@ -295,6 +298,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
                       <AutoSizeTextarea
                         id={inputId}
                         value={bullet}
+                        placeholder="Describe project deliverables and results..."
                         onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? {
                           ...p,
                           bullets: p.bullets.map((b: string, bI: number) => bI === bulletIdx ? val : b)

@@ -5,7 +5,7 @@ import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Toast } from '../components/Toast';
-import { Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Save, RefreshCw, Trash, Plus, Settings, Minimize2, LayoutGrid, Layers, Sliders, Briefcase, Code, GraduationCap, Globe, Eye, EyeOff, RotateCcw, Mail } from 'lucide-react';
+import { Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Save, RefreshCw, Trash, Plus, Settings, Minimize2, LayoutGrid, Layers, Sliders, Briefcase, Code, GraduationCap, Globe, Eye, EyeOff, RotateCcw, Mail, ChevronDown } from 'lucide-react';
 import styles from './editorStyles';
 
 import { ATSDashboard, ATSReport, Proposal, WeakBulletWithOriginal, RecommendedKeyword } from '../components/ATSDashboard';
@@ -237,6 +237,36 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const [applicationTracked, setApplicationTracked] = useState(false);
   const [saveAutomatically, setSaveAutomatically] = useState(true);
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
+  const downloadRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isDownloadOpen) return;
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (downloadRef.current && !downloadRef.current.contains(e.target as Node)) {
+        setIsDownloadOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsDownloadOpen(false);
+      }
+    };
+    const handleDismiss = () => {
+      setIsDownloadOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', handleDismiss, true);
+    window.addEventListener('resize', handleDismiss);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', handleDismiss, true);
+      window.removeEventListener('resize', handleDismiss);
+    };
+  }, [isDownloadOpen]);
   // Dismissed layout notice, keyed by version + page count so it reappears
   // when pagination worsens (or another version is opened).
   const [dismissedLayoutNotice, setDismissedLayoutNotice] = useState<{ versionId: string | null; pages: number } | null>(null);
@@ -1720,23 +1750,23 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
     if (format === 'keyvalue') {
       newSec.keyValuePairs = [
-        { key: 'Category / Key', value: 'Tools, proficiencies, or relevant details' }
+        { key: '', value: '' }
       ];
     } else if (format === 'entries') {
       newSec.entries = [
         {
           id: `entry_${Date.now()}`,
-          title: `${title} Contributor / Role`,
-          subtitle: 'Organization or Project',
-          location: 'City, Country',
-          date: '2023 - Present',
-          bullets: ['Spearheaded key project initiative and delivered measurable performance outcomes.']
+          title: '',
+          subtitle: '',
+          location: '',
+          date: '',
+          bullets: ['']
         }
       ];
     } else if (format === 'paragraph') {
-      newSec.paragraphText = 'Experienced professional committed to delivering high-impact solutions, optimizing system performance, and driving core project objectives.';
+      newSec.paragraphText = '';
     } else {
-      newSec.bullets = ['Earned credential / accomplishment with distinguished outcome.'];
+      newSec.bullets = [''];
     }
 
     setSections(prev => [...prev, newSec]);
@@ -3101,10 +3131,16 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                     <Save size={16} />
                     <span>{currentVersion.id.startsWith('unsaved_') ? 'Save as New Version' : isDirty ? '● Save Changes' : 'Saved ✓'}</span>
                   </Button>
-                  <div style={{ position: 'relative' }}>
-                    <Button variant="secondary" onClick={() => setIsDownloadOpen(!isDownloadOpen)}>
+                  <div ref={downloadRef} style={{ position: 'relative' }}>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setIsDownloadOpen(!isDownloadOpen)}
+                      aria-haspopup="menu"
+                      aria-expanded={isDownloadOpen}
+                    >
                       <Download size={16} />
                       <span>Download</span>
+                      <ChevronDown size={12} className={`${styles.toolbarChevron} ${isDownloadOpen ? styles.toolbarChevronOpen : ''}`} />
                     </Button>
                     {isDownloadOpen && (
                       <div className={styles.downloadDropdown}>

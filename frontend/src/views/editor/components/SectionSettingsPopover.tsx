@@ -185,12 +185,12 @@ export const SectionSettingsPopover: React.FC<SectionSettingsPopoverProps> = ({
                 onClick={() => {
                   setEditableExperiences(prev => [...prev, {
                     id: `exp_${Date.now()}`,
-                    company: 'Company Name',
-                    position: 'Job Title',
-                    location: 'City, Country',
-                    start_date: '01/2026',
-                    end_date: 'Present',
-                    bullets: ['Describe your major contribution...']
+                    company: '',
+                    position: '',
+                    location: '',
+                    start_date: '',
+                    end_date: '',
+                    bullets: ['']
                   }]);
                 }}
                 className={styles.popoverAddBtn}
@@ -205,16 +205,16 @@ export const SectionSettingsPopover: React.FC<SectionSettingsPopoverProps> = ({
                     if (prev.length === 0) {
                       return [{
                         id: `exp_${Date.now()}`,
-                        company: 'Company Name',
-                        position: 'Job Title',
-                        location: 'City, Country',
-                        start_date: '01/2026',
-                        end_date: 'Present',
-                        bullets: ['New key accomplishment...']
+                        company: '',
+                        position: '',
+                        location: '',
+                        start_date: '',
+                        end_date: '',
+                        bullets: ['']
                       }];
                     }
                     const lastIdx = prev.length - 1;
-                    return prev.map((exp, idx) => idx === lastIdx ? { ...exp, bullets: [...exp.bullets, 'New key accomplishment...'] } : exp);
+                    return prev.map((exp, idx) => idx === lastIdx ? { ...exp, bullets: [...exp.bullets, ''] } : exp);
                   });
                 }}
                 className={styles.popoverAddBtn}
@@ -233,12 +233,12 @@ export const SectionSettingsPopover: React.FC<SectionSettingsPopoverProps> = ({
                 onClick={() => {
                   setEditableProjects(prev => [...prev, {
                     id: `proj_${Date.now()}`,
-                    title: 'Project Title',
-                    role: 'Your Role / Contributions',
-                    date: '2026',
-                    link: 'https://github.com/username/repository',
-                    technologies: ['React', 'TypeScript', 'Node.js'],
-                    bullets: ['Describe project deliverables & technical output...']
+                    title: '',
+                    role: '',
+                    date: '',
+                    link: '',
+                    technologies: [],
+                    bullets: ['']
                   }]);
                 }}
                 className={styles.popoverAddBtn}
@@ -253,16 +253,16 @@ export const SectionSettingsPopover: React.FC<SectionSettingsPopoverProps> = ({
                     if (prev.length === 0) {
                       return [{
                         id: `proj_${Date.now()}`,
-                        title: 'Project Title',
-                        role: 'Your Role',
-                        date: '2026',
-                        link: 'https://github.com/username/repository',
-                        technologies: ['React', 'TypeScript'],
-                        bullets: ['New project accomplishment...']
+                        title: '',
+                        role: '',
+                        date: '',
+                        link: '',
+                        technologies: [],
+                        bullets: ['']
                       }];
                     }
                     const lastIdx = prev.length - 1;
-                    return prev.map((proj, idx) => idx === lastIdx ? { ...proj, bullets: [...proj.bullets, 'New project accomplishment...'] } : proj);
+                    return prev.map((proj, idx) => idx === lastIdx ? { ...proj, bullets: [...proj.bullets, ''] } : proj);
                   });
                 }}
                 className={styles.popoverAddBtn}
@@ -280,12 +280,12 @@ export const SectionSettingsPopover: React.FC<SectionSettingsPopoverProps> = ({
               onClick={() => {
                 setEditableEducations(prev => [...prev, {
                   id: `edu_${Date.now()}`,
-                  institution: 'University / Institute Name',
-                  degree: 'Degree',
-                  field_of_study: 'Field of Study',
-                  start_date: '2022',
-                  end_date: '2026',
-                  location: 'City, Country'
+                  institution: '',
+                  degree: '',
+                  field_of_study: '',
+                  start_date: '',
+                  end_date: '',
+                  location: ''
                 }]);
               }}
               className={styles.popoverAddBtn}
@@ -300,7 +300,7 @@ export const SectionSettingsPopover: React.FC<SectionSettingsPopoverProps> = ({
               onClick={() => {
                 setSections(prev => prev.map(s => {
                   if (s.id === sectionId) {
-                    return { ...s, bullets: [...(s.bullets || []), 'New custom section point...'] };
+                    return { ...s, bullets: [...(s.bullets || []), ''] };
                   }
                   return s;
                 }));

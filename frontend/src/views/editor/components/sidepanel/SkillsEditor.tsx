@@ -163,7 +163,8 @@ const SkillCategoryItem: React.FC<SkillCategoryItemProps> = ({
                   type="text"
                   className={styles.skillTagInput}
                   value={sk.name}
-                  style={{ width: `${Math.max(sk.name.length * 8, 38)}px` }}
+                  placeholder="Skill name"
+                  style={{ width: `${Math.max(sk.name.length * 8, 65)}px` }}
                   onChange={(e) => onUpdateSkillName(sk.id, e.target.value)}
                 />
                 <div className={styles.skillTagActionGroup}>
@@ -290,7 +291,7 @@ export const SkillsEditor: React.FC<SkillsEditorProps> = ({
     if (!trimmed) return;
     setSkills(prev => [...prev, {
       id: `sk_${Date.now()}`,
-      name: 'New Skill',
+      name: '',
       category: trimmed
     }]);
     setExpandedCats(prev => ({ ...prev, [trimmed.toLowerCase()]: true }));

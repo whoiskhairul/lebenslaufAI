@@ -722,7 +722,7 @@
   margin-bottom: var(--space-4);
   flex-shrink: 0;
   position: relative;
-  z-index: 110;
+  z-index: 130;
 }
 
 .canvasTabs {
@@ -2876,7 +2876,7 @@
 }
 
 .dropdownItem:hover {
-  background-color: var(--muted-light) !important;
+  background-color: rgba(99, 102, 241, 0.08) !important;
   color: var(--primary) !important;
 }
 
@@ -2889,10 +2889,13 @@
   flex-direction: column;
   gap: 4px;
   padding: 6px;
-  z-index: 100;
-  min-width: 150px;
-  box-shadow: var(--shadow-md);
-  border-radius: var(--radius-md);
+  z-index: 500;
+  min-width: 160px;
+  box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08));
+  border-radius: 10px;
+  animation: toolbarDropdownFadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+
+
   border: 1px solid var(--card-border, #e2e8f0);
   background: var(--card-bg, #ffffff);
 }
@@ -4816,6 +4819,23 @@
   color: #ffffff;
 }
 
+.toolbarBtnActive {
+  border-color: var(--primary, #6366f1) !important;
+  color: var(--primary, #4f46e5) !important;
+  background: rgba(99, 102, 241, 0.08) !important;
+}
+
+.toolbarChevron {
+  transition: transform 0.18s ease;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.toolbarChevronOpen {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
 .toolbarBadge {
   font-size: 10px;
   font-weight: 800;
@@ -4976,7 +4996,9 @@
   border: 1px solid var(--card-border, #e2e8f0);
   border-radius: 10px;
   box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
-  z-index: 200;
+  z-index: 1000;
+  animation: toolbarDropdownFadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top;
 }
 
 .toolbarMenuItem {
@@ -4998,6 +5020,34 @@
 .toolbarMenuItem:hover {
   background: rgba(99, 102, 241, 0.08);
   color: var(--primary, #4f46e5);
+}
+
+.toolbarMenuItemActive {
+  background: rgba(99, 102, 241, 0.1) !important;
+  color: var(--primary, #4f46e5) !important;
+  font-weight: 700;
+}
+
+.toolbarMenuItem:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.toolbarCheckIcon {
+  color: var(--primary, #6366f1);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+@keyframes toolbarDropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .toolbarZoomLabel {

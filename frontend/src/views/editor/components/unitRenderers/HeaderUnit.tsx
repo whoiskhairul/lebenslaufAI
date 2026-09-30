@@ -84,6 +84,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
             <AutoSizeTextarea
               style={nameStyleOverride}
               value={editablePersonalInfo.full_name}
+              placeholder="Your Full Name"
               onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, full_name: val }))}
             />
           </h1>
@@ -91,6 +92,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
             <AutoSizeTextarea
               style={titleStyleOverride}
               value={editablePersonalInfo.title}
+              placeholder="Professional Title"
               onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, title: val }))}
             />
           </h2>
@@ -202,6 +204,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
             <AutoSizeTextarea
               style={nameStyleOverride}
               value={editablePersonalInfo.full_name}
+              placeholder="Vor- und Nachname"
               onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, full_name: val }))}
             />
           </h1>
@@ -209,6 +212,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
             <AutoSizeTextarea
               style={titleStyleOverride}
               value={editablePersonalInfo.title}
+              placeholder="Berufsbezeichnung / Fachrichtung"
               onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, title: val }))}
             />
           </h2>
@@ -323,6 +327,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
             <AutoSizeTextarea
               style={nameStyleOverride}
               value={editablePersonalInfo.full_name}
+              placeholder="Your Full Name"
               onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, full_name: val }))}
             />
           </h2>
@@ -330,6 +335,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
             <AutoSizeTextarea
               style={titleStyleOverride}
               value={editablePersonalInfo.title}
+              placeholder="Professional Title"
               onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, title: val }))}
             />
           </p>
