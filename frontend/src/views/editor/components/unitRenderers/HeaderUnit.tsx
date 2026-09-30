@@ -65,9 +65,13 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
     position: 'relative' as const,
   };
 
+  const triggerFocus = () => {
+    p.onCanvasFocus?.('header', 'header');
+  };
+
   if (isPP) {
     return (
-      <div className={styles.ppHeader} style={headerContainerStyle} data-section-id="header">
+      <div onClick={triggerFocus} className={styles.ppHeader} style={headerContainerStyle} data-section-id="header">
         {headerControls}
         {!isMeasuring && isHeaderSettingsOpen && (
           <HeaderSettingsPopover
@@ -85,6 +89,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
               style={nameStyleOverride}
               value={editablePersonalInfo.full_name}
               placeholder="Your Full Name"
+              onFocus={triggerFocus}
               onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, full_name: val }))}
             />
           </h1>
@@ -93,6 +98,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
               style={titleStyleOverride}
               value={editablePersonalInfo.title}
               placeholder="Professional Title"
+              onFocus={triggerFocus}
               onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, title: val }))}
             />
           </h2>
@@ -187,7 +193,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
 
   if (isGerman) {
     return (
-      <div className={styles.germanHeader} style={headerContainerStyle} data-section-id="header">
+      <div onClick={triggerFocus} className={styles.germanHeader} style={headerContainerStyle} data-section-id="header">
         {headerControls}
         {!isMeasuring && isHeaderSettingsOpen && (
           <HeaderSettingsPopover
@@ -205,6 +211,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
               style={nameStyleOverride}
               value={editablePersonalInfo.full_name}
               placeholder="Vor- und Nachname"
+              onFocus={triggerFocus}
               onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, full_name: val }))}
             />
           </h1>
@@ -213,6 +220,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
               style={titleStyleOverride}
               value={editablePersonalInfo.title}
               placeholder="Berufsbezeichnung / Fachrichtung"
+              onFocus={triggerFocus}
               onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, title: val }))}
             />
           </h2>
@@ -224,6 +232,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
                   <span className={styles.germanContactVal}>
                     <AutoSizeTextarea
                       value={editablePersonalInfo.location}
+                      onFocus={triggerFocus}
                       onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, location: val }))}
                     />
                   </span>
@@ -235,6 +244,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
                   <span className={styles.germanContactVal}>
                     <AutoSizeTextarea
                       value={editablePersonalInfo.email}
+                      onFocus={triggerFocus}
                       onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, email: val }))}
                     />
                   </span>
@@ -247,6 +257,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
                     <a href={ensureAbsoluteUrl(editablePersonalInfo.website)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'block', width: '100%' }}>
                       <AutoSizeTextarea
                         value={editablePersonalInfo.website}
+                        onFocus={triggerFocus}
                         onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, website: val }))}
                       />
                     </a>
@@ -261,6 +272,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
                   <span className={styles.germanContactVal}>
                     <AutoSizeTextarea
                       value={formatPhoneNumber(editablePersonalInfo.phone)}
+                      onFocus={triggerFocus}
                       onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, phone: val }))}
                       onBlur={() => setEditablePersonalInfo((p: any) => ({ ...p, phone: formatPhoneNumber(p.phone) }))}
                     />
@@ -274,6 +286,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
                     <a href={ensureAbsoluteUrl(editablePersonalInfo.linkedin)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'block', width: '100%' }}>
                       <AutoSizeTextarea
                         value={editablePersonalInfo.linkedin}
+                        onFocus={triggerFocus}
                         onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, linkedin: val }))}
                       />
                     </a>
@@ -287,6 +300,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
                     <a href={ensureAbsoluteUrl(editablePersonalInfo.github)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'block', width: '100%' }}>
                       <AutoSizeTextarea
                         value={editablePersonalInfo.github}
+                        onFocus={triggerFocus}
                         onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, github: val }))}
                       />
                     </a>
@@ -306,7 +320,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
   }
 
   return (
-    <div className={styles.resumeHeader} style={headerContainerStyle} data-section-id="header">
+    <div onClick={triggerFocus} className={styles.resumeHeader} style={headerContainerStyle} data-section-id="header">
       {headerControls}
       {!isMeasuring && isHeaderSettingsOpen && (
         <HeaderSettingsPopover
@@ -328,6 +342,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
               style={nameStyleOverride}
               value={editablePersonalInfo.full_name}
               placeholder="Your Full Name"
+              onFocus={triggerFocus}
               onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, full_name: val }))}
             />
           </h2>
@@ -336,6 +351,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
               style={titleStyleOverride}
               value={editablePersonalInfo.title}
               placeholder="Professional Title"
+              onFocus={triggerFocus}
               onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, title: val }))}
             />
           </p>
@@ -346,6 +362,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
           <AutoSizeTextarea
             singleLine
             value={editablePersonalInfo.location}
+            onFocus={triggerFocus}
             onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, location: val }))}
           />
         )}
@@ -356,6 +373,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
               <AutoSizeTextarea
                 singleLine
                 value={editablePersonalInfo.email}
+                onFocus={triggerFocus}
                 onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, email: val }))}
               />
             </a>
@@ -368,6 +386,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
               <AutoSizeTextarea
                 singleLine
                 value={editablePersonalInfo.website}
+                onFocus={triggerFocus}
                 onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, website: val }))}
               />
             </a>
@@ -380,6 +399,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
               <AutoSizeTextarea
                 singleLine
                 value={formatPhoneNumber(editablePersonalInfo.phone)}
+                onFocus={triggerFocus}
                 onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, phone: val }))}
                 onBlur={() => setEditablePersonalInfo((p: any) => ({ ...p, phone: formatPhoneNumber(p.phone) }))}
               />
@@ -393,6 +413,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
               <AutoSizeTextarea
                 singleLine
                 value={editablePersonalInfo.linkedin}
+                onFocus={triggerFocus}
                 onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, linkedin: val }))}
               />
             </a>
@@ -405,6 +426,7 @@ export const HeaderUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> = 
               <AutoSizeTextarea
                 singleLine
                 value={editablePersonalInfo.github}
+                onFocus={triggerFocus}
                 onChange={(val) => setEditablePersonalInfo((p: any) => ({ ...p, github: val }))}
               />
             </a>

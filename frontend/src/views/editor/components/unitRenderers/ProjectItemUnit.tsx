@@ -25,8 +25,13 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
   const hasTech = Boolean(techString && techString.trim());
   const isSectionHovered = hoveredSectionId === unit.sectionId;
 
+  const triggerFocus = () => {
+    p.onCanvasFocus?.('projects', proj.id || `proj_${projIdx}`);
+  };
+
   return (
     <div
+      onClick={triggerFocus}
       className={`${isPP ? styles.ppSectionRow : (isGerman ? styles.germanRow : styles.resumeItem)} ${isSectionHovered ? styles.sectionHoverActive : ''}`}
       style={{ ...mergedStyles, position: 'relative' }}
       onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
@@ -39,6 +44,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
               <AutoSizeTextarea
                 value={proj.title || ''}
                 placeholder="Project Title"
+                onFocus={triggerFocus}
                 onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? { ...p, title: val } : p))}
               />
             </h4>
@@ -48,6 +54,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
                   singleLine
                   value={proj.date || ''}
                   placeholder="Project Date..."
+                  onFocus={triggerFocus}
                   onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, date: val } : p))}
                 />
               </div>
@@ -64,6 +71,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
                       style={{ fontSize: '1em', fontWeight: 500, color: '#1e293b' }}
                       value={proj.role || ''}
                       placeholder="Your Role / Contributions..."
+                      onFocus={triggerFocus}
                       onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
                     />
                   </div>
@@ -77,6 +85,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
                       style={{ fontSize: '1em', fontWeight: 400, color: '#334155', fontStyle: 'italic' }}
                       value={techString}
                       placeholder="Technologies used..."
+                      onFocus={triggerFocus}
                       onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
                         ...p,
                         technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
@@ -102,6 +111,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
                         style={{ fontSize: '1em', fontWeight: 500, color: '#1e293b' }}
                         value={linkVal}
                         placeholder="GitHub / Live Demo Link..."
+                        onFocus={triggerFocus}
                         onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, link: val } : p))}
                       />
                     </a>
@@ -159,6 +169,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
                           id={inputId}
                           value={bullet}
                           placeholder="Describe project deliverables and results..."
+                          onFocus={triggerFocus}
                           onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
                             ...p,
                             bullets: p.bullets.map((b: string, bI: number) => bI === bulletIdx ? val : b)
@@ -180,6 +191,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
               <AutoSizeTextarea
                 value={proj.title || ''}
                 placeholder="Project Title"
+                onFocus={triggerFocus}
                 onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, title: val } : p))}
               />
             </strong>
@@ -190,6 +202,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
                 singleLine
                 value={proj.date || ''}
                 placeholder="Project Date..."
+                onFocus={triggerFocus}
                 onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, date: val } : p))}
               />
             </div>
@@ -204,6 +217,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
                     style={{ fontSize: '1em', fontWeight: 500, color: '#1e293b' }}
                     value={proj.role || ''}
                     placeholder="Your Role / Contributions..."
+                    onFocus={triggerFocus}
                     onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, role: val } : p))}
                   />
                 </div>
@@ -217,6 +231,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
                     style={{ fontSize: '1em', fontWeight: 400, color: '#334155', fontStyle: 'italic' }}
                     value={techString}
                     placeholder="Technologies used..."
+                    onFocus={triggerFocus}
                     onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? {
                       ...p,
                       technologies: val.includes(',') ? val.split(',').map(t => t.trim()) : (val ? [val] : [])
@@ -242,6 +257,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
                       style={{ fontSize: '1em', fontWeight: 500, color: '#1e293b' }}
                       value={linkVal}
                       placeholder="GitHub / Live Demo Link..."
+                      onFocus={triggerFocus}
                       onChange={(val) => setEditableProjects(prev => prev.map((p, i) => ((p.id && proj.id && p.id === proj.id) || i === projIdx) ? { ...p, link: val } : p))}
                     />
                   </a>
@@ -299,6 +315,7 @@ export const ProjectItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext 
                         id={inputId}
                         value={bullet}
                         placeholder="Describe project deliverables and results..."
+                        onFocus={triggerFocus}
                         onChange={(val) => setEditableProjects(prev => prev.map((p, i) => i === projIdx ? {
                           ...p,
                           bullets: p.bullets.map((b: string, bI: number) => bI === bulletIdx ? val : b)

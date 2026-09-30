@@ -16,11 +16,16 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
   const isSectionHovered = hoveredSectionId === unit.sectionId;
   const format = sec?.customFormat || 'bullets';
 
+  const triggerFocus = () => {
+    if (unit.sectionId) p.onCanvasFocus?.(unit.sectionId, unit.sectionId);
+  };
+
   // Key-Value Layout
   if (format === 'keyvalue') {
     const pairs = sec?.keyValuePairs || [{ key: '', value: '' }];
     return (
       <div
+        onClick={triggerFocus}
         className={isSectionHovered ? styles.sectionHoverActive : ''}
         style={mergedStyles}
         onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
@@ -37,6 +42,7 @@ export const CustomContentUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                 <AutoSizeTextarea
                   value={pair.key}
                   placeholder="Key / Category"
+                  onFocus={triggerFocus}
                   onChange={(val) => {
                     setSections(prev => prev.map(s => {
                       if (s.id === unit.sectionId) {

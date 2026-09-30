@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
@@ -320,6 +320,23 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   // Smooth Section Hide / Show Animation State
   const [animatingHideSectionId, setAnimatingHideSectionId] = useState<string | null>(null);
   const [animatingShowSectionId, setAnimatingShowSectionId] = useState<string | null>(null);
+
+  // Auto Focus / Highlight Sidebar Item from Canvas Interaction
+  const [focusedSidebarItemId, setFocusedSidebarItemId] = useState<string | null>(null);
+  const focusHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleCanvasFocus = useCallback((sectionId: string, itemId?: string) => {
+    setActiveControlTab('style');
+    setActiveStyleSubTab('sections');
+    setActiveDetailSectionId(sectionId);
+    if (itemId) {
+      setFocusedSidebarItemId(itemId);
+      if (focusHighlightTimerRef.current) clearTimeout(focusHighlightTimerRef.current);
+      focusHighlightTimerRef.current = setTimeout(() => {
+        setFocusedSidebarItemId(null);
+      }, 2400);
+    }
+  }, []);
 
   const toggleSectionVisibility = (sectionId: string) => {
     const target = sections.find(s => s.id === sectionId);
@@ -2399,6 +2416,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
         getAlertsFor={getAlertsFor}
         toggleSectionVisibility={toggleSectionVisibility}
         onResetToMasterProfile={handleResetSectionToMasterProfile}
+        onCanvasFocus={handleCanvasFocus}
       />
     );
   };
@@ -2584,6 +2602,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 activeStyleSubTab={activeStyleSubTab}
                 setActiveStyleSubTab={setActiveStyleSubTab}
                 activeDetailSectionId={activeDetailSectionId}
+                focusedSidebarItemId={focusedSidebarItemId}
                 targetLanguage={targetLanguage}
                 animatingHideSectionId={animatingHideSectionId}
                 onOpenSectionDetail={handleOpenSectionDetail}

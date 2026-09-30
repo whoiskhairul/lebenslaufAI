@@ -8,6 +8,7 @@ export interface SummaryEditorProps {
   summary: string;
   setSummary: (val: string) => void;
   onOpenAiPolish: () => void;
+  focusedSidebarItemId?: string | null;
 }
 
 export const SummaryEditor: React.FC<SummaryEditorProps> = ({
@@ -15,10 +16,21 @@ export const SummaryEditor: React.FC<SummaryEditorProps> = ({
   onRenameSection,
   summary,
   setSummary,
-  onOpenAiPolish
+  onOpenAiPolish,
+  focusedSidebarItemId
 }) => {
   const charCount = summary ? summary.length : 0;
   const wordCount = summary ? summary.trim().split(/\s+/).filter(Boolean).length : 0;
+
+  React.useEffect(() => {
+    if (focusedSidebarItemId === 'summary') {
+      const timer = setTimeout(() => {
+        const el = document.getElementById('sidebar-item-summary');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [focusedSidebarItemId]);
 
   return (
     <div className={styles.sideEditorContent}>
@@ -47,7 +59,10 @@ export const SummaryEditor: React.FC<SummaryEditorProps> = ({
       </div>
 
       {/* Summary Content Body */}
-      <div className={styles.sideFieldGroupCard}>
+      <div
+        id="sidebar-item-summary"
+        className={`${styles.sideFieldGroupCard} ${focusedSidebarItemId === 'summary' ? styles.sidebarItemHighlightFocus : ''}`}
+      >
         <div className={styles.sideFieldLabelRow} style={{ marginBottom: '8px' }}>
           <label className={styles.sideFieldLabel} style={{ marginBottom: 0 }}>
             <FileText size={13} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />

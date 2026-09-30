@@ -13,6 +13,7 @@ interface StyleControlsPanelProps {
   activeStyleSubTab: 'theme' | 'sections';
   setActiveStyleSubTab: (tab: 'theme' | 'sections') => void;
   activeDetailSectionId: string | null;
+  focusedSidebarItemId?: string | null;
   targetLanguage: 'en' | 'de';
   animatingHideSectionId: string | null;
   onOpenSectionDetail: (sectionId: string) => void;
@@ -34,6 +35,7 @@ export const StyleControlsPanel: React.FC<StyleControlsPanelProps> = ({
   activeStyleSubTab,
   setActiveStyleSubTab,
   activeDetailSectionId,
+  focusedSidebarItemId,
   targetLanguage,
   animatingHideSectionId,
   onOpenSectionDetail,
@@ -286,6 +288,7 @@ export const StyleControlsPanel: React.FC<StyleControlsPanelProps> = ({
           /* Master-Detail Full Section Editor */
           <SectionDetailEditor
             sectionId={activeDetailSectionId}
+            focusedSidebarItemId={focusedSidebarItemId}
             sections={sections}
             setSections={setSections}
             onBack={onCloseSectionDetail}

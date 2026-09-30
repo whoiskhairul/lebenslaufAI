@@ -3719,6 +3719,34 @@
   box-shadow: 0 2px 6px rgba(99, 102, 241, 0.08);
 }
 
+@keyframes sidebarFocusPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+    border-color: var(--card-border, #e2e8f0);
+  }
+  15% {
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.35), 0 6px 20px rgba(99, 102, 241, 0.18);
+    border-color: #6366f1;
+    background-color: rgba(99, 102, 241, 0.06);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2), 0 4px 12px rgba(99, 102, 241, 0.12);
+    border-color: #818cf8;
+    background-color: rgba(99, 102, 241, 0.03);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+    border-color: rgba(99, 102, 241, 0.4);
+    background-color: var(--card-bg, #ffffff);
+  }
+}
+
+.sidebarItemHighlightFocus {
+  animation: sidebarFocusPulse 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  position: relative;
+  z-index: 5;
+}
+
 .sideCardHeader {
   display: flex;
   justify-content: space-between;

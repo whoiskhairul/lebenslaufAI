@@ -61,4 +61,5 @@ export interface UnitRendererProps {
   getAlertsFor: (section: string) => any[];
   toggleSectionVisibility?: (sectionId: string) => void;
   onResetToMasterProfile?: (sectionId: string) => void;
+  onCanvasFocus?: (sectionId: string, itemId?: string) => void;
 }

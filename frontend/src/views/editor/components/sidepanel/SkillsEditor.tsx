@@ -21,6 +21,7 @@ export interface SkillsEditorProps {
   languagesTitle: string;
   setLanguagesTitle: (val: string) => void;
   targetLanguage: 'en' | 'de';
+  focusedSidebarItemId?: string | null;
 }
 
 interface SkillCategoryItemProps {
@@ -30,6 +31,7 @@ interface SkillCategoryItemProps {
   originalCategory: string;
   displayHeader: string;
   isExpanded: boolean;
+  isHighlighted?: boolean;
   totalCats: number;
   activeAddCat: string | null;
   quickAddInput: string;
@@ -53,6 +55,7 @@ const SkillCategoryItem: React.FC<SkillCategoryItemProps> = ({
   originalCategory,
   displayHeader,
   isExpanded,
+  isHighlighted,
   totalCats,
   activeAddCat,
   quickAddInput,
@@ -84,7 +87,10 @@ const SkillCategoryItem: React.FC<SkillCategoryItemProps> = ({
   };
 
   return (
-    <div className={`${styles.sideItemCard} ${isExpanded ? styles.sideItemCardExpanded : ''}`}>
+    <div
+      id={`sidebar-item-cat-${catKey}`}
+      className={`${styles.sideItemCard} ${isExpanded ? styles.sideItemCardExpanded : ''} ${isHighlighted ? styles.sidebarItemHighlightFocus : ''}`}
+    >
       {/* Category Header */}
       <div
         className={styles.sideCardHeader}
@@ -252,7 +258,8 @@ export const SkillsEditor: React.FC<SkillsEditorProps> = ({
   getLocalizedCategoryName,
   languagesTitle,
   setLanguagesTitle,
-  targetLanguage
+  targetLanguage,
+  focusedSidebarItemId
 }) => {
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({
     languages: true
@@ -265,6 +272,32 @@ export const SkillsEditor: React.FC<SkillsEditorProps> = ({
   const toggleCat = (catKey: string) => {
     setExpandedCats(prev => ({ ...prev, [catKey]: !prev[catKey] }));
   };
+
+  // Auto-expand and scroll to focused category or languages
+  useEffect(() => {
+    if (!focusedSidebarItemId) return;
+    const normalizedTarget = focusedSidebarItemId.toLowerCase().trim();
+
+    if (normalizedTarget === 'languages') {
+      const timer = setTimeout(() => {
+        const el = document.getElementById('sidebar-item-cat-languages');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+
+    // Check if target matches any category directly or via a skill inside it
+    const matchingSkill = skills.find(s => s.id === focusedSidebarItemId || (s.category || '').toLowerCase().trim() === normalizedTarget);
+    const targetCatKey = matchingSkill ? (matchingSkill.category || 'technical').toLowerCase().trim() : normalizedTarget;
+
+    setExpandedCats(prev => ({ ...prev, [targetCatKey]: true }));
+
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`sidebar-item-cat-${targetCatKey}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [focusedSidebarItemId, skills]);
 
   // Separate non-language IT skills and language skills
   const itSkills = skills.filter(s => (s.category || '').toLowerCase().trim() !== 'languages');
@@ -474,6 +507,8 @@ export const SkillsEditor: React.FC<SkillsEditorProps> = ({
           const originalCategory = categorySkills[0]?.category || catKey;
           const displayHeader = getLocalizedCategoryName(originalCategory);
           const isExpanded = !!expandedCats[catKey];
+          const isHighlighted = focusedSidebarItemId?.toLowerCase().trim() === catKey ||
+            categorySkills.some(s => s.id === focusedSidebarItemId);
 
           return (
             <SkillCategoryItem
@@ -484,6 +519,7 @@ export const SkillsEditor: React.FC<SkillsEditorProps> = ({
               originalCategory={originalCategory}
               displayHeader={displayHeader}
               isExpanded={isExpanded}
+              isHighlighted={isHighlighted}
               totalCats={finalCats.length}
               activeAddCat={activeAddCat}
               quickAddInput={quickAddInput}
@@ -517,7 +553,10 @@ export const SkillsEditor: React.FC<SkillsEditorProps> = ({
         </span>
       </div>
 
-      <div className={styles.sideFieldGroupCard}>
+      <div
+        id="sidebar-item-cat-languages"
+        className={`${styles.sideFieldGroupCard} ${focusedSidebarItemId === 'languages' ? styles.sidebarItemHighlightFocus : ''}`}
+      >
         <div className={styles.sideFieldRow} style={{ marginBottom: '10px' }}>
           <label className={styles.sideFieldLabel}>Languages Heading</label>
           <input

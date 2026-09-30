@@ -29,15 +29,27 @@ export interface CustomSectionEditorProps {
   onUpdateSection: (updates: Partial<CustomSectionItem>) => void;
   onDeleteSection: () => void;
   onPolishBullet?: (bulletText: string, onAccept: (newText: string) => void) => void;
+  focusedSidebarItemId?: string | null;
 }
 
 export const CustomSectionEditor: React.FC<CustomSectionEditorProps> = ({
   section,
   onUpdateSection,
   onDeleteSection,
-  onPolishBullet
+  onPolishBullet,
+  focusedSidebarItemId
 }) => {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  React.useEffect(() => {
+    if (focusedSidebarItemId && (focusedSidebarItemId === section.id || focusedSidebarItemId === 'custom')) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`sidebar-item-custom-${section.id}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [focusedSidebarItemId, section.id]);
   const format = section.customFormat || 'bullets';
   const bullets = Array.isArray(section.bullets) ? section.bullets : ['Earned industry credential / achievement with distinction.'];
   const keyValuePairs = Array.isArray(section.keyValuePairs) ? section.keyValuePairs : [
@@ -183,7 +195,10 @@ export const CustomSectionEditor: React.FC<CustomSectionEditorProps> = ({
       </div>
 
       {/* Section Title & Format Switcher */}
-      <div className={styles.sideFieldGroupCard}>
+      <div
+        id={`sidebar-item-custom-${section.id}`}
+        className={`${styles.sideFieldGroupCard} ${focusedSidebarItemId === section.id ? styles.sidebarItemHighlightFocus : ''}`}
+      >
         <div className={styles.sideFieldRow}>
           <label className={styles.sideFieldLabel}>Section Heading</label>
           <input
