@@ -8,6 +8,7 @@ export interface AutoSizeTextareaProps {
   onChange: (val: string) => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onBlur?: () => void;
+  onFocus?: (e: React.FocusEvent<HTMLTextAreaElement>) => void;
   className?: string;
   placeholder?: string;
   id?: string;
@@ -17,7 +18,7 @@ export interface AutoSizeTextareaProps {
 }
 
 export const AutoSizeTextarea: React.FC<AutoSizeTextareaProps> = ({
-  value, onChange, onKeyDown, onBlur, className, placeholder, id, singleLine, autoFocus = false, style
+  value, onChange, onKeyDown, onBlur, onFocus, className, placeholder, id, singleLine, autoFocus = false, style
 }) => {
   const isMeasuring = useContext(MeasuringContext);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -150,6 +151,7 @@ export const AutoSizeTextarea: React.FC<AutoSizeTextareaProps> = ({
         onSelect={handleSelect}
         onKeyDown={onKeyDown}
         onBlur={onBlur}
+        onFocus={onFocus}
         className={`${className || ''} ${styles.canvasFieldEdit} print-hidden`}
         placeholder={placeholder}
         rows={1}

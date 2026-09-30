@@ -19,8 +19,13 @@ export const SkillsLanguagesUnit: React.FC<{ p: UnitRendererProps; ctx: UnitCont
   const skillsList = unit.skills || [];
   const isSectionHovered = hoveredSectionId === unit.sectionId;
 
+  const triggerFocus = () => {
+    p.onCanvasFocus?.('skills', 'languages');
+  };
+
   return (
     <div
+      onClick={triggerFocus}
       className={isSectionHovered ? styles.sectionHoverActive : ''}
       style={{ ...mergedStyles, position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', marginTop: '6px', marginBottom: '8px' }}
       onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
@@ -29,6 +34,7 @@ export const SkillsLanguagesUnit: React.FC<{ p: UnitRendererProps; ctx: UnitCont
       <div style={{ fontWeight: 700, fontSize: '1.05em', color: 'var(--accent-color, #0f172a)', marginBottom: '4px' }}>
         <AutoSizeTextarea
           value={languagesTitle || (targetLanguage === 'de' ? 'Sprachen' : 'Languages')}
+          onFocus={triggerFocus}
           onChange={(val) => setLanguagesTitle(val)}
         />
       </div>
@@ -40,12 +46,14 @@ export const SkillsLanguagesUnit: React.FC<{ p: UnitRendererProps; ctx: UnitCont
             const rawLangs = skillsList.map(s => s.name).join(', ');
             const formattedNode = renderFormattedLanguageList(rawLangs);
             return formattedNode && editingLanguagesId !== unit.id ? (
-              <div onClick={() => setEditingLanguagesId(unit.id!)} style={{ cursor: 'pointer', minHeight: '1.2em' }}>
+              <div onClick={() => { triggerFocus(); setEditingLanguagesId(unit.id!); }} style={{ cursor: 'pointer', minHeight: '1.2em' }}>
                 {formattedNode}
               </div>
             ) : (
               <AutoSizeTextarea
                 value={rawLangs}
+                placeholder="e.g. English (Native), German (B2)"
+                onFocus={triggerFocus}
                 onChange={(val) => {
                   const names = val.split(',').map(n => n.trim()).filter(Boolean);
                   setEditableSkills(prev => {
@@ -83,8 +91,13 @@ export const SkillsCategoryUnit: React.FC<{ p: UnitRendererProps; ctx: UnitConte
   const catLabel = getLocalizedCategoryName(cat);
   const isSectionHovered = hoveredSectionId === unit.sectionId;
 
+  const triggerFocus = () => {
+    p.onCanvasFocus?.('skills', cat.toLowerCase().trim());
+  };
+
   return (
     <div
+      onClick={triggerFocus}
       className={isSectionHovered ? styles.sectionHoverActive : ''}
       style={{ ...mergedStyles, position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', marginBottom: '8px' }}
       onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
@@ -98,6 +111,8 @@ export const SkillsCategoryUnit: React.FC<{ p: UnitRendererProps; ctx: UnitConte
         <div style={{ flex: 1 }}>
           <AutoSizeTextarea
             value={skillsList.map(s => s.name).join(', ')}
+            placeholder="e.g. React, TypeScript, Node.js"
+            onFocus={triggerFocus}
             onChange={(val) => {
               const names = val.split(',').map(n => n.trim()).filter(Boolean);
               setEditableSkills(prev => {

@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Toast } from '../components/Toast';
-import { Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Brain, Save, RefreshCw, Trash, Plus, Settings, Minimize2, LayoutGrid, Layers, Sliders, User, Briefcase, Code, GraduationCap, Globe, Eye, EyeOff, RotateCcw, Mail } from 'lucide-react';
+import { Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Save, RefreshCw, Trash, Plus, Settings, Minimize2, LayoutGrid, Layers, Sliders, Briefcase, Code, GraduationCap, Globe, Eye, EyeOff, RotateCcw, Mail, ChevronDown } from 'lucide-react';
 import styles from './editorStyles';
 
 import { ATSDashboard, ATSReport, Proposal, WeakBulletWithOriginal, RecommendedKeyword } from '../components/ATSDashboard';
@@ -225,6 +225,10 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const template = useCvDocumentStore((s) => s.template);
   const setTemplate = useCvDocumentStore((s) => s.setTemplate);
   const [isLoading, setIsLoading] = useState(false);
+  // True while an existing resume/version is being fetched from the DB.
+  // Distinct from isLoading (AI tailoring) so we never flash the empty
+  // state before the real content arrives.
+  const [isBootLoading, setIsBootLoading] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<ResumeVersion | null>(null);
   // Bumped after async content arrives to force a pagination re-measure
   // once the preview subtree has remounted (skeleton -> canvas race).
@@ -233,6 +237,36 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const [applicationTracked, setApplicationTracked] = useState(false);
   const [saveAutomatically, setSaveAutomatically] = useState(true);
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
+  const downloadRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isDownloadOpen) return;
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (downloadRef.current && !downloadRef.current.contains(e.target as Node)) {
+        setIsDownloadOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsDownloadOpen(false);
+      }
+    };
+    const handleDismiss = () => {
+      setIsDownloadOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', handleDismiss, true);
+    window.addEventListener('resize', handleDismiss);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', handleDismiss, true);
+      window.removeEventListener('resize', handleDismiss);
+    };
+  }, [isDownloadOpen]);
   // Dismissed layout notice, keyed by version + page count so it reappears
   // when pagination worsens (or another version is opened).
   const [dismissedLayoutNotice, setDismissedLayoutNotice] = useState<{ versionId: string | null; pages: number } | null>(null);
@@ -286,6 +320,23 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   // Smooth Section Hide / Show Animation State
   const [animatingHideSectionId, setAnimatingHideSectionId] = useState<string | null>(null);
   const [animatingShowSectionId, setAnimatingShowSectionId] = useState<string | null>(null);
+
+  // Auto Focus / Highlight Sidebar Item from Canvas Interaction
+  const [focusedSidebarItemId, setFocusedSidebarItemId] = useState<string | null>(null);
+  const focusHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleCanvasFocus = useCallback((sectionId: string, itemId?: string) => {
+    setActiveControlTab('style');
+    setActiveStyleSubTab('sections');
+    setActiveDetailSectionId(sectionId);
+    if (itemId) {
+      setFocusedSidebarItemId(itemId);
+      if (focusHighlightTimerRef.current) clearTimeout(focusHighlightTimerRef.current);
+      focusHighlightTimerRef.current = setTimeout(() => {
+        setFocusedSidebarItemId(null);
+      }, 2400);
+    }
+  }, []);
 
   const toggleSectionVisibility = (sectionId: string) => {
     const target = sections.find(s => s.id === sectionId);
@@ -1156,9 +1207,19 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   // Sync route param hashes
   const updateTabHash = (newTab: 'resume' | 'letter' | 'job') => {
     setEditorTab(newTab);
-    if (initialJobParams?.application_id) {
-      window.location.hash = `editor?appId=${initialJobParams.application_id}&tab=${newTab}`;
+    // Persist the tab in the real query string — NOT location.hash. A hash
+    // fragment both corrupts the address bar (…#editor?appId=…&tab=…) and
+    // drops `tab` on re-parse, which used to retrigger the full version
+    // reload below on every tab click.
+    const params = new URLSearchParams(window.location.search);
+    if (initialJobParams?.application_id && !params.get('appId')) {
+      params.set('appId', initialJobParams.application_id);
     }
+    params.set('tab', newTab);
+    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+    // Keep App's route state truthful; data loaders below are keyed on the
+    // application/version id, so a tab-only change refetches nothing.
+    window.dispatchEvent(new Event('popstate'));
   };
 
   // Sync category ordering on skills changes (preserving custom category order).
@@ -1273,6 +1334,13 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   const [masterProfileData, setMasterProfileData] = useState<any>(null);
 
+  // Data loaders below must NOT rerun on tab-only route changes (tab clicks
+  // update the query string). Key them on the target document instead, and
+  // read the latest params through a ref so fresh navigations still load.
+  const routeDataKey = `${initialJobParams?.application_id || ''}|${initialJobParams?.version_id || ''}`;
+  const initialJobParamsRef = useRef(initialJobParams);
+  initialJobParamsRef.current = initialJobParams;
+
   // Load master profile projects and info for tailoring selection & diagnostics
   useEffect(() => {
     const fetchMasterProfile = async () => {
@@ -1308,7 +1376,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           }
 
           // Only set default editable fields if no existing version/application is loaded
-          if (!initialJobParams?.application_id) {
+          if (!initialJobParamsRef.current?.application_id) {
             if (profileObj.personal_info) {
               setEditablePersonalInfo({
                 id: profileObj.personal_info.id,
@@ -1348,7 +1416,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
       }
     };
     fetchMasterProfile();
-  }, [initialJobParams]);
+  }, [routeDataKey]);
 
 
   // Keyboard focus relocation hook for bullet list manipulation
@@ -1363,23 +1431,28 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     }
   }, [focusedBulletInfo]);
 
-  // Load resume application version on startup
+  // Load resume application version on startup (or when the target
+  // application/version changes — tab-only route changes must not refetch).
   useEffect(() => {
-    if (initialJobParams) {
-      if (initialJobParams.tab && ['resume', 'letter', 'job'].includes(initialJobParams.tab)) {
-        setEditorTab(initialJobParams.tab as any);
+    const params = initialJobParamsRef.current;
+    if (params) {
+      if (params.tab && ['resume', 'letter', 'job'].includes(params.tab)) {
+        setEditorTab(params.tab as any);
       }
-      if (initialJobParams.company) setCompany(initialJobParams.company);
-      if (initialJobParams.position) setPosition(initialJobParams.position);
-      if (initialJobParams.desc) setJobDescription(initialJobParams.desc);
+      if (params.company) setCompany(params.company);
+      if (params.position) setPosition(params.position);
+      if (params.desc) setJobDescription(params.desc);
     }
 
     const fetchExistingVersion = async () => {
+      const needsFetch = Boolean(params?.version_id || params?.application_id);
+      if (needsFetch) setIsBootLoading(true);
+      try {
       // Chrome-extension deep link: /editor?versionId=<uuid>
-      if (initialJobParams?.version_id) {
+      if (params?.version_id) {
         try {
           const res = await api.get('/resume/versions');
-          const ver = (res.data as any[]).find((v: any) => v.id === initialJobParams.version_id);
+          const ver = (res.data as any[]).find((v: any) => v.id === params.version_id);
           if (ver) {
             setCompany(ver.target_company || '');
             setCompanyDomain('');
@@ -1409,9 +1482,9 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         return;
       }
 
-      if (initialJobParams?.application_id) {
+      if (params?.application_id) {
         try {
-          const appRes = await api.get(`/applications/${initialJobParams.application_id}`);
+          const appRes = await api.get(`/applications/${params.application_id}`);
           if (appRes.data) {
             setCompany(appRes.data.company || '');
             setCompanyDomain(appRes.data.company_domain || '');
@@ -1427,7 +1500,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           const sortedVersions = [...res.data].sort((a: any, b: any) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           );
-          const matched = sortedVersions.find((v: any) => v.application === initialJobParams.application_id);
+          const matched = sortedVersions.find((v: any) => v.application === params.application_id);
           if (matched) {
             const ver = matched as ResumeVersion;
             setCurrentVersion(ver);
@@ -1437,7 +1510,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
             const sortedLetters = [...letterRes.data].sort((a: any, b: any) =>
               new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             );
-            const matchedLetter = sortedLetters.find((l: any) => l.application === initialJobParams.application_id);
+            const matchedLetter = sortedLetters.find((l: any) => l.application === params.application_id);
             if (matchedLetter) {
               // Late async arrival (dashboard-card flow) — not a user edit.
               markBulkLoad();
@@ -1449,9 +1522,12 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           console.error('Failed to load version details:', err);
         }
       }
+      } finally {
+        if (needsFetch) setIsBootLoading(false);
+      }
     };
     fetchExistingVersion();
-  }, [initialJobParams]);
+  }, [routeDataKey]);
 
   // Helper to initialize fields from version object
   const initializeVersionFields = (ver: ResumeVersion) => {
@@ -1691,23 +1767,23 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
     if (format === 'keyvalue') {
       newSec.keyValuePairs = [
-        { key: 'Category / Key', value: 'Tools, proficiencies, or relevant details' }
+        { key: '', value: '' }
       ];
     } else if (format === 'entries') {
       newSec.entries = [
         {
           id: `entry_${Date.now()}`,
-          title: `${title} Contributor / Role`,
-          subtitle: 'Organization or Project',
-          location: 'City, Country',
-          date: '2023 - Present',
-          bullets: ['Spearheaded key project initiative and delivered measurable performance outcomes.']
+          title: '',
+          subtitle: '',
+          location: '',
+          date: '',
+          bullets: ['']
         }
       ];
     } else if (format === 'paragraph') {
-      newSec.paragraphText = 'Experienced professional committed to delivering high-impact solutions, optimizing system performance, and driving core project objectives.';
+      newSec.paragraphText = '';
     } else {
-      newSec.bullets = ['Earned credential / accomplishment with distinguished outcome.'];
+      newSec.bullets = [''];
     }
 
     setSections(prev => [...prev, newSec]);
@@ -2340,6 +2416,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
         getAlertsFor={getAlertsFor}
         toggleSectionVisibility={toggleSectionVisibility}
         onResetToMasterProfile={handleResetSectionToMasterProfile}
+        onCanvasFocus={handleCanvasFocus}
       />
     );
   };
@@ -2378,12 +2455,6 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
           }
         }
       `}} />
-      <div className={`${styles.headerRow} no-print`}>
-        <div>
-          <h2 className={styles.title}>Premium CV Rebuilder</h2>
-          <p className={styles.subtitle}>Audit ATS match scores, approve real-time tailored variations and edit canvas inline.</p>
-        </div>
-      </div>
 
       {showSaveBanner && (
         <div className={styles.saveBanner}>
@@ -2531,6 +2602,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                 activeStyleSubTab={activeStyleSubTab}
                 setActiveStyleSubTab={setActiveStyleSubTab}
                 activeDetailSectionId={activeDetailSectionId}
+                focusedSidebarItemId={focusedSidebarItemId}
                 targetLanguage={targetLanguage}
                 animatingHideSectionId={animatingHideSectionId}
                 onOpenSectionDetail={handleOpenSectionDetail}
@@ -2908,11 +2980,11 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
         {/* Right Preview Area */}
         <div ref={previewCanvasRef} className={styles.previewCanvas}>
-          {isLoading ? (
+          {(isBootLoading || isLoading) ? (
             <div className={styles.skeletonContainer}>
               <div className={styles.skeletonLoaderBanner} style={{ width: `${794 * scale}px` }}>
                 <RefreshCw className={styles.skeletonSpinner} size={16} />
-                <span>AI is compiling keywords and tailoring resume cards...</span>
+                <span>{isBootLoading ? 'Loading your resume…' : 'AI is compiling keywords and tailoring resume cards...'}</span>
               </div>
               <div
                 className={styles.skeletonPaperWrapper}
@@ -3078,10 +3150,16 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                     <Save size={16} />
                     <span>{currentVersion.id.startsWith('unsaved_') ? 'Save as New Version' : isDirty ? '● Save Changes' : 'Saved ✓'}</span>
                   </Button>
-                  <div style={{ position: 'relative' }}>
-                    <Button variant="secondary" onClick={() => setIsDownloadOpen(!isDownloadOpen)}>
+                  <div ref={downloadRef} style={{ position: 'relative' }}>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setIsDownloadOpen(!isDownloadOpen)}
+                      aria-haspopup="menu"
+                      aria-expanded={isDownloadOpen}
+                    >
                       <Download size={16} />
                       <span>Download</span>
+                      <ChevronDown size={12} className={`${styles.toolbarChevron} ${isDownloadOpen ? styles.toolbarChevronOpen : ''}`} />
                     </Button>
                     {isDownloadOpen && (
                       <div className={styles.downloadDropdown}>
@@ -3836,9 +3914,24 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             </div>
           ) : (
             <div className={styles.emptyWorkspace}>
-              <Brain size={48} className={styles.emptyIcon} />
-              <h3>Tailoring Workspace Ready</h3>
-              <p>Tailor your master profile credentials against standard job descriptions to start.</p>
+              <FileText size={20} className={styles.emptyMiniIcon} />
+              <h3>No resume yet</h3>
+              <p>Paste a job description and hit Generate.</p>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setActiveControlTab('tailor');
+                  if (isMobileViewport) setMobileActivePane('editor');
+                  requestAnimationFrame(() => {
+                    const ta = controlPanelRef.current?.querySelector('textarea');
+                    if (ta instanceof HTMLTextAreaElement) ta.focus();
+                    else controlPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  });
+                }}
+              >
+                <Wand2 size={14} />
+                <span>Start tailoring</span>
+              </Button>
             </div>
           )}
         </div>

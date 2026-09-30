@@ -141,13 +141,15 @@ export const SectionTitleUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext
             textAlign: localStyles.headingAlignment ? localStyles.headingAlignment : undefined,
           } as React.CSSProperties}>
             {formattedTitleNode && editingSectionTitleId !== unit.sectionId ? (
-              <span onClick={() => setEditingSectionTitleId(unit.sectionId!)} style={{ cursor: 'pointer', display: 'inline-block', width: '100%' }}>
+              <span onClick={() => { if (unit.sectionId) p.onCanvasFocus?.(unit.sectionId, unit.sectionId); setEditingSectionTitleId(unit.sectionId!); }} style={{ cursor: 'pointer', display: 'inline-block', width: '100%' }}>
                 {formattedTitleNode}
               </span>
             ) : (
               <AutoSizeTextarea
                 autoFocus
                 value={unit.titleText || ''}
+                placeholder="Section Title"
+                onFocus={() => { if (unit.sectionId) p.onCanvasFocus?.(unit.sectionId, unit.sectionId); }}
                 onChange={(val) => setSections(prev => prev.map(s => s.id === unit.sectionId ? { ...s, name: val } : s))}
                 onBlur={() => setEditingSectionTitleId(null)}
               />

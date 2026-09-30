@@ -29,15 +29,27 @@ export interface CustomSectionEditorProps {
   onUpdateSection: (updates: Partial<CustomSectionItem>) => void;
   onDeleteSection: () => void;
   onPolishBullet?: (bulletText: string, onAccept: (newText: string) => void) => void;
+  focusedSidebarItemId?: string | null;
 }
 
 export const CustomSectionEditor: React.FC<CustomSectionEditorProps> = ({
   section,
   onUpdateSection,
   onDeleteSection,
-  onPolishBullet
+  onPolishBullet,
+  focusedSidebarItemId
 }) => {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  React.useEffect(() => {
+    if (focusedSidebarItemId && (focusedSidebarItemId === section.id || focusedSidebarItemId === 'custom')) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`sidebar-item-custom-${section.id}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [focusedSidebarItemId, section.id]);
   const format = section.customFormat || 'bullets';
   const bullets = Array.isArray(section.bullets) ? section.bullets : ['Earned industry credential / achievement with distinction.'];
   const keyValuePairs = Array.isArray(section.keyValuePairs) ? section.keyValuePairs : [
@@ -46,20 +58,20 @@ export const CustomSectionEditor: React.FC<CustomSectionEditorProps> = ({
   const entries = Array.isArray(section.entries) ? section.entries : [
     {
       id: `entry_${Date.now()}`,
-      title: 'Role / Position Title',
-      subtitle: 'Organization or Project',
-      date: '2023 - Present',
-      location: 'City, Country',
-      bullets: ['Key contribution or responsibility accomplishment detail...']
+      title: '',
+      subtitle: '',
+      date: '',
+      location: '',
+      bullets: ['']
     }
   ];
-  const paragraphText = section.paragraphText ?? (bullets.length > 0 ? bullets.join(' ') : 'Experienced professional committed to delivering high-impact solutions, optimizing scalability, and driving core product reliability.');
+  const paragraphText = section.paragraphText ?? '';
 
   const handleFormatChange = (newFormat: 'bullets' | 'keyvalue' | 'entries' | 'paragraph') => {
     onUpdateSection({
       customFormat: newFormat,
-      keyValuePairs: newFormat === 'keyvalue' ? (section.keyValuePairs || [{ key: 'Category / Skill Area', value: 'Proficiencies, tools, or relevant details' }]) : section.keyValuePairs,
-      bullets: newFormat === 'bullets' ? (section.bullets || ['Earned industry credential / achievement with distinction.']) : section.bullets,
+      keyValuePairs: newFormat === 'keyvalue' ? (section.keyValuePairs || [{ key: '', value: '' }]) : section.keyValuePairs,
+      bullets: newFormat === 'bullets' ? (section.bullets || ['']) : section.bullets,
       entries: newFormat === 'entries' ? (section.entries || entries) : section.entries,
       paragraphText: newFormat === 'paragraph' ? (section.paragraphText || paragraphText) : section.paragraphText
     });
@@ -67,7 +79,7 @@ export const CustomSectionEditor: React.FC<CustomSectionEditorProps> = ({
 
   // Bullet Handlers
   const handleAddBullet = () => {
-    const next = [...bullets, 'Demonstrated specialized expertise and delivered measurable results.'];
+    const next = [...bullets, ''];
     onUpdateSection({ bullets: next });
   };
 
@@ -94,7 +106,7 @@ export const CustomSectionEditor: React.FC<CustomSectionEditorProps> = ({
 
   // Key-Value Handlers
   const handleAddPair = () => {
-    const next = [...keyValuePairs, { key: 'Category / Skill Area', value: 'Tools, proficiencies, or relevant details' }];
+    const next = [...keyValuePairs, { key: '', value: '' }];
     onUpdateSection({ keyValuePairs: next });
   };
 
@@ -122,11 +134,11 @@ export const CustomSectionEditor: React.FC<CustomSectionEditorProps> = ({
   const handleAddEntry = () => {
     const newEntry: CustomSectionEntry = {
       id: `entry_${Date.now()}`,
-      title: 'Role / Position Title',
-      subtitle: 'Organization or Project',
-      date: '2023 - Present',
-      location: 'City, Country',
-      bullets: ['Key contribution or responsibility accomplishment detail...']
+      title: '',
+      subtitle: '',
+      date: '',
+      location: '',
+      bullets: ['']
     };
     onUpdateSection({ entries: [...entries, newEntry] });
   };
@@ -153,7 +165,7 @@ export const CustomSectionEditor: React.FC<CustomSectionEditorProps> = ({
 
   const handleAddEntryBullet = (eIdx: number) => {
     const entry = entries[eIdx];
-    const updatedBullets = [...(entry.bullets || []), 'Delivered measurable outcome and enhanced system performance.'];
+    const updatedBullets = [...(entry.bullets || []), ''];
     handleUpdateEntry(eIdx, { bullets: updatedBullets });
   };
 
@@ -183,7 +195,10 @@ export const CustomSectionEditor: React.FC<CustomSectionEditorProps> = ({
       </div>
 
       {/* Section Title & Format Switcher */}
-      <div className={styles.sideFieldGroupCard}>
+      <div
+        id={`sidebar-item-custom-${section.id}`}
+        className={`${styles.sideFieldGroupCard} ${focusedSidebarItemId === section.id ? styles.sidebarItemHighlightFocus : ''}`}
+      >
         <div className={styles.sideFieldRow}>
           <label className={styles.sideFieldLabel}>Section Heading</label>
           <input

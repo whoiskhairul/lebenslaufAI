@@ -184,3 +184,11 @@ button {
   background: var(--card-border);
   border-radius: 9999px;
 }
+
+/* Kanban drop placeholder: invisible spacemaker that opens where a dragged
+   card will land (siblings glide around it via FLIP). */
+.kanban-drop-gap {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+}

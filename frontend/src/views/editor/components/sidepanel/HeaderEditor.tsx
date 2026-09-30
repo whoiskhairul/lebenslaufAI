@@ -19,16 +19,28 @@ export interface HeaderEditorProps {
   };
   setPersonalInfo: React.Dispatch<React.SetStateAction<any>>;
   onPolishField?: (fieldName: string, text: string) => void;
+  focusedSidebarItemId?: string | null;
 }
 
 export const HeaderEditor: React.FC<HeaderEditorProps> = ({
   personalInfo,
   setPersonalInfo,
-  onPolishField
+  onPolishField,
+  focusedSidebarItemId
 }) => {
   const handleChange = (field: string, value: string) => {
     setPersonalInfo((prev: any) => ({ ...prev, [field]: value }));
   };
+
+  React.useEffect(() => {
+    if (focusedSidebarItemId === 'header') {
+      const timer = setTimeout(() => {
+        const el = document.getElementById('sidebar-item-header');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [focusedSidebarItemId]);
 
   return (
     <div className={styles.sideEditorContent}>
@@ -43,7 +55,10 @@ export const HeaderEditor: React.FC<HeaderEditorProps> = ({
       </div>
 
       {/* Primary Identity Section */}
-      <div className={styles.sideFieldGroupCard}>
+      <div
+        id="sidebar-item-header"
+        className={`${styles.sideFieldGroupCard} ${focusedSidebarItemId === 'header' ? styles.sidebarItemHighlightFocus : ''}`}
+      >
         <div className={styles.sideFieldGroupHeader}>
           <User size={14} className={styles.sideFieldGroupIcon} />
           <span>Core Identity</span>

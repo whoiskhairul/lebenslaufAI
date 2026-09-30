@@ -24,6 +24,7 @@ export interface EducationEditorProps {
   setEducations: React.Dispatch<React.SetStateAction<EducationItem[]>>;
   onAddEducation: () => void;
   onPolishBullet?: (bulletText: string, onAccept: (newText: string) => void) => void;
+  focusedSidebarItemId?: string | null;
 }
 
 export const EducationEditor: React.FC<EducationEditorProps> = ({
@@ -32,7 +33,8 @@ export const EducationEditor: React.FC<EducationEditorProps> = ({
   educations,
   setEducations,
   onAddEducation,
-  onPolishBullet
+  onPolishBullet,
+  focusedSidebarItemId
 }) => {
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -41,6 +43,22 @@ export const EducationEditor: React.FC<EducationEditorProps> = ({
     }
     return initial;
   });
+
+  // Auto-expand and scroll to focused card
+  React.useEffect(() => {
+    if (!focusedSidebarItemId) return;
+    const match = educations.find((edu, i) => edu.id === focusedSidebarItemId || `edu_${i}` === focusedSidebarItemId);
+    const targetKey = match ? (match.id || `edu_${educations.indexOf(match)}`) : focusedSidebarItemId;
+    setExpandedCards(prev => ({ ...prev, [targetKey]: true }));
+
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`sidebar-item-${targetKey}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [focusedSidebarItemId, educations]);
 
   const toggleExpand = (cardKey: string) => {
     setExpandedCards(prev => ({ ...prev, [cardKey]: !prev[cardKey] }));
@@ -85,7 +103,7 @@ export const EducationEditor: React.FC<EducationEditorProps> = ({
     setEducations(prev => prev.map((edu, i) => {
       if (i !== eduIndex) return edu;
       const bullets = Array.isArray(edu.bullets) ? [...edu.bullets] : [];
-      bullets.push('Graduated with Honors (Top 5% of class) • Relevant Coursework: Algorithms & AI Systems.');
+      bullets.push('');
       return { ...edu, bullets };
     }));
   };
@@ -180,6 +198,7 @@ export const EducationEditor: React.FC<EducationEditorProps> = ({
         {educations.map((edu, eIdx) => {
           const cardKey = edu.id || `edu_${eIdx}`;
           const isExpanded = !!expandedCards[cardKey];
+          const isHighlighted = focusedSidebarItemId === cardKey || focusedSidebarItemId === edu.id;
           const isOngoing = !edu.end_date ||
             edu.end_date.toLowerCase().trim() === 'present' ||
             edu.end_date.toLowerCase().trim() === 'heute' ||
@@ -187,7 +206,11 @@ export const EducationEditor: React.FC<EducationEditorProps> = ({
           const bullets = Array.isArray(edu.bullets) ? edu.bullets : [];
 
           return (
-            <div key={cardKey} className={`${styles.sideItemCard} ${isExpanded ? styles.sideItemCardExpanded : ''}`}>
+            <div
+              key={cardKey}
+              id={`sidebar-item-${cardKey}`}
+              className={`${styles.sideItemCard} ${isExpanded ? styles.sideItemCardExpanded : ''} ${isHighlighted ? styles.sidebarItemHighlightFocus : ''}`}
+            >
               {/* Header Bar */}
               <div
                 className={styles.sideCardHeader}

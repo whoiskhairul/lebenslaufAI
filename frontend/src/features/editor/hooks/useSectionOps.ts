@@ -64,7 +64,7 @@ export function useSectionOps(deps: SectionOpsDeps) {
     if (!targetSec) return;
 
     if (targetSec.type === 'summary') {
-      setEditableSummary(prev => prev ? `${prev}\n- Driven professional with expertise in technical execution and business impact.` : '- Driven professional with expertise in technical execution and business impact.');
+      setEditableSummary(prev => prev ? `${prev}\n- ` : '- ');
     } else if (targetSec.type === 'experience') {
       handleAddExperience();
     } else if (targetSec.type === 'projects') {
@@ -74,7 +74,7 @@ export function useSectionOps(deps: SectionOpsDeps) {
     } else if (targetSec.type === 'skills') {
       const newSkill = {
         id: `skill_${Date.now()}`,
-        name: 'New Skill',
+        name: '',
         category: 'Technical Skills'
       };
       setEditableSkills(prev => [...prev, newSkill]);
@@ -455,12 +455,12 @@ export function useSectionOps(deps: SectionOpsDeps) {
     const newId = `exp_${Date.now()}`;
     const newExp = {
       id: newId,
-      company: 'New Company',
-      position: 'Job Title',
-      location: 'City, Country',
-      start_date: '01/2026',
-      end_date: 'Present',
-      bullets: ['Describe your major contribution...']
+      company: '',
+      position: '',
+      location: '',
+      start_date: '',
+      end_date: '',
+      bullets: ['']
     };
     setEditableExperiences(prev => [...prev, newExp]);
   };
@@ -589,10 +589,10 @@ export function useSectionOps(deps: SectionOpsDeps) {
     const newId = `proj_${Date.now()}`;
     const newProj = {
       id: newId,
-      title: 'Project Title',
-      role: 'Your Role / Core Technologies',
-      date: '2026',
-      bullets: ['Describe project milestone deliverables...']
+      title: '',
+      role: '',
+      date: '',
+      bullets: ['']
     };
     setEditableProjects(prev => [...prev, newProj]);
   };
@@ -637,12 +637,13 @@ export function useSectionOps(deps: SectionOpsDeps) {
     const newId = `edu_${Date.now()}`;
     const newEdu = {
       id: newId,
-      institution: 'Institution Name',
-      degree: 'Degree / Academic Title',
-      field_of_study: 'Field of Study',
-      start_date: '2022',
-      end_date: '2026',
-      location: 'City, Country'
+      institution: '',
+      degree: '',
+      field_of_study: '',
+      start_date: '',
+      end_date: '',
+      location: '',
+      bullets: ['']
     };
     setEditableEducations(prev => [...prev, newEdu]);
   };

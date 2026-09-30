@@ -68,11 +68,11 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  const handleNavigateToEditor = (params?: { application_id?: string }) => {
+  const handleNavigateToEditor = (params?: { application_id?: string; tab?: string }) => {
     if (params?.application_id) {
-      navigateTo(`/editor?appId=${params.application_id}`);
+      navigateTo(`/editor?appId=${params.application_id}${params.tab ? `&tab=${params.tab}` : ''}`);
     } else {
-      navigateTo('/editor');
+      navigateTo(params?.tab ? `/editor?tab=${params.tab}` : '/editor');
     }
   };
 
@@ -98,7 +98,7 @@ export const App: React.FC = () => {
 
   // Auth-independent route classification: unknown paths → 404 page.
   const publicPaths = ['', 'login', 'register'];
-  const protectedPaths = ['dashboard', 'master-profile', 'editor', 'security', 'settings', 'admin'];
+  const protectedPaths = ['dashboard', 'archived', 'master-profile', 'editor', 'security', 'settings', 'admin'];
   const isNotFound = !publicPaths.includes(currentPath) && !protectedPaths.includes(currentPath);
 
   // View actually rendered:
@@ -160,6 +160,9 @@ export const App: React.FC = () => {
     <AppShell activeView={activeView} onNavigate={(view) => navigateTo(view)}>
       {activeView === 'dashboard' && (
         <Dashboard onNavigateToEditor={handleNavigateToEditor} activeAppId={routeParams.appId} />
+      )}
+      {activeView === 'archived' && (
+        <Dashboard onNavigateToEditor={handleNavigateToEditor} activeAppId={routeParams.appId} initialView="archived" />
       )}
       {activeView === 'master-profile' && <MasterProfile />}
       {activeView === 'editor' && (

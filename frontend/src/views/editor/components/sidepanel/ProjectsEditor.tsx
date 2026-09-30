@@ -22,6 +22,7 @@ export interface ProjectsEditorProps {
   setProjects: React.Dispatch<React.SetStateAction<ProjectItem[]>>;
   onAddProject: () => void;
   onPolishBullet?: (bulletText: string, onAccept: (newText: string) => void) => void;
+  focusedSidebarItemId?: string | null;
 }
 
 export const ProjectsEditor: React.FC<ProjectsEditorProps> = ({
@@ -30,7 +31,8 @@ export const ProjectsEditor: React.FC<ProjectsEditorProps> = ({
   projects,
   setProjects,
   onAddProject,
-  onPolishBullet
+  onPolishBullet,
+  focusedSidebarItemId
 }) => {
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -39,6 +41,22 @@ export const ProjectsEditor: React.FC<ProjectsEditorProps> = ({
     }
     return initial;
   });
+
+  // Auto-expand and scroll to focused card
+  React.useEffect(() => {
+    if (!focusedSidebarItemId) return;
+    const match = projects.find((proj, i) => proj.id === focusedSidebarItemId || `proj_${i}` === focusedSidebarItemId);
+    const targetKey = match ? (match.id || `proj_${projects.indexOf(match)}`) : focusedSidebarItemId;
+    setExpandedCards(prev => ({ ...prev, [targetKey]: true }));
+
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`sidebar-item-${targetKey}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [focusedSidebarItemId, projects]);
 
   const toggleExpand = (cardKey: string) => {
     setExpandedCards(prev => ({ ...prev, [cardKey]: !prev[cardKey] }));
@@ -83,7 +101,7 @@ export const ProjectsEditor: React.FC<ProjectsEditorProps> = ({
     setProjects(prev => prev.map((proj, i) => {
       if (i !== projIndex) return proj;
       const bullets = Array.isArray(proj.bullets) ? [...proj.bullets] : [];
-      bullets.push('Architected resilient microservices handling high transaction throughput.');
+      bullets.push('');
       return { ...proj, bullets };
     }));
   };
@@ -184,8 +202,14 @@ export const ProjectsEditor: React.FC<ProjectsEditorProps> = ({
           const linkVal = proj.link || proj.github_url || proj.demo_url || '';
           const bullets = Array.isArray(proj.bullets) ? proj.bullets : [];
 
+          const isHighlighted = focusedSidebarItemId === proj.id || focusedSidebarItemId === `proj_${pIdx}`;
+
           return (
-            <div key={cardKey} className={`${styles.sideItemCard} ${isExpanded ? styles.sideItemCardExpanded : ''}`}>
+            <div
+              key={cardKey}
+              id={`sidebar-item-${cardKey}`}
+              className={`${styles.sideItemCard} ${isExpanded ? styles.sideItemCardExpanded : ''} ${isHighlighted ? styles.sidebarItemHighlightFocus : ''}`}
+            >
               {/* Header Bar */}
               <div
                 className={styles.sideCardHeader}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '../components/Button';
 import { InputField } from '../components/InputField';
 import api from '../services/api';
@@ -6,14 +6,94 @@ import { navigateTo } from '../utils/navigation';
 import { CompanyAutocomplete } from '../components/CompanyAutocomplete';
 import { ConfirmPopover } from '../components/ConfirmPopover';
 import { CompanyLogo } from '../components/CompanyLogo';
+import { Toast } from '../components/Toast';
 import { ApplicationDetailsPopover, type ApplicationStatus } from '../components/ApplicationDetailsPopover';
 import { KanbanCardSkeleton } from '../components/skeleton/DashboardSkeleton';
 import { Skeleton } from '../components/skeleton/Skeleton';
-import { Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, ExternalLink, Sparkles, Info, FileText, Archive, Undo2, Search } from 'lucide-react';
+import { Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, ExternalLink, Sparkles, Info, FileText, Undo2, Search } from 'lucide-react';
 
 // Shared utility class strings for the kanban icon buttons
 const iconBtnBase = 'w-[26px] h-[26px] rounded-md flex items-center justify-center text-muted transition-colors';
 const fieldLabelCls = 'font-header text-xs font-bold uppercase tracking-wide text-muted';
+
+// Manual column ordering (fractional index; legacy rows without `order`
+// keep their previous relative order via updated_at tiebreak).
+const orderOf = (a: { order?: number }): number => a.order ?? 0;
+
+const sortedByOrder = <T extends { order?: number; updated_at: string }>(apps: T[]): T[] =>
+  [...apps].sort(
+    (a, b) => orderOf(a) - orderOf(b) || (+new Date(b.updated_at) - +new Date(a.updated_at))
+  );
+
+const maxOrderIn = <T extends { id: string; status: string; order?: number }>(
+  apps: T[],
+  status: string,
+  excludeId?: string
+): number =>
+  apps.reduce(
+    (m, a) => (a.status === status && a.id !== excludeId ? Math.max(m, orderOf(a)) : m),
+    0
+  );
+
+// Fractional insertion order between two neighbours (single-PATCH moves).
+const orderForInsert = <T extends { order?: number }>(sortedOthers: T[], index: number): number => {
+  const prev = index > 0 ? orderOf(sortedOthers[index - 1]) : null;
+  const next = index < sortedOthers.length ? orderOf(sortedOthers[index]) : null;
+  if (prev === null && next === null) return 1;
+  if (prev === null) return (next as number) - 1;
+  if (next === null) return (prev as number) + 1;
+  return (prev + next) / 2;
+};
+
+// Insertion index of a pointer Y within a column list (dragged card excluded).
+const insertIndexFor = (listEl: HTMLElement, excludeId: string, y: number): number => {
+  const cards = [...listEl.querySelectorAll<HTMLElement>('[data-app-id]')].filter(
+    (el) => el.dataset.appId !== excludeId
+  );
+  let idx = 0;
+  for (const card of cards) {
+    const r = card.getBoundingClientRect();
+    if (y < r.top + r.height / 2) break;
+    idx++;
+  }
+  return idx;
+};
+
+// FLIP helpers: animate sibling glide when a gap opens/closes or a card lands.
+const captureTops = (listEl: HTMLElement | null): Map<string, number> => {
+  const m = new Map<string, number>();
+  listEl?.querySelectorAll<HTMLElement>('[data-app-id]').forEach((card) => {
+    m.set(card.dataset.appId as string, card.getBoundingClientRect().top);
+  });
+  return m;
+};
+
+const flipList = (listEl: HTMLElement | null, prevTops: Map<string, number>) => {
+  if (!listEl || prevTops.size === 0) return;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  listEl.querySelectorAll<HTMLElement>('[data-app-id]').forEach((card) => {
+    const id = card.dataset.appId as string;
+    const prev = prevTops.get(id);
+    if (prev === undefined) {
+      card.animate(
+        [{ opacity: 0, transform: 'scale(0.96)' }, { opacity: 1, transform: 'scale(1)' }],
+        { duration: 200, easing: 'ease-out' }
+      );
+      return;
+    }
+    const dy = prev - card.getBoundingClientRect().top;
+    if (Math.abs(dy) > 2) {
+      card.animate(
+        [{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0px)' }],
+        { duration: 260, easing: 'cubic-bezier(0.22,1,0.36,1)' }
+      );
+    }
+  });
+};
+
+const doubleRaf = (fn: () => void) => {
+  requestAnimationFrame(() => requestAnimationFrame(fn));
+};
 
 
 interface Application {
@@ -32,15 +112,38 @@ interface Application {
   deadline?: string;
   status_history?: Array<{ status: string; date: string }>;
   created_at?: string;
+  // Manual board position within a status column (fractional index).
+  order?: number;
   updated_at: string;
 }
 
 interface DashboardProps {
-  onNavigateToEditor: (params?: { company?: string; position?: string; desc?: string; application_id?: string }) => void;
+  onNavigateToEditor: (params?: { company?: string; position?: string; desc?: string; application_id?: string; tab?: string }) => void;
   activeAppId?: string;
+  initialView?: 'board' | 'archived';
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, activeAppId }) => {
+// In-progress pointer drag for a kanban card (see handlers below).
+interface CardGesture {
+  appId: string;
+  fromStatus: Application['status'];
+  pointerId: number;
+  startX: number;
+  startY: number;
+  lastX: number;
+  lastY: number;
+  offsetX: number;
+  offsetY: number;
+  node: HTMLElement;
+  ghost: HTMLElement | null;
+  tilt: HTMLElement | null;
+  active: boolean;
+  longPressTimer: ReturnType<typeof setTimeout> | null;
+  raf: number | null;
+  escapeHandler: ((e: KeyboardEvent) => void) | null;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, activeAppId, initialView }) => {
   const [applications, setApplications] = useState<Application[]>([]);
   const [atsScores, setAtsScores] = useState<Record<string, number>>({});
   const [resumeVersions, setResumeVersions] = useState<any[]>([]);
@@ -54,9 +157,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
   // Selected Card Details Sidebar State
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  // Optimistic status moves: card jumps instantly, server syncs in background.
+  const [pendingStatus, setPendingStatus] = useState<Record<string, boolean>>({});
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Board vs Archived list view
-  const [activeView, setActiveView] = useState<'board' | 'archived'>('board');
+  // Board vs Archived list view (one route each: /dashboard and /archived).
+  const [activeView, setActiveView] = useState<'board' | 'archived'>(initialView ?? 'board');
+  const basePath = (initialView ?? 'board') === 'archived' ? '/archived' : '/dashboard';
   const [archivedSearch, setArchivedSearch] = useState('');
 
   // Form Fields
@@ -122,7 +229,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
     if (activeAppId && applications.length > 0) {
       const matched = applications.find(a => a.id === activeAppId);
       if (matched) {
-        // Deep-linking an archived card opens the Archived view instead of the board.
+        // Keep card deep-links on their own route: archived cards belong to
+        // /archived, everything else to /dashboard.
+        const wantsArchived = matched.status === 'archived';
+        const isArchivedRoute = basePath === '/archived';
+        if (wantsArchived !== isArchivedRoute) {
+          navigateTo(wantsArchived ? `/archived?appId=${activeAppId}` : `/dashboard?appId=${activeAppId}`);
+          return;
+        }
         setActiveView(matched.status === 'archived' ? 'archived' : 'board');
         setSelectedApp(matched);
         setIsDetailsOpen(true);
@@ -131,6 +245,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
       setIsDetailsOpen(false);
       setSelectedApp(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAppId, applications]);
 
   const resetForm = () => {
@@ -200,6 +315,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
       job_description: jobDescription,
       contact_name: contactName || null,
       contact_email: contactEmail || null,
+      // New cards append at the end of their column.
+      order: maxOrderIn(applications, status) + 1,
     };
 
     try {
@@ -221,17 +338,72 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
     }
   };
 
-  const handleUpdateStatus = async (appId: string, newStatus: Application['status']) => {
+  // Shared server sync for a status/order move (optimistic state is applied
+  // by the caller so FLIP measurements stay exact). Rolls back on failure.
+  const persistStatusMove = async (
+    appId: string,
+    newStatus: Application['status'],
+    targetOrder: number,
+    rollback: { status: Application['status']; order: number }
+  ) => {
+    setPendingStatus((prev) => ({ ...prev, [appId]: true }));
     try {
-      await api.patch(`/applications/${appId}`, { status: newStatus });
-      fetchApplications();
-      // If details pane is open, sync details
-      if (selectedApp && selectedApp.id === appId) {
-        setSelectedApp(prev => prev ? { ...prev, status: newStatus } : null);
-      }
+      await api.patch(`/applications/${appId}`, { status: newStatus, order: targetOrder });
+      await fetchApplications();
     } catch (err) {
       console.error(err);
+      // Roll back — but only if the user hasn't moved the card again
+      // meanwhile (a newer optimistic move always wins).
+      setApplications((prev) =>
+        prev.map((a) =>
+          a.id === appId && a.status === newStatus && orderOf(a) === targetOrder
+            ? { ...a, status: rollback.status, order: rollback.order }
+            : a
+        )
+      );
+      setSelectedApp((prev) =>
+        prev && prev.id === appId && prev.status === newStatus && orderOf(prev) === targetOrder
+          ? { ...prev, status: rollback.status, order: rollback.order }
+          : prev
+      );
+      setToast({ message: 'Could not move the card. Please try again.', type: 'error' });
+    } finally {
+      setPendingStatus((prev) => {
+        const next = { ...prev };
+        delete next[appId];
+        return next;
+      });
     }
+  };
+
+  const applyOptimisticMove = (appId: string, newStatus: Application['status'], targetOrder: number) => {
+    setApplications((prev) =>
+      prev.map((a) => (a.id === appId ? { ...a, status: newStatus, order: targetOrder } : a))
+    );
+    setSelectedApp((prev) =>
+      prev && prev.id === appId ? { ...prev, status: newStatus, order: targetOrder } : prev
+    );
+  };
+
+  const handleUpdateStatus = async (
+    appId: string,
+    newStatus: Application['status'],
+    newOrder?: number
+  ) => {
+    const app = applications.find((a) => a.id === appId) ?? selectedApp;
+    const current = app && app.id === appId ? app.status : undefined;
+    const currentOrder = app && app.id === appId ? orderOf(app) : 0;
+    if (!current || pendingStatus[appId]) return;
+    // Moves without an explicit position land at the end of the target column.
+    const targetOrder = newOrder ?? maxOrderIn(applications, newStatus, appId) + 1;
+    if (current === newStatus && targetOrder === currentOrder) return;
+
+    // 1. Move instantly in local state (card + open popover stay in sync).
+    applyOptimisticMove(appId, newStatus, targetOrder);
+
+    // 2. Persist in the background, then reconcile with server truth
+    // (fresh status_history included).
+    await persistStatusMove(appId, newStatus, targetOrder, { status: current, order: currentOrder });
   };
 
   const handleArchive = async (appId: string) => {
@@ -260,7 +432,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
       await api.delete(`/applications/${appId}`);
       setIsDetailsOpen(false);
       setSelectedApp(null);
-      navigateTo('/dashboard');
+      navigateTo(basePath);
       fetchApplications();
       fetchAtsScores();
     } catch (err) {
@@ -277,17 +449,284 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
     }
   };
 
-  // Drag and Drop implementation
-  const handleDragStart = (e: React.DragEvent, appId: string) => {
-    e.dataTransfer.setData('text/plain', appId);
+  // Pointer-driven kanban drag: a real clone node follows the cursor fully
+  // opaque and tilted (native ghosts can't do either). Mouse drags from
+  // anywhere on the card; touch uses long-press so list scrolling keeps
+  // working (cards keep `touch-pan-y`).
+  const boardScrollRef = useRef<HTMLDivElement | null>(null);
+  const suppressClickRef = useRef(false);
+  const gestureRef = useRef<CardGesture | null>(null);
+  // Live drop gap during a drag (column + index among the other cards).
+  const [dropIndicator, setDropIndicator] = useState<{ colId: string; index: number } | null>(null);
+  const indicatorRef = useRef<{ colId: string; index: number } | null>(null);
+  const showIndicator = (v: { colId: string; index: number } | null) => {
+    indicatorRef.current = v;
+    setDropIndicator(v);
+  };
+  // Id of the card being dragged (hidden from its source list while lifted).
+  const [dragId, setDragId] = useState<string | null>(null);
+  // Measured height of the lifted card, so the gap matches its size.
+  const dragHeightRef = useRef(0);
+
+  const listElFor = (colId: string): HTMLElement | null =>
+    boardScrollRef.current?.querySelector<HTMLElement>(`[data-kanban-list="${colId}"]`) ?? null;
+
+  // Run a mutation flanked by FLIP measurements so siblings glide instead
+  // of jumping when a gap opens/closes or a card lands.
+  const withFlip = (colIds: Array<string | null | undefined>, mutate: () => void) => {
+    const board = boardScrollRef.current;
+    const ids = [...new Set(colIds.filter(Boolean))] as string[];
+    const prevs = new Map(
+      ids.map((id) => [id, captureTops(board?.querySelector<HTMLElement>(`[data-kanban-list="${id}"]`) ?? null)])
+    );
+    mutate();
+    doubleRaf(() => {
+      prevs.forEach((tops, id) => {
+        flipList(board?.querySelector<HTMLElement>(`[data-kanban-list="${id}"]`) ?? null, tops);
+      });
+    });
   };
 
-  const handleDrop = (e: React.DragEvent, targetStatus: Application['status']) => {
-    e.preventDefault();
-    const appId = e.dataTransfer.getData('text/plain');
-    if (appId) {
-      handleUpdateStatus(appId, targetStatus);
+  // Animated teardown of drag visuals (gap closes, source card returns).
+  const cancelDragUI = () => {
+    const g = gestureRef.current;
+    const cols = [indicatorRef.current?.colId, g?.fromStatus].filter(Boolean) as string[];
+    withFlip(cols, () => {
+      showIndicator(null);
+      setDragId(null);
+    });
+    finishGesture();
+  };
+
+  const finishGesture = () => {
+    const g = gestureRef.current;
+    gestureRef.current = null;
+    setDragOverCol(null);
+    window.removeEventListener('pointermove', onWindowPointerMove);
+    window.removeEventListener('pointerup', onWindowPointerUp);
+    window.removeEventListener('pointercancel', onWindowPointerCancel);
+    if (!g) return;
+    if (g.longPressTimer) clearTimeout(g.longPressTimer);
+    if (g.raf !== null) cancelAnimationFrame(g.raf);
+    if (g.escapeHandler) window.removeEventListener('keydown', g.escapeHandler);
+    g.ghost?.remove();
+    g.node.style.opacity = '';
+  };
+
+  // Window-level tracking for the ACTIVE drag: the lifted source card
+  // unmounts (hidden), which would kill element-level capture/listeners,
+  // so moves, release and cancel are observed globally instead.
+  const onWindowPointerMove = (e: PointerEvent) => {
+    const g = gestureRef.current;
+    if (!g?.active || e.pointerId !== g.pointerId) return;
+    moveGhost(g, e.clientX, e.clientY);
+  };
+
+  const onWindowPointerUp = (e: PointerEvent) => {
+    const g = gestureRef.current;
+    if (!g?.active || e.pointerId !== g.pointerId) return;
+    commitDrop();
+  };
+
+  const onWindowPointerCancel = (e: PointerEvent) => {
+    const g = gestureRef.current;
+    if (!g || e.pointerId !== g.pointerId) return;
+    if (g.active) suppressClickRef.current = true;
+    cancelDragUI();
+  };
+
+  // Shared drop commit used by pointer-up (and only there): land at the live
+  // gap with a fractional order, or glide everything back when released
+  // outside any column.
+  const commitDrop = () => {
+    const g = gestureRef.current;
+    if (!g) return;
+    const target = indicatorRef.current;
+    const { appId, fromStatus } = g;
+    const mover = applications.find((a) => a.id === appId);
+    const currentOrder = mover ? orderOf(mover) : 0;
+    suppressClickRef.current = true;
+    if (!target) {
+      cancelDragUI();
+      return;
     }
+    const targetStatus = target.colId as Application['status'];
+    const others = sortedByOrder(
+      activeApplications.filter((a) => a.status === target.colId && a.id !== appId)
+    );
+    const targetOrder = orderForInsert(others, Math.min(target.index, others.length));
+    if (targetStatus === fromStatus && targetOrder === currentOrder) {
+      cancelDragUI();
+      return;
+    }
+    withFlip([fromStatus, target.colId], () => {
+      showIndicator(null);
+      setDragId(null);
+      applyOptimisticMove(appId, targetStatus, targetOrder);
+    });
+    finishGesture();
+    persistStatusMove(appId, targetStatus, targetOrder, { status: fromStatus, order: currentOrder });
+  };
+
+  const moveGhost = (g: CardGesture, x: number, y: number) => {
+    g.lastX = x;
+    g.lastY = y;
+    // Holder follows the cursor instantly; the inner card owns the tilt
+    // (animated separately so positioning never lags).
+    if (g.ghost) {
+      g.ghost.style.transform = `translate3d(${x - g.offsetX}px, ${y - g.offsetY}px, 0)`;
+    }
+    const el = document.elementFromPoint(x, y) as HTMLElement | null;
+    const colEl = el?.closest?.('[data-kanban-col]') as HTMLElement | null;
+    const colId = colEl?.dataset?.kanbanCol ?? null;
+    setDragOverCol(colId);
+    // Live insertion gap: index among the other cards, siblings glide via FLIP.
+    const listEl = colId ? listElFor(colId) : null;
+    const next = colId && listEl ? { colId, index: insertIndexFor(listEl, g.appId, y) } : null;
+    const cur = indicatorRef.current;
+    if (!next !== !cur || next?.colId !== cur?.colId || (next && cur && next.index !== cur.index)) {
+      const cols = [cur?.colId, next?.colId].filter(Boolean) as string[];
+      withFlip(cols, () => showIndicator(next));
+    }
+  };
+
+  const activateGesture = (g: CardGesture, x: number, y: number) => {
+    if (gestureRef.current !== g || g.active) return;
+    const tilt = g.node.cloneNode(true) as HTMLElement;
+    const rect = g.node.getBoundingClientRect();
+    // The clone carries the card's entrance animation class — strip it, or it
+    // replays on mount (flash of the card at the top-left).
+    tilt.classList.remove('animate-cardSlideIn');
+    tilt.style.animation = 'none';
+    tilt.style.width = `${rect.width}px`;
+    tilt.style.margin = '0';
+    tilt.style.opacity = '1';
+    tilt.style.transition = 'transform 0.18s ease';
+    tilt.style.transform = 'rotate(0deg)';
+    tilt.style.boxShadow = '0 16px 40px rgba(15, 23, 42, 0.28)';
+    // Position BEFORE mounting so the first paint is already correct —
+    // otherwise one frame renders at the un-transformed top-left origin.
+    const holder = document.createElement('div');
+    holder.style.position = 'fixed';
+    holder.style.left = '0';
+    holder.style.top = '0';
+    holder.style.margin = '0';
+    holder.style.transition = 'none';
+    holder.style.pointerEvents = 'none';
+    holder.style.zIndex = '1000';
+    holder.style.transform = `translate3d(${x - g.offsetX}px, ${y - g.offsetY}px, 0)`;
+    holder.appendChild(tilt);
+    document.body.appendChild(holder);
+    g.ghost = holder;
+    g.tilt = tilt;
+    // Ease into the tilt on the next frame — position tracking stays instant
+    // because only the inner card's transform transitions.
+    requestAnimationFrame(() => {
+      if (gestureRef.current === g && g.tilt) {
+        g.tilt.style.transform = 'rotate(-3deg)';
+      }
+    });
+    g.active = true;
+    g.node.style.opacity = '0.35';
+    // Size the drop gap like the lifted card and hide the source card so
+    // siblings close ranks (animated via FLIP).
+    dragHeightRef.current = g.node.offsetHeight || 120;
+    withFlip([g.fromStatus], () => setDragId(g.appId));
+    // Track the active drag on window: the lifted card unmounts, so
+    // element-level listeners/capture would die with it.
+    window.addEventListener('pointermove', onWindowPointerMove);
+    window.addEventListener('pointerup', onWindowPointerUp);
+    window.addEventListener('pointercancel', onWindowPointerCancel);
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        suppressClickRef.current = true;
+        cancelDragUI();
+      }
+    };
+    g.escapeHandler = onEscape;
+    window.addEventListener('keydown', onEscape);
+    try {
+      navigator.vibrate?.(10);
+    } catch {
+      // Haptics unsupported — ignore.
+    }
+    // Edge auto-scroll for the (horizontally scrolling) board.
+    const loop = () => {
+      const gg = gestureRef.current;
+      const sc = boardScrollRef.current;
+      if (!gg?.active || !sc) return;
+      const r = sc.getBoundingClientRect();
+      if (gg.lastX > r.right - 56) sc.scrollLeft += 14;
+      else if (gg.lastX < r.left + 56) sc.scrollLeft -= 14;
+      gg.raf = requestAnimationFrame(loop);
+    };
+    g.raf = requestAnimationFrame(loop);
+    moveGhost(g, x, y);
+  };
+
+  const onCardPointerDown = (e: React.PointerEvent, app: Application) => {
+    if (gestureRef.current || pendingStatus[app.id]) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    // A previous drag may have set this without any click consuming it
+    // (source card unmounts on lift, so release clicks land elsewhere).
+    suppressClickRef.current = false;
+    const node = e.currentTarget as HTMLElement;
+    const rect = node.getBoundingClientRect();
+    const g: CardGesture = {
+      appId: app.id,
+      fromStatus: app.status,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+      node,
+      ghost: null,
+      tilt: null,
+      active: false,
+      longPressTimer: null,
+      raf: null,
+      escapeHandler: null,
+    };
+    gestureRef.current = g;
+    if (e.pointerType === 'touch') {
+      g.longPressTimer = setTimeout(() => {
+        const cur = gestureRef.current;
+        if (cur === g) activateGesture(g, g.lastX, g.lastY);
+      }, 380);
+    }
+  };
+
+  // Pre-activation tracking only (threshold / long-press). Once the drag
+  // is active the source card is unmounted and window listeners take over.
+  const onCardPointerMove = (e: React.PointerEvent) => {
+    const g = gestureRef.current;
+    if (!g || g.active || e.pointerId !== g.pointerId) return;
+    g.lastX = e.clientX;
+    g.lastY = e.clientY;
+    const dist = Math.hypot(e.clientX - g.startX, e.clientY - g.startY);
+    if (e.pointerType === 'touch') {
+      // Finger wandered before long-press fired → it's a scroll, not a drag.
+      if (dist > 10) finishGesture();
+      return;
+    }
+    if (dist > 6) activateGesture(g, e.clientX, e.clientY);
+  };
+
+  // Card-level release/cancel are pre-activation only (plain taps). Active
+  // drags are owned by the window listeners above.
+  const onCardPointerUp = (e: React.PointerEvent) => {
+    const g = gestureRef.current;
+    if (!g || g.active || e.pointerId !== g.pointerId) return;
+    finishGesture();
+  };
+
+  const onCardPointerCancel = (e: React.PointerEvent) => {
+    const g = gestureRef.current;
+    if (!g || g.active || e.pointerId !== g.pointerId) return;
+    finishGesture();
   };
 
   // Metrics calculators (archived cards are excluded from the active pipeline)
@@ -323,35 +762,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
 
   return (
     <div className="flex flex-col h-full">
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
       {/* Top Banner Row - Renders immediately! */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-4 md:mb-6 shrink-0">
         <div>
           <h2 className="font-header text-xl md:text-2xl font-extrabold text-foreground">Career Command Center</h2>
           <p className="text-xs md:text-sm text-muted">Track applications, verify conversions, and launch tailoring tasks.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-mutedlight rounded-lg p-1" role="tablist" aria-label="Board or archived view">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeView === 'board'}
-              onClick={() => setActiveView('board')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${activeView === 'board' ? 'bg-card text-foreground shadow-sm' : 'text-muted hover:text-foreground'}`}
-            >
-              Board ({isInitialLoading ? '…' : activeApplications.length})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeView === 'archived'}
-              onClick={() => setActiveView('archived')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors flex items-center gap-1 ${activeView === 'archived' ? 'bg-card text-foreground shadow-sm' : 'text-muted hover:text-foreground'}`}
-            >
-              <Archive size={13} />
-              Archived ({isInitialLoading ? '…' : archivedApplications.length})
-            </button>
-          </div>
-          <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 justify-center">
+        <div className="flex flex-col gap-1.5 md:flex-row md:items-center">
+          <Button onClick={() => setIsModalOpen(true)} className="w-full md:w-auto flex items-center gap-2 justify-center">
             <Plus size={18} />
             <span>Create New Application</span>
           </Button>
@@ -394,29 +819,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
 
       {/* Kanban Board Container - Board layout & headers render immediately */}
       {activeView === 'board' ? (
-        <div className="relative h-[calc(100dvh-400px)] min-h-[340px] md:h-auto md:flex-1 overflow-x-auto overflow-y-hidden p-1 pb-4 snap-x snap-mandatory md:snap-none thin-scrollbar">
+        <div ref={boardScrollRef} className="relative h-[calc(100dvh_-_448px_-_env(safe-area-inset-bottom,0px))] min-h-[320px] md:h-auto md:flex-1 overflow-x-auto overflow-y-hidden p-1 pb-4 snap-x snap-mandatory md:snap-none thin-scrollbar">
           <div className="flex gap-3.5 h-full w-max md:w-full min-w-full">
             {columns.map((col) => {
-              const colApps = activeApplications.filter((app) => app.status === col.id);
+              const colApps = sortedByOrder(activeApplications.filter((app) => app.status === col.id));
               const isDragOver = dragOverCol === col.id;
               return (
                 <div
                   key={col.id}
+                  data-kanban-col={col.id}
                   style={{ '--col-accent': col.color } as React.CSSProperties}
                   className={`relative overflow-hidden flex flex-col bg-card border border-cardline rounded-[14px] p-3 w-[82vw] sm:w-[320px] md:w-auto md:flex-1 md:min-w-[220px] shrink-0 md:shrink snap-start h-full transition-all duration-200
                   before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-[3px] before:bg-[var(--col-accent,var(--primary))] before:opacity-85
                   ${isDragOver ? 'border-[var(--col-accent,var(--primary))] shadow-[0_0_0_2px_var(--col-accent,var(--primary))] scale-[1.01]' : ''}`}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    if (dragOverCol !== col.id) {
-                      setDragOverCol(col.id);
-                    }
-                  }}
-                  onDragLeave={() => setDragOverCol(null)}
-                  onDrop={(e) => {
-                    handleDrop(e, col.id);
-                    setDragOverCol(null);
-                  }}
                 >
                   <div className="flex justify-between items-center mb-3 pb-2 border-b border-cardline shrink-0">
                     <div className="flex items-center gap-2 min-w-0">
@@ -428,28 +843,40 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                     </span>
                   </div>
 
-                  <div className="flex flex-col gap-2.5 flex-1 min-h-0 overflow-y-auto px-0.5 pb-1.5 thin-scrollbar">
+                  <div data-kanban-list={col.id} className="flex flex-col gap-2.5 flex-1 min-h-0 overflow-y-auto px-0.5 pb-1.5 thin-scrollbar">
                     {isInitialLoading ? (
                       <>
                         <KanbanCardSkeleton />
                         <KanbanCardSkeleton />
                       </>
-                    ) : colApps.length === 0 ? (
+                    ) : colApps.length === 0 && (!dropIndicator || dropIndicator.colId !== col.id) ? (
                       <div className="flex justify-center items-center h-[72px] text-muted text-xs border-[1.5px] border-dashed border-cardline rounded-[10px] opacity-80">No items</div>
                     ) : (
-                      colApps.map((app) => {
-                        const score = atsScores[app.id];
-                        return (
-                          <div
-                            key={app.id}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, app.id)}
+                      (() => {
+                        const items: React.ReactNode[] = [];
+                        // Lifted card hides from its source list; the gap takes its place.
+                        const visible = colApps.filter((a) => a.id !== dragId);
+                        visible.forEach((app) => {
+                          const score = atsScores[app.id];
+                          items.push(
+                            <div
+                              key={app.id}
+                              data-app-id={app.id}
+                              onPointerDown={(e) => onCardPointerDown(e, app)}
+                              onPointerMove={onCardPointerMove}
+                              onPointerUp={onCardPointerUp}
+                              onPointerCancel={onCardPointerCancel}
+                            onDragStart={(e) => e.preventDefault()}
                             onClick={() => {
+                              if (suppressClickRef.current) {
+                                suppressClickRef.current = false;
+                                return;
+                              }
                               setSelectedApp(app);
                               setIsDetailsOpen(true);
                               navigateTo(`/dashboard?appId=${app.id}`);
                             }}
-                            className="min-w-0 shrink-0 overflow-hidden px-3.5 py-3 text-left flex flex-col gap-2 bg-card border border-cardline rounded-xl shadow-sm animate-cardSlideIn cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--col-accent,var(--primary))] active:scale-[0.98]"
+                            className={`min-w-0 shrink-0 overflow-hidden select-none touch-pan-y px-3.5 py-3 text-left flex flex-col gap-2 bg-card border border-cardline rounded-xl shadow-sm animate-cardSlideIn cursor-grab active:cursor-grabbing transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--col-accent,var(--primary))] active:scale-[0.98] ${pendingStatus[app.id] ? 'opacity-70' : ''}`}
                           >
 
 
@@ -509,7 +936,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                                     const idx = columns.findIndex(c => c.id === app.status);
                                     if (idx > 0) handleUpdateStatus(app.id, columns[idx - 1].id);
                                   }}
-                                  disabled={app.status === 'wishlist'}
+                                  disabled={app.status === 'wishlist' || !!pendingStatus[app.id]}
                                   title="Move left"
                                   className={`${iconBtnBase} hover:bg-mutedlight hover:text-foreground disabled:opacity-30`}
                                 >
@@ -520,7 +947,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                                     const idx = columns.findIndex(c => c.id === app.status);
                                     if (idx < columns.length - 1) handleUpdateStatus(app.id, columns[idx + 1].id);
                                   }}
-                                  disabled={app.status === 'rejected'}
+                                  disabled={app.status === 'rejected' || !!pendingStatus[app.id]}
                                   title="Move right"
                                   className={`${iconBtnBase} hover:bg-mutedlight hover:text-foreground disabled:opacity-30`}
                                 >
@@ -547,8 +974,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                               </div>
                             </div>
                           </div>
-                        );
-                      })
+                          );
+                        });
+                        if (dropIndicator && dropIndicator.colId === col.id) {
+                          items.splice(
+                            Math.min(dropIndicator.index, items.length),
+                            0,
+                            <div
+                              key="drop-gap"
+                              aria-hidden="true"
+                              className="kanban-drop-gap"
+                              style={{ height: dragHeightRef.current || 120 }}
+                            />
+                          );
+                        }
+                        return <>{items}</>;
+                      })()
                     )}
                   </div>
                 </div>
@@ -562,6 +1003,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
         /* Archived list view — compact rows, not a kanban board */
         <div className="flex-1 overflow-y-auto p-1 pb-4 thin-scrollbar">
           <div className="glass-card p-4 md:p-6 max-w-[900px] mx-auto w-full">
+            <button
+              type="button"
+              onClick={() => setActiveView('board')}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-primary transition-colors mb-3"
+            >
+              <ArrowLeft size={14} />
+              <span>Back to board</span>
+            </button>
             <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
               <div>
                 <h3 className="font-header text-base font-bold text-foreground">Archived Applications</h3>
@@ -584,9 +1033,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
               </>
             ) : (() => {
               const q = archivedSearch.trim().toLowerCase();
-              const rows = archivedApplications.filter(a =>
+              const rows = sortedByOrder(archivedApplications.filter(a =>
                 !q || a.company.toLowerCase().includes(q) || a.position.toLowerCase().includes(q)
-              );
+              ));
               if (rows.length === 0) {
                 return (
                   <div className="flex justify-center items-center h-[120px] text-muted text-sm border-[1.5px] border-dashed border-cardline rounded-[10px]">
@@ -602,7 +1051,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                       onClick={() => {
                         setSelectedApp(app);
                         setIsDetailsOpen(true);
-                        navigateTo(`/dashboard?appId=${app.id}`);
+                        navigateTo(`/archived?appId=${app.id}`);
                       }}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-cardline bg-card hover:border-primary hover:shadow-sm cursor-pointer transition-all"
                     >
@@ -642,7 +1091,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
           statusOptions={[...columns.map((c) => ({ id: c.id, label: c.label })), { id: 'archived' as const, label: 'Archived' }]}
           resumeVersions={resumeVersions
             .filter((v) => v.application === selectedApp.id)
-            .map((v) => ({ id: v.id, ats_score: v.ats_score, created_at: v.created_at }))}
+            .map((v) => ({ id: v.id, ats_score: v.ats_score, created_at: v.created_at, tailored_details: v.tailored_details, validation_alerts: v.validation_alerts }))}
           coverLetters={coverLetters
             .filter((l: any) => l.application === selectedApp.id || (!l.application && l.target_company === selectedApp.company))
             .map((l: any) => ({ id: l.id, tone: l.tone, length: l.length, content: l.content, created_at: l.created_at }))}
@@ -650,7 +1099,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
           onClose={() => {
             setIsDetailsOpen(false);
             setSelectedApp(null);
-            navigateTo('/dashboard');
+            navigateTo(basePath);
           }}
           onStatusChange={handleUpdateStatus}
           onDelete={(id) => setPendingConfirm({ message: 'Are you sure you want to remove this job tracking card?', action: () => handleDelete(id) })}
@@ -675,7 +1124,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
               application_id: selectedApp.id,
             });
           }}
+          onOpenLetter={() => {
+            setIsDetailsOpen(false);
+            onNavigateToEditor({
+              company: selectedApp.company,
+              position: selectedApp.position,
+              desc: selectedApp.job_description || selectedApp.notes || '',
+              application_id: selectedApp.id,
+              tab: 'letter',
+            });
+          }}
           onDeleteVersion={(versionId) => setPendingConfirm({ message: 'Are you sure you want to delete this tailored CV version?', action: () => handleDeleteVersion(versionId) })}
+          onDeleteHistoryStep={(entryIndex) => {
+            const app = applications.find((a) => a.id === selectedApp?.id) ?? selectedApp;
+            if (!app) return;
+            const hist = app.status_history || [];
+            const entry = hist[entryIndex];
+            const label = !entry
+              ? 'this timeline entry'
+              : entryIndex === 0
+                ? '“New Job created”'
+                : `“Moved to ${entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}”`;
+            setPendingConfirm({
+              message: `Delete ${label} from the timeline? This cannot be undone.`,
+              action: () => handlePatchFields(app.id, { status_history: hist.filter((_, i) => i !== entryIndex) }),
+            });
+          }}
           onPatchFields={handlePatchFields}
         />
       )}

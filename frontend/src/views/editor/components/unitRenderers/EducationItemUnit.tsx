@@ -21,8 +21,13 @@ export const EducationItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
   const eduIdx = unit.itemIndex!;
   const isSectionHovered = hoveredSectionId === unit.sectionId;
 
+  const triggerFocus = () => {
+    p.onCanvasFocus?.('education', edu.id || `edu_${eduIdx}`);
+  };
+
   return (
     <div
+      onClick={triggerFocus}
       className={`${isPP ? styles.ppSectionRow : (isGerman ? styles.germanRow : styles.resumeItem)} ${isSectionHovered ? styles.sectionHoverActive : ''}`}
       style={{ ...mergedStyles, position: 'relative' }}
       onMouseEnter={() => setHoveredSectionId(unit.sectionId || null)}
@@ -34,6 +39,8 @@ export const EducationItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
             <span className={isPP ? styles.ppDateRange : styles.germanDateRange}>
               <AutoSizeTextarea
                 value={formatDisplayDateRange(edu.start_date, edu.end_date, targetLanguage)}
+                placeholder="YYYY - YYYY"
+                onFocus={triggerFocus}
                 onChange={(val) => {
                   const parts = val.split(' - ');
                   setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, start_date: parts[0] || '', end_date: parts[1] || '' } : e));
@@ -45,6 +52,8 @@ export const EducationItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
             <h4 className={isPP ? styles.ppDegree : styles.germanDegree} style={{ color: '#3d7ee6' }}>
               <AutoSizeTextarea
                 value={`${edu.degree || ''}${edu.field_of_study ? ` in ${edu.field_of_study}` : ''}`}
+                placeholder="Degree in Field of Study"
+                onFocus={triggerFocus}
                 onChange={(val) => {
                   const index = val.toLowerCase().indexOf(' in ');
                   let newDegree = val;
@@ -61,13 +70,17 @@ export const EducationItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
               <div className={isPP ? styles.ppCompany : styles.germanCompany} style={{ fontWeight: 600 }}>
                 <AutoSizeTextarea
                   value={edu.institution || ''}
+                  placeholder="Institution Name"
+                  onFocus={triggerFocus}
                   onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, institution: val } : e))}
                 />
               </div>
               <div className={isPP ? styles.ppLocation : styles.germanLocation} style={{ fontWeight: 400, opacity: 0.8 }}>
                 <AutoSizeTextarea
                   value={edu.location || ''}
-                  onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, location: val } : e))}
+                  placeholder="City, Country"
+                  onFocus={triggerFocus}
+                  onChange={(e) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, location: e } : e))}
                 />
               </div>
             </div>
@@ -105,6 +118,8 @@ export const EducationItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                         <AutoSizeTextarea
                           id={inputId}
                           value={bullet}
+                          placeholder="Academic accomplishment or coursework..."
+                          onFocus={triggerFocus}
                           onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? {
                             ...e,
                             bullets: (e.bullets || []).map((b: string, bI: number) => bI === bulletIdx ? val : b)
@@ -125,6 +140,8 @@ export const EducationItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
             <strong style={{ color: '#3d7ee6' }}>
               <AutoSizeTextarea
                 value={`${edu.degree || ''}${edu.field_of_study ? ` in ${edu.field_of_study}` : ''}`}
+                placeholder="Degree in Field of Study"
+                onFocus={triggerFocus}
                 onChange={(val) => {
                   const index = val.toLowerCase().indexOf(' in ');
                   let newDegree = val;
@@ -140,6 +157,8 @@ export const EducationItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
             <span>
               <AutoSizeTextarea
                 value={formatDisplayDateRange(edu.start_date, edu.end_date, targetLanguage)}
+                placeholder="YYYY - YYYY"
+                onFocus={triggerFocus}
                 onChange={(val) => {
                   const parts = val.split(' - ');
                   setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, start_date: parts[0] || '', end_date: parts[1] || '' } : e));
@@ -151,12 +170,16 @@ export const EducationItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
             <div className={styles.itemCompany} style={{ fontWeight: 600 }}>
               <AutoSizeTextarea
                 value={edu.institution || ''}
+                placeholder="Institution Name"
+                onFocus={triggerFocus}
                 onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, institution: val } : e))}
               />
             </div>
             <div style={{ fontSize: '0.85em', color: '#64748b', fontWeight: 400, opacity: 0.8 }}>
               <AutoSizeTextarea
                 value={edu.location || ''}
+                placeholder="City, Country"
+                onFocus={triggerFocus}
                 onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? { ...e, location: val } : e))}
               />
             </div>
@@ -195,6 +218,8 @@ export const EducationItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContex
                       <AutoSizeTextarea
                         id={inputId}
                         value={bullet}
+                        placeholder="Academic accomplishment or coursework..."
+                        onFocus={triggerFocus}
                         onChange={(val) => setEditableEducations(prev => prev.map((e, i) => i === eduIdx ? {
                           ...e,
                           bullets: (e.bullets || []).map((b: string, bI: number) => bI === bulletIdx ? val : b)

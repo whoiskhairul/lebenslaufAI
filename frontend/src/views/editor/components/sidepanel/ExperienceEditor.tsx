@@ -21,6 +21,7 @@ export interface ExperienceEditorProps {
   setExperiences: React.Dispatch<React.SetStateAction<ExperienceItem[]>>;
   onAddExperience: () => void;
   onPolishBullet?: (bulletText: string, onAccept: (newText: string) => void) => void;
+  focusedSidebarItemId?: string | null;
 }
 
 export const ExperienceEditor: React.FC<ExperienceEditorProps> = ({
@@ -29,7 +30,8 @@ export const ExperienceEditor: React.FC<ExperienceEditorProps> = ({
   experiences,
   setExperiences,
   onAddExperience,
-  onPolishBullet
+  onPolishBullet,
+  focusedSidebarItemId
 }) => {
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -38,6 +40,22 @@ export const ExperienceEditor: React.FC<ExperienceEditorProps> = ({
     }
     return initial;
   });
+
+  // Auto-expand and scroll to focused card
+  React.useEffect(() => {
+    if (!focusedSidebarItemId) return;
+    const match = experiences.find((exp, i) => exp.id === focusedSidebarItemId || `exp_${i}` === focusedSidebarItemId);
+    const targetKey = match ? (match.id || `exp_${experiences.indexOf(match)}`) : focusedSidebarItemId;
+    setExpandedCards(prev => ({ ...prev, [targetKey]: true }));
+
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`sidebar-item-${targetKey}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [focusedSidebarItemId, experiences]);
 
   const toggleExpand = (cardKey: string) => {
     setExpandedCards(prev => ({ ...prev, [cardKey]: !prev[cardKey] }));
@@ -82,7 +100,7 @@ export const ExperienceEditor: React.FC<ExperienceEditorProps> = ({
     setExperiences(prev => prev.map((exp, i) => {
       if (i !== expIndex) return exp;
       const bullets = Array.isArray(exp.bullets) ? [...exp.bullets] : [];
-      bullets.push('Spearheaded key initiatives to improve system scalability and performance.');
+      bullets.push('');
       return { ...exp, bullets };
     }));
   };
@@ -212,8 +230,14 @@ export const ExperienceEditor: React.FC<ExperienceEditorProps> = ({
           const duration = calculateDuration(exp.start_date, exp.end_date);
           const bullets = Array.isArray(exp.bullets) ? exp.bullets : [];
 
+          const isHighlighted = focusedSidebarItemId === exp.id || focusedSidebarItemId === `exp_${eIdx}`;
+
           return (
-            <div key={cardKey} className={`${styles.sideItemCard} ${isExpanded ? styles.sideItemCardExpanded : ''}`}>
+            <div
+              key={cardKey}
+              id={`sidebar-item-${cardKey}`}
+              className={`${styles.sideItemCard} ${isExpanded ? styles.sideItemCardExpanded : ''} ${isHighlighted ? styles.sidebarItemHighlightFocus : ''}`}
+            >
               {/* Header Bar */}
               <div
                 className={styles.sideCardHeader}

@@ -15,9 +15,13 @@ export const SummaryUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> =
 
   if (unit.type !== 'summary') return null;
   const isSectionHovered = hoveredSectionId === unit.sectionId;
+  const triggerFocus = () => {
+    p.onCanvasFocus?.('summary', 'summary');
+  };
+
   return (
     <div
-      onClick={handleContainerClickToFocus}
+      onClick={(e) => { triggerFocus(); handleContainerClickToFocus(e); }}
       className={`${styles.summaryBox} ${styles.canvasHoverBlock} ${isSectionHovered ? styles.sectionHoverActive : ''} ${!reviewedActions['summary'] ? styles.aiHighlighted : ''}`}
       style={mergedStyles}
       onMouseEnter={() => { handleMouseEnterSuggestion('summary'); setHoveredSectionId(unit.sectionId || null); }}
@@ -38,6 +42,8 @@ export const SummaryUnit: React.FC<{ p: UnitRendererProps; ctx: UnitContext }> =
       ) : (
         <AutoSizeTextarea
           value={editableSummary}
+          placeholder="A brief summary of your professional background, strengths, and career focus..."
+          onFocus={triggerFocus}
           onChange={(val) => setEditableSummary(val)}
         />
       )}

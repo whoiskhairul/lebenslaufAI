@@ -12,6 +12,7 @@ import { CustomSectionEditor } from './CustomSectionEditor';
 
 export interface SectionDetailEditorProps {
   sectionId: string;
+  focusedSidebarItemId?: string | null;
   sections: Array<{
     id: string;
     name: string;
@@ -73,6 +74,7 @@ export interface SectionDetailEditorProps {
 
 export const SectionDetailEditor: React.FC<SectionDetailEditorProps> = ({
   sectionId,
+  focusedSidebarItemId,
   sections,
   setSections,
   onBack,
@@ -255,6 +257,7 @@ export const SectionDetailEditor: React.FC<SectionDetailEditorProps> = ({
           <HeaderEditor
             personalInfo={personalInfo}
             setPersonalInfo={setPersonalInfo}
+            focusedSidebarItemId={focusedSidebarItemId}
             onPolishField={(fieldName, text) => {
               if (onPolishBullet) {
                 onPolishBullet(text, (newText) => {
@@ -271,6 +274,7 @@ export const SectionDetailEditor: React.FC<SectionDetailEditorProps> = ({
             onRenameSection={handleRenameSection}
             summary={summary}
             setSummary={setSummary}
+            focusedSidebarItemId={focusedSidebarItemId}
             onOpenAiPolish={() => onOpenAiPolishModal(sectionId)}
           />
         )}
@@ -281,6 +285,7 @@ export const SectionDetailEditor: React.FC<SectionDetailEditorProps> = ({
             onRenameSection={handleRenameSection}
             experiences={experiences}
             setExperiences={setExperiences}
+            focusedSidebarItemId={focusedSidebarItemId}
             onAddExperience={onAddExperience}
             onPolishBullet={onPolishBullet}
           />
@@ -292,6 +297,7 @@ export const SectionDetailEditor: React.FC<SectionDetailEditorProps> = ({
             onRenameSection={handleRenameSection}
             projects={projects}
             setProjects={setProjects}
+            focusedSidebarItemId={focusedSidebarItemId}
             onAddProject={onAddProject}
             onPolishBullet={onPolishBullet}
           />
@@ -303,6 +309,7 @@ export const SectionDetailEditor: React.FC<SectionDetailEditorProps> = ({
             onRenameSection={handleRenameSection}
             educations={educations}
             setEducations={setEducations}
+            focusedSidebarItemId={focusedSidebarItemId}
             onAddEducation={onAddEducation}
             onPolishBullet={onPolishBullet}
           />
@@ -314,6 +321,7 @@ export const SectionDetailEditor: React.FC<SectionDetailEditorProps> = ({
             onRenameSection={handleRenameSection}
             skills={skills}
             setSkills={setSkills}
+            focusedSidebarItemId={focusedSidebarItemId}
             categoryOrder={categoryOrder}
             onMoveSkillCategory={onMoveSkillCategory}
             getLocalizedCategoryName={getLocalizedCategoryName}
@@ -326,6 +334,7 @@ export const SectionDetailEditor: React.FC<SectionDetailEditorProps> = ({
         {activeSection && (activeSection.type === 'custom' || !['summary', 'experience', 'projects', 'education', 'skills'].includes(activeSection.type)) && (
           <CustomSectionEditor
             section={activeSection as any}
+            focusedSidebarItemId={focusedSidebarItemId}
             onUpdateSection={handleUpdateCustomSection}
             onDeleteSection={handleDeleteCustomSection}
             onPolishBullet={onPolishBullet}

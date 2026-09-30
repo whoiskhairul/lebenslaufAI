@@ -7,27 +7,6 @@
   animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.headerRow {
-  margin-bottom: var(--space-4);
-  flex-shrink: 0;
-  text-align: left;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.title {
-  font-size: var(--text-xl);
-  font-weight: 800;
-  color: var(--foreground);
-  letter-spacing: -0.02em;
-}
-
-.subtitle {
-  font-size: var(--text-xs);
-  color: var(--muted);
-}
-
 .workspace {
   display: flex;
   gap: var(--space-6);
@@ -743,7 +722,7 @@
   margin-bottom: var(--space-4);
   flex-shrink: 0;
   position: relative;
-  z-index: 110;
+  z-index: 130;
 }
 
 .canvasTabs {
@@ -1155,34 +1134,34 @@
   border-radius: 4px;
 }
 
-/* Empty State */
+/* Empty State — minimal, compact */
 .emptyWorkspace {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: var(--muted);
-  border: 2px dashed var(--card-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-8);
+  gap: 8px;
+  padding: 24px 16px;
   text-align: center;
 }
 
-.emptyIcon {
-  color: var(--muted-light);
-  margin-bottom: var(--space-4);
+.emptyMiniIcon {
+  color: var(--muted-light, #cbd5e1);
 }
 
 .emptyWorkspace h3 {
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
   color: var(--foreground);
-  margin-bottom: var(--space-1);
+  margin: 4px 0 0;
 }
 
 .emptyWorkspace p {
   font-size: var(--text-xs);
-  max-width: 320px;
+  color: var(--muted);
+  margin: 0 0 8px;
+  max-width: 260px;
   line-height: 1.5;
 }
 
@@ -2897,7 +2876,7 @@
 }
 
 .dropdownItem:hover {
-  background-color: var(--muted-light) !important;
+  background-color: rgba(99, 102, 241, 0.08) !important;
   color: var(--primary) !important;
 }
 
@@ -2910,10 +2889,13 @@
   flex-direction: column;
   gap: 4px;
   padding: 6px;
-  z-index: 100;
-  min-width: 150px;
-  box-shadow: var(--shadow-md);
-  border-radius: var(--radius-md);
+  z-index: 500;
+  min-width: 160px;
+  box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08));
+  border-radius: 10px;
+  animation: toolbarDropdownFadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+
+
   border: 1px solid var(--card-border, #e2e8f0);
   background: var(--card-bg, #ffffff);
 }
@@ -3735,6 +3717,34 @@
 .sideItemCardExpanded {
   border-color: rgba(99, 102, 241, 0.4);
   box-shadow: 0 2px 6px rgba(99, 102, 241, 0.08);
+}
+
+@keyframes sidebarFocusPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+    border-color: var(--card-border, #e2e8f0);
+  }
+  15% {
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.35), 0 6px 20px rgba(99, 102, 241, 0.18);
+    border-color: #6366f1;
+    background-color: rgba(99, 102, 241, 0.06);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2), 0 4px 12px rgba(99, 102, 241, 0.12);
+    border-color: #818cf8;
+    background-color: rgba(99, 102, 241, 0.03);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+    border-color: rgba(99, 102, 241, 0.4);
+    background-color: var(--card-bg, #ffffff);
+  }
+}
+
+.sidebarItemHighlightFocus {
+  animation: sidebarFocusPulse 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  position: relative;
+  z-index: 5;
 }
 
 .sideCardHeader {
@@ -4837,6 +4847,23 @@
   color: #ffffff;
 }
 
+.toolbarBtnActive {
+  border-color: var(--primary, #6366f1) !important;
+  color: var(--primary, #4f46e5) !important;
+  background: rgba(99, 102, 241, 0.08) !important;
+}
+
+.toolbarChevron {
+  transition: transform 0.18s ease;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.toolbarChevronOpen {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
 .toolbarBadge {
   font-size: 10px;
   font-weight: 800;
@@ -4997,7 +5024,9 @@
   border: 1px solid var(--card-border, #e2e8f0);
   border-radius: 10px;
   box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
-  z-index: 200;
+  z-index: 1000;
+  animation: toolbarDropdownFadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top;
 }
 
 .toolbarMenuItem {
@@ -5019,6 +5048,34 @@
 .toolbarMenuItem:hover {
   background: rgba(99, 102, 241, 0.08);
   color: var(--primary, #4f46e5);
+}
+
+.toolbarMenuItemActive {
+  background: rgba(99, 102, 241, 0.1) !important;
+  color: var(--primary, #4f46e5) !important;
+  font-weight: 700;
+}
+
+.toolbarMenuItem:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.toolbarCheckIcon {
+  color: var(--primary, #6366f1);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+@keyframes toolbarDropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .toolbarZoomLabel {
@@ -5119,10 +5176,6 @@
 }
 
 @media (max-width: 768px) {
-  .headerRow .subtitle {
-    display: none;
-  }
-
   .tabHeader {
     flex-wrap: wrap;
     gap: 10px;

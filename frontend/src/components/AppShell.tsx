@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import {
-  LayoutDashboard, UserCircle, Wand2, Settings as SettingsIcon, LogOut, Sun, Moon, Eye, Sliders, ChevronLeft, ChevronRight, ShieldCheck
+  LayoutDashboard, UserCircle, Wand2, Settings as SettingsIcon, LogOut, Sun, Moon, Eye, Sliders, ChevronLeft, ChevronRight, ShieldCheck, Archive
 } from 'lucide-react';
 import styles from './AppShell.module.css';
 import { Logo } from './Logo';
@@ -23,6 +23,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'archived', label: 'Archived', icon: Archive },
     { id: 'master-profile', label: 'Profile', icon: UserCircle },
     { id: 'editor', label: 'Tailor', icon: Wand2 },
     { id: 'settings', label: 'Settings', icon: SettingsIcon },
@@ -34,6 +35,28 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
   const leftNavItems = navItems.slice(0, Math.ceil(navItems.length / 2));
   const rightNavItems = navItems.slice(Math.ceil(navItems.length / 2));
   const showPaneSwitcher = activeView === 'editor';
+
+  // Center-slot choreography: mount closed so the max-width expand + pane
+  // switcher spring-in transitions play, and delay unmount so the collapse
+  // transition plays when leaving the editor.
+  const [centerVisible, setCenterVisible] = useState(showPaneSwitcher);
+  const [centerOpen, setCenterOpen] = useState(showPaneSwitcher);
+  useEffect(() => {
+    let t1: ReturnType<typeof setTimeout> | undefined;
+    let t2: ReturnType<typeof setTimeout> | undefined;
+    if (showPaneSwitcher) {
+      setCenterVisible(true);
+      setCenterOpen(false);
+      t1 = setTimeout(() => setCenterOpen(true), 30);
+    } else {
+      setCenterOpen(false);
+      t2 = setTimeout(() => setCenterVisible(false), 500);
+    }
+    return () => {
+      if (t1) clearTimeout(t1);
+      if (t2) clearTimeout(t2);
+    };
+  }, [showPaneSwitcher]);
 
   const renderNavItem = (item: { id: string; label: string; icon: typeof LayoutDashboard }) => {
     const Icon = item.icon;
@@ -131,40 +154,49 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
         </main>
       </div>
 
-      {/* Mobile Bottom Navigation Bar: nav split left/right, editor pane switcher in the middle */}
+      {/* Mobile Bottom Navigation Bar: a single even row normally;
+          editor pane switcher sits centered between two balanced pairs */}
       <nav className={`${styles.mobileBottomNav} no-print`} aria-label="Mobile navigation">
-        <div className={styles.mobileNavSide}>
-          {leftNavItems.map(renderNavItem)}
-        </div>
+        {centerVisible ? (
+          <>
+            <div className={styles.mobileNavSide}>
+              {leftNavItems.map(renderNavItem)}
+            </div>
 
-        <div className={`${styles.mobileNavCenter} ${showPaneSwitcher ? styles.mobileNavCenterOpen : ''}`}>
-          <div className={styles.mobilePaneSwitcher} aria-hidden={!showPaneSwitcher}>
-            <button
-              type="button"
-              tabIndex={showPaneSwitcher ? 0 : -1}
-              className={`${styles.mobilePaneBtn} ${mobileActivePane === 'editor' ? styles.mobilePaneBtnActive : ''}`}
-              onClick={() => setMobileActivePane('editor')}
-              aria-label="Show editor controls"
-            >
-              <Sliders size={15} />
-              <span>Editor</span>
-            </button>
-            <button
-              type="button"
-              tabIndex={showPaneSwitcher ? 0 : -1}
-              className={`${styles.mobilePaneBtn} ${mobileActivePane === 'preview' ? styles.mobilePaneBtnActive : ''}`}
-              onClick={() => setMobileActivePane('preview')}
-              aria-label="Show CV canvas"
-            >
-              <Eye size={15} />
-              <span>Canvas</span>
-            </button>
+            <div className={`${styles.mobileNavCenter} ${centerOpen ? styles.mobileNavCenterOpen : ''}`}>
+              <div className={styles.mobilePaneSwitcher} aria-hidden={!centerOpen}>
+                <button
+                  type="button"
+                  tabIndex={centerOpen ? 0 : -1}
+                  className={`${styles.mobilePaneBtn} ${mobileActivePane === 'editor' ? styles.mobilePaneBtnActive : ''}`}
+                  onClick={() => setMobileActivePane('editor')}
+                  aria-label="Show editor controls"
+                >
+                  <Sliders size={15} />
+                  <span>Editor</span>
+                </button>
+                <button
+                  type="button"
+                  tabIndex={centerOpen ? 0 : -1}
+                  className={`${styles.mobilePaneBtn} ${mobileActivePane === 'preview' ? styles.mobilePaneBtnActive : ''}`}
+                  onClick={() => setMobileActivePane('preview')}
+                  aria-label="Show CV canvas"
+                >
+                  <Eye size={15} />
+                  <span>Canvas</span>
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.mobileNavSide}>
+              {rightNavItems.map(renderNavItem)}
+            </div>
+          </>
+        ) : (
+          <div className={styles.mobileNavRow} role="group" aria-label="Primary">
+            {navItems.map(renderNavItem)}
           </div>
-        </div>
-
-        <div className={styles.mobileNavSide}>
-          {rightNavItems.map(renderNavItem)}
-        </div>
+        )}
       </nav>
     </div>
   );

@@ -23,8 +23,13 @@ export const ExperienceItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitConte
   const hasAIChange = !reviewedActions[exp.id];
   const isSectionHovered = hoveredSectionId === unit.sectionId;
 
+  const triggerFocus = () => {
+    p.onCanvasFocus?.('experience', exp.id || `exp_${expIdx}`);
+  };
+
   return (
     <div
+      onClick={triggerFocus}
       className={`${isPP ? styles.ppSectionRow : (isGerman ? styles.germanRow : styles.resumeItem)} ${isSectionHovered ? styles.sectionHoverActive : ''}`}
       style={{ ...mergedStyles, position: 'relative' }}
       onMouseEnter={() => { handleMouseEnterSuggestion(exp.id); setHoveredSectionId(unit.sectionId || null); }}
@@ -36,6 +41,8 @@ export const ExperienceItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitConte
             <span className={isPP ? styles.ppDateRange : styles.germanDateRange}>
               <AutoSizeTextarea
                 value={formatDisplayDateRange(exp.start_date, exp.end_date, targetLanguage)}
+                placeholder="MM/YYYY - Present"
+                onFocus={triggerFocus}
                 onChange={(val) => {
                   const parts = val.split(' - ');
                   setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, start_date: parts[0] || '', end_date: parts[1] || '' } : e));
@@ -47,6 +54,8 @@ export const ExperienceItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitConte
             <h4 className={isPP ? styles.ppJobTitle : styles.germanJobTitle}>
               <AutoSizeTextarea
                 value={exp.position || ''}
+                placeholder="Job Title / Position"
+                onFocus={triggerFocus}
                 onChange={(val) => setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, position: val } : e))}
               />
             </h4>
@@ -55,6 +64,7 @@ export const ExperienceItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitConte
                 <AutoSizeTextarea
                   value={`${exp.company || ''}${exp.location ? `, ${exp.location}` : ''}`}
                   placeholder="Company Name, Location"
+                  onFocus={triggerFocus}
                   onChange={(val) => {
                     const commaIndex = val.indexOf(',');
                     let newComp = val;
@@ -111,6 +121,8 @@ export const ExperienceItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitConte
                           <AutoSizeTextarea
                             id={inputId}
                             value={bullet}
+                            placeholder="Describe your achievement / responsibility..."
+                            onFocus={triggerFocus}
                             onChange={(val) => setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? {
                               ...e,
                               bullets: e.bullets.map((b: string, bI: number) => bI === bulletIdx ? val : b)
@@ -132,12 +144,16 @@ export const ExperienceItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitConte
             <strong style={{ color: '#3d7ee6', fontSize: 'calc(var(--base-font-size, 13px) * 0.92)' }}>
               <AutoSizeTextarea
                 value={exp.position || ''}
+                placeholder="Job Title / Position"
+                onFocus={triggerFocus}
                 onChange={(val) => setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, position: val } : e))}
               />
             </strong>
             <span style={{ fontSize: 'calc(var(--base-font-size, 13px) * 0.92)' }}>
               <AutoSizeTextarea
                 value={formatDisplayDateRange(exp.start_date, exp.end_date, targetLanguage)}
+                placeholder="MM/YYYY - Present"
+                onFocus={triggerFocus}
                 onChange={(val) => {
                   const parts = val.split(' - ');
                   setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? { ...e, start_date: parts[0] || '', end_date: parts[1] || '' } : e));
@@ -149,6 +165,7 @@ export const ExperienceItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitConte
             <AutoSizeTextarea
               value={`${exp.company || ''}${exp.location ? `, ${exp.location}` : ''}`}
               placeholder="Company Name, Location"
+              onFocus={triggerFocus}
               onChange={(val) => {
                 const commaIndex = val.indexOf(',');
                 let newComp = val;
@@ -203,6 +220,8 @@ export const ExperienceItemUnit: React.FC<{ p: UnitRendererProps; ctx: UnitConte
                         <AutoSizeTextarea
                           id={inputId}
                           value={bullet}
+                          placeholder="Describe your achievement / responsibility..."
+                          onFocus={triggerFocus}
                           onChange={(val) => setEditableExperiences(prev => prev.map((e, i) => i === expIdx ? {
                             ...e,
                             bullets: e.bullets.map((b: string, bI: number) => bI === bulletIdx ? val : b)
