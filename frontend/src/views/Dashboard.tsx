@@ -10,7 +10,7 @@ import { Toast } from '../components/Toast';
 import { ApplicationDetailsPopover, type ApplicationStatus } from '../components/ApplicationDetailsPopover';
 import { KanbanCardSkeleton } from '../components/skeleton/DashboardSkeleton';
 import { Skeleton } from '../components/skeleton/Skeleton';
-import { Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, ExternalLink, Sparkles, Info, FileText, Archive, Undo2, Search } from 'lucide-react';
+import { Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, ExternalLink, Sparkles, Info, FileText, Undo2, Search } from 'lucide-react';
 
 // Shared utility class strings for the kanban icon buttons
 const iconBtnBase = 'w-[26px] h-[26px] rounded-md flex items-center justify-center text-muted transition-colors';
@@ -120,6 +120,7 @@ interface Application {
 interface DashboardProps {
   onNavigateToEditor: (params?: { company?: string; position?: string; desc?: string; application_id?: string; tab?: string }) => void;
   activeAppId?: string;
+  initialView?: 'board' | 'archived';
 }
 
 // In-progress pointer drag for a kanban card (see handlers below).
@@ -135,13 +136,14 @@ interface CardGesture {
   offsetY: number;
   node: HTMLElement;
   ghost: HTMLElement | null;
+  tilt: HTMLElement | null;
   active: boolean;
   longPressTimer: ReturnType<typeof setTimeout> | null;
   raf: number | null;
   escapeHandler: ((e: KeyboardEvent) => void) | null;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, activeAppId }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, activeAppId, initialView }) => {
   const [applications, setApplications] = useState<Application[]>([]);
   const [atsScores, setAtsScores] = useState<Record<string, number>>({});
   const [resumeVersions, setResumeVersions] = useState<any[]>([]);
@@ -159,8 +161,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
   const [pendingStatus, setPendingStatus] = useState<Record<string, boolean>>({});
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Board vs Archived list view
-  const [activeView, setActiveView] = useState<'board' | 'archived'>('board');
+  // Board vs Archived list view (one route each: /dashboard and /archived).
+  const [activeView, setActiveView] = useState<'board' | 'archived'>(initialView ?? 'board');
+  const basePath = (initialView ?? 'board') === 'archived' ? '/archived' : '/dashboard';
   const [archivedSearch, setArchivedSearch] = useState('');
 
   // Form Fields
@@ -226,7 +229,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
     if (activeAppId && applications.length > 0) {
       const matched = applications.find(a => a.id === activeAppId);
       if (matched) {
-        // Deep-linking an archived card opens the Archived view instead of the board.
+        // Keep card deep-links on their own route: archived cards belong to
+        // /archived, everything else to /dashboard.
+        const wantsArchived = matched.status === 'archived';
+        const isArchivedRoute = basePath === '/archived';
+        if (wantsArchived !== isArchivedRoute) {
+          navigateTo(wantsArchived ? `/archived?appId=${activeAppId}` : `/dashboard?appId=${activeAppId}`);
+          return;
+        }
         setActiveView(matched.status === 'archived' ? 'archived' : 'board');
         setSelectedApp(matched);
         setIsDetailsOpen(true);
@@ -235,6 +245,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
       setIsDetailsOpen(false);
       setSelectedApp(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAppId, applications]);
 
   const resetForm = () => {
@@ -421,7 +432,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
       await api.delete(`/applications/${appId}`);
       setIsDetailsOpen(false);
       setSelectedApp(null);
-      navigateTo('/dashboard');
+      navigateTo(basePath);
       fetchApplications();
       fetchAtsScores();
     } catch (err) {
@@ -560,8 +571,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
   const moveGhost = (g: CardGesture, x: number, y: number) => {
     g.lastX = x;
     g.lastY = y;
+    // Holder follows the cursor instantly; the inner card owns the tilt
+    // (animated separately so positioning never lags).
     if (g.ghost) {
-      g.ghost.style.transform = `translate3d(${x - g.offsetX}px, ${y - g.offsetY}px, 0) rotate(-3deg)`;
+      g.ghost.style.transform = `translate3d(${x - g.offsetX}px, ${y - g.offsetY}px, 0)`;
     }
     const el = document.elementFromPoint(x, y) as HTMLElement | null;
     const colEl = el?.closest?.('[data-kanban-col]') as HTMLElement | null;
@@ -579,20 +592,40 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
 
   const activateGesture = (g: CardGesture, x: number, y: number) => {
     if (gestureRef.current !== g || g.active) return;
-    const ghost = g.node.cloneNode(true) as HTMLElement;
+    const tilt = g.node.cloneNode(true) as HTMLElement;
     const rect = g.node.getBoundingClientRect();
-    ghost.style.width = `${rect.width}px`;
-    ghost.style.position = 'fixed';
-    ghost.style.left = '0';
-    ghost.style.top = '0';
-    ghost.style.margin = '0';
-    ghost.style.opacity = '1';
-    ghost.style.transition = 'none';
-    ghost.style.pointerEvents = 'none';
-    ghost.style.zIndex = '1000';
-    ghost.style.boxShadow = '0 16px 40px rgba(15, 23, 42, 0.28)';
-    document.body.appendChild(ghost);
-    g.ghost = ghost;
+    // The clone carries the card's entrance animation class — strip it, or it
+    // replays on mount (flash of the card at the top-left).
+    tilt.classList.remove('animate-cardSlideIn');
+    tilt.style.animation = 'none';
+    tilt.style.width = `${rect.width}px`;
+    tilt.style.margin = '0';
+    tilt.style.opacity = '1';
+    tilt.style.transition = 'transform 0.18s ease';
+    tilt.style.transform = 'rotate(0deg)';
+    tilt.style.boxShadow = '0 16px 40px rgba(15, 23, 42, 0.28)';
+    // Position BEFORE mounting so the first paint is already correct —
+    // otherwise one frame renders at the un-transformed top-left origin.
+    const holder = document.createElement('div');
+    holder.style.position = 'fixed';
+    holder.style.left = '0';
+    holder.style.top = '0';
+    holder.style.margin = '0';
+    holder.style.transition = 'none';
+    holder.style.pointerEvents = 'none';
+    holder.style.zIndex = '1000';
+    holder.style.transform = `translate3d(${x - g.offsetX}px, ${y - g.offsetY}px, 0)`;
+    holder.appendChild(tilt);
+    document.body.appendChild(holder);
+    g.ghost = holder;
+    g.tilt = tilt;
+    // Ease into the tilt on the next frame — position tracking stays instant
+    // because only the inner card's transform transitions.
+    requestAnimationFrame(() => {
+      if (gestureRef.current === g && g.tilt) {
+        g.tilt.style.transform = 'rotate(-3deg)';
+      }
+    });
     g.active = true;
     g.node.style.opacity = '0.35';
     // Size the drop gap like the lifted card and hide the source card so
@@ -651,6 +684,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
       offsetY: e.clientY - rect.top,
       node,
       ghost: null,
+      tilt: null,
       active: false,
       longPressTimer: null,
       raf: null,
@@ -741,29 +775,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
           <h2 className="font-header text-xl md:text-2xl font-extrabold text-foreground">Career Command Center</h2>
           <p className="text-xs md:text-sm text-muted">Track applications, verify conversions, and launch tailoring tasks.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-mutedlight rounded-lg p-1" role="tablist" aria-label="Board or archived view">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeView === 'board'}
-              onClick={() => setActiveView('board')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${activeView === 'board' ? 'bg-card text-foreground shadow-sm' : 'text-muted hover:text-foreground'}`}
-            >
-              Board ({isInitialLoading ? '…' : activeApplications.length})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeView === 'archived'}
-              onClick={() => setActiveView('archived')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors flex items-center gap-1 ${activeView === 'archived' ? 'bg-card text-foreground shadow-sm' : 'text-muted hover:text-foreground'}`}
-            >
-              <Archive size={13} />
-              Archived ({isInitialLoading ? '…' : archivedApplications.length})
-            </button>
-          </div>
-          <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 justify-center">
+        <div className="flex flex-col gap-1.5 md:flex-row md:items-center">
+          <Button onClick={() => setIsModalOpen(true)} className="w-full md:w-auto flex items-center gap-2 justify-center">
             <Plus size={18} />
             <span>Create New Application</span>
           </Button>
@@ -806,7 +819,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
 
       {/* Kanban Board Container - Board layout & headers render immediately */}
       {activeView === 'board' ? (
-        <div ref={boardScrollRef} className="relative h-[calc(100dvh-400px)] min-h-[340px] md:h-auto md:flex-1 overflow-x-auto overflow-y-hidden p-1 pb-4 snap-x snap-mandatory md:snap-none thin-scrollbar">
+        <div ref={boardScrollRef} className="relative h-[calc(100dvh_-_448px_-_env(safe-area-inset-bottom,0px))] min-h-[320px] md:h-auto md:flex-1 overflow-x-auto overflow-y-hidden p-1 pb-4 snap-x snap-mandatory md:snap-none thin-scrollbar">
           <div className="flex gap-3.5 h-full w-max md:w-full min-w-full">
             {columns.map((col) => {
               const colApps = sortedByOrder(activeApplications.filter((app) => app.status === col.id));
@@ -990,6 +1003,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
         /* Archived list view — compact rows, not a kanban board */
         <div className="flex-1 overflow-y-auto p-1 pb-4 thin-scrollbar">
           <div className="glass-card p-4 md:p-6 max-w-[900px] mx-auto w-full">
+            <button
+              type="button"
+              onClick={() => setActiveView('board')}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-muted hover:text-primary transition-colors mb-3"
+            >
+              <ArrowLeft size={14} />
+              <span>Back to board</span>
+            </button>
             <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
               <div>
                 <h3 className="font-header text-base font-bold text-foreground">Archived Applications</h3>
@@ -1030,7 +1051,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
                       onClick={() => {
                         setSelectedApp(app);
                         setIsDetailsOpen(true);
-                        navigateTo(`/dashboard?appId=${app.id}`);
+                        navigateTo(`/archived?appId=${app.id}`);
                       }}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-cardline bg-card hover:border-primary hover:shadow-sm cursor-pointer transition-all"
                     >
@@ -1070,7 +1091,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
           statusOptions={[...columns.map((c) => ({ id: c.id, label: c.label })), { id: 'archived' as const, label: 'Archived' }]}
           resumeVersions={resumeVersions
             .filter((v) => v.application === selectedApp.id)
-            .map((v) => ({ id: v.id, ats_score: v.ats_score, created_at: v.created_at }))}
+            .map((v) => ({ id: v.id, ats_score: v.ats_score, created_at: v.created_at, tailored_details: v.tailored_details, validation_alerts: v.validation_alerts }))}
           coverLetters={coverLetters
             .filter((l: any) => l.application === selectedApp.id || (!l.application && l.target_company === selectedApp.company))
             .map((l: any) => ({ id: l.id, tone: l.tone, length: l.length, content: l.content, created_at: l.created_at }))}
@@ -1078,7 +1099,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
           onClose={() => {
             setIsDetailsOpen(false);
             setSelectedApp(null);
-            navigateTo('/dashboard');
+            navigateTo(basePath);
           }}
           onStatusChange={handleUpdateStatus}
           onDelete={(id) => setPendingConfirm({ message: 'Are you sure you want to remove this job tracking card?', action: () => handleDelete(id) })}
@@ -1114,6 +1135,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
             });
           }}
           onDeleteVersion={(versionId) => setPendingConfirm({ message: 'Are you sure you want to delete this tailored CV version?', action: () => handleDeleteVersion(versionId) })}
+          onDeleteHistoryStep={(entryIndex) => {
+            const app = applications.find((a) => a.id === selectedApp?.id) ?? selectedApp;
+            if (!app) return;
+            const hist = app.status_history || [];
+            const entry = hist[entryIndex];
+            const label = !entry
+              ? 'this timeline entry'
+              : entryIndex === 0
+                ? '“New Job created”'
+                : `“Moved to ${entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}”`;
+            setPendingConfirm({
+              message: `Delete ${label} from the timeline? This cannot be undone.`,
+              action: () => handlePatchFields(app.id, { status_history: hist.filter((_, i) => i !== entryIndex) }),
+            });
+          }}
           onPatchFields={handlePatchFields}
         />
       )}

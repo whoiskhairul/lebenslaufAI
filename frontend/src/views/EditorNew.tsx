@@ -5,7 +5,7 @@ import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Toast } from '../components/Toast';
-import { Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Brain, Save, RefreshCw, Trash, Plus, Settings, Minimize2, LayoutGrid, Layers, Sliders, User, Briefcase, Code, GraduationCap, Globe, Eye, EyeOff, RotateCcw, Mail } from 'lucide-react';
+import { Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Save, RefreshCw, Trash, Plus, Settings, Minimize2, LayoutGrid, Layers, Sliders, Briefcase, Code, GraduationCap, Globe, Eye, EyeOff, RotateCcw, Mail } from 'lucide-react';
 import styles from './editorStyles';
 
 import { ATSDashboard, ATSReport, Proposal, WeakBulletWithOriginal, RecommendedKeyword } from '../components/ATSDashboard';
@@ -225,6 +225,10 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const template = useCvDocumentStore((s) => s.template);
   const setTemplate = useCvDocumentStore((s) => s.setTemplate);
   const [isLoading, setIsLoading] = useState(false);
+  // True while an existing resume/version is being fetched from the DB.
+  // Distinct from isLoading (AI tailoring) so we never flash the empty
+  // state before the real content arrives.
+  const [isBootLoading, setIsBootLoading] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<ResumeVersion | null>(null);
   // Bumped after async content arrives to force a pagination re-measure
   // once the preview subtree has remounted (skeleton -> canvas race).
@@ -1394,6 +1398,9 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     }
 
     const fetchExistingVersion = async () => {
+      const needsFetch = Boolean(params?.version_id || params?.application_id);
+      if (needsFetch) setIsBootLoading(true);
+      try {
       // Chrome-extension deep link: /editor?versionId=<uuid>
       if (params?.version_id) {
         try {
@@ -1467,6 +1474,9 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         } catch (err) {
           console.error('Failed to load version details:', err);
         }
+      }
+      } finally {
+        if (needsFetch) setIsBootLoading(false);
       }
     };
     fetchExistingVersion();
@@ -2921,11 +2931,11 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
 
         {/* Right Preview Area */}
         <div ref={previewCanvasRef} className={styles.previewCanvas}>
-          {isLoading ? (
+          {(isBootLoading || isLoading) ? (
             <div className={styles.skeletonContainer}>
               <div className={styles.skeletonLoaderBanner} style={{ width: `${794 * scale}px` }}>
                 <RefreshCw className={styles.skeletonSpinner} size={16} />
-                <span>AI is compiling keywords and tailoring resume cards...</span>
+                <span>{isBootLoading ? 'Loading your resume…' : 'AI is compiling keywords and tailoring resume cards...'}</span>
               </div>
               <div
                 className={styles.skeletonPaperWrapper}
@@ -3849,9 +3859,24 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
             </div>
           ) : (
             <div className={styles.emptyWorkspace}>
-              <Brain size={48} className={styles.emptyIcon} />
-              <h3>Tailoring Workspace Ready</h3>
-              <p>Tailor your master profile credentials against standard job descriptions to start.</p>
+              <FileText size={20} className={styles.emptyMiniIcon} />
+              <h3>No resume yet</h3>
+              <p>Paste a job description and hit Generate.</p>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setActiveControlTab('tailor');
+                  if (isMobileViewport) setMobileActivePane('editor');
+                  requestAnimationFrame(() => {
+                    const ta = controlPanelRef.current?.querySelector('textarea');
+                    if (ta instanceof HTMLTextAreaElement) ta.focus();
+                    else controlPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  });
+                }}
+              >
+                <Wand2 size={14} />
+                <span>Start tailoring</span>
+              </Button>
             </div>
           )}
         </div>

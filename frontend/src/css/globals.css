@@ -185,22 +185,10 @@ button {
   border-radius: 9999px;
 }
 
-/* Kanban drop placeholder: the gap that opens where a dragged card lands */
+/* Kanban drop placeholder: invisible spacemaker that opens where a dragged
+   card will land (siblings glide around it via FLIP). */
 .kanban-drop-gap {
   flex-shrink: 0;
-  border: 1.5px dashed var(--primary, #6366f1);
-  border-radius: 12px;
-  background: rgba(99, 102, 241, 0.07);
-  animation: kanbanGapIn 0.22s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-@keyframes kanbanGapIn {
-  from {
-    opacity: 0;
-    transform: scaleY(0.6);
-  }
-  to {
-    opacity: 1;
-    transform: scaleY(1);
-  }
+  border: none;
+  background: transparent;
 }

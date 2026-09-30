@@ -1134,34 +1134,34 @@
   border-radius: 4px;
 }
 
-/* Empty State */
+/* Empty State — minimal, compact */
 .emptyWorkspace {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: var(--muted);
-  border: 2px dashed var(--card-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-8);
+  gap: 8px;
+  padding: 24px 16px;
   text-align: center;
 }
 
-.emptyIcon {
-  color: var(--muted-light);
-  margin-bottom: var(--space-4);
+.emptyMiniIcon {
+  color: var(--muted-light, #cbd5e1);
 }
 
 .emptyWorkspace h3 {
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
   color: var(--foreground);
-  margin-bottom: var(--space-1);
+  margin: 4px 0 0;
 }
 
 .emptyWorkspace p {
   font-size: var(--text-xs);
-  max-width: 320px;
+  color: var(--muted);
+  margin: 0 0 8px;
+  max-width: 260px;
   line-height: 1.5;
 }
 

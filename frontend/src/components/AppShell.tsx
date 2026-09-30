@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import {
-  LayoutDashboard, UserCircle, Wand2, Settings as SettingsIcon, LogOut, Sun, Moon, Eye, Sliders, ChevronLeft, ChevronRight, ShieldCheck
+  LayoutDashboard, UserCircle, Wand2, Settings as SettingsIcon, LogOut, Sun, Moon, Eye, Sliders, ChevronLeft, ChevronRight, ShieldCheck, Archive
 } from 'lucide-react';
 import styles from './AppShell.module.css';
 import { Logo } from './Logo';
@@ -23,6 +23,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'archived', label: 'Archived', icon: Archive },
     { id: 'master-profile', label: 'Profile', icon: UserCircle },
     { id: 'editor', label: 'Tailor', icon: Wand2 },
     { id: 'settings', label: 'Settings', icon: SettingsIcon },
