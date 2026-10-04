@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import {
-  LayoutDashboard, UserCircle, Wand2, Settings as SettingsIcon, LogOut, Sun, Moon, Eye, Sliders, ChevronLeft, ChevronRight, ShieldCheck, Archive
+  LayoutDashboard, UserCircle, Wand2, LogOut, Sun, Moon, Eye, Sliders, ChevronLeft, ChevronRight, ShieldCheck, Archive, Menu, X
 } from 'lucide-react';
 import styles from './AppShell.module.css';
 import { Logo } from './Logo';
@@ -26,14 +26,18 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
     { id: 'archived', label: 'Archived', icon: Archive },
     { id: 'master-profile', label: 'Profile', icon: UserCircle },
     { id: 'editor', label: 'Tailor', icon: Wand2 },
-    { id: 'settings', label: 'Settings', icon: SettingsIcon },
     ...(user?.is_staff || user?.is_superuser
       ? [{ id: 'admin', label: 'Admin', icon: ShieldCheck }]
       : []),
   ];
 
-  const leftNavItems = navItems.slice(0, Math.ceil(navItems.length / 2));
-  const rightNavItems = navItems.slice(Math.ceil(navItems.length / 2));
+  // Mobile bar stays at 4 slots no matter how the nav grows: the three
+  // primary destinations plus a Menu holding everything else.
+  const primaryMobileIds = ['dashboard', 'master-profile', 'editor'];
+  const primaryMobileItems = navItems.filter((item) => primaryMobileIds.includes(item.id));
+  const menuNavItems = navItems.filter((item) => !primaryMobileIds.includes(item.id));
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const menuHoldsActiveView = menuNavItems.some((item) => item.id === activeView);
   const showPaneSwitcher = activeView === 'editor';
 
   // Center-slot choreography: mount closed so the max-width expand + pane
@@ -58,6 +62,22 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
     };
   }, [showPaneSwitcher]);
 
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
+  const handleMobileNavigate = (id: string) => {
+    closeMobileMenu();
+    onNavigate(id);
+  };
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeMobileMenu();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileMenuOpen]);
+
   const renderNavItem = (item: { id: string; label: string; icon: typeof LayoutDashboard }) => {
     const Icon = item.icon;
     const isActive = activeView === item.id;
@@ -65,7 +85,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
       <button
         key={item.id}
         className={`${styles.mobileNavItem} ${isActive ? styles.mobileNavItemActive : ''}`}
-        onClick={() => onNavigate(item.id)}
+        onClick={() => handleMobileNavigate(item.id)}
         aria-label={item.label}
         title={item.label}
       >
@@ -75,11 +95,32 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
     );
   };
 
+  const renderMenuButton = () => (
+    <button
+      key="menu"
+      type="button"
+      className={`${styles.mobileNavItem} ${menuHoldsActiveView ? styles.mobileNavItemActive : ''}`}
+      onClick={() => setMobileMenuOpen((prev) => !prev)}
+      aria-label="More options"
+      aria-haspopup="dialog"
+      aria-expanded={mobileMenuOpen}
+      title="Menu"
+    >
+      {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+      <span>Menu</span>
+    </button>
+  );
+
   return (
     <div className={styles.container}>
       {/* Mobile Top Bar */}
       <header className={`${styles.header} no-print`}>
-        <button className={styles.themeBtn} onClick={toggleTheme} aria-label="Toggle theme">
+        <button
+          className={styles.themeBtn}
+          onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
           {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
         </button>
         <div className={styles.logoContainer}>
@@ -132,6 +173,23 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
           </nav>
 
           <div className={styles.sidebarFooter}>
+            <button
+              type="button"
+              className={styles.themeToggle}
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              <span className={styles.themeToggleIcon}>
+                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              </span>
+              <span className={styles.themeToggleLabel}>
+                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              </span>
+              <span className={styles.themeToggleHint}>
+                {theme === 'dark' ? 'On' : 'Off'}
+              </span>
+            </button>
             <div className={styles.userProfile} title={`${fullName || 'User'} (${email || ''})`}>
               <div className={styles.userAvatar}>
                 {(fullName || 'U').charAt(0).toUpperCase()}
@@ -154,13 +212,58 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
         </main>
       </div>
 
-      {/* Mobile Bottom Navigation Bar: a single even row normally;
-          editor pane switcher sits centered between two balanced pairs */}
+      {/* Mobile Bottom Navigation Bar: always 4 slots (3 destinations +
+          menu); editor pane switcher sits centered between two pairs */}
+      {mobileMenuOpen && (
+        <div
+          className={styles.mobileMenuBackdrop}
+          onClick={closeMobileMenu}
+          aria-hidden="true"
+        />
+      )}
+      <div
+        className={`${styles.mobileMenuSheet} ${mobileMenuOpen ? styles.mobileMenuSheetOpen : ''} no-print`}
+        role="dialog"
+        aria-modal="false"
+        aria-label="More options"
+        aria-hidden={!mobileMenuOpen}
+      >
+        <div className={styles.mobileMenuGrabber} aria-hidden="true" />
+        {menuNavItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeView === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              tabIndex={mobileMenuOpen ? 0 : -1}
+              className={`${styles.mobileMenuItem} ${isActive ? styles.mobileMenuItemActive : ''}`}
+              onClick={() => handleMobileNavigate(item.id)}
+            >
+              <Icon size={20} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+        <div className={styles.mobileMenuDivider} aria-hidden="true" />
+        <button
+          type="button"
+          tabIndex={mobileMenuOpen ? 0 : -1}
+          className={styles.mobileMenuItem}
+          onClick={() => {
+            toggleTheme();
+            closeMobileMenu();
+          }}
+        >
+          {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+        </button>
+      </div>
       <nav className={`${styles.mobileBottomNav} no-print`} aria-label="Mobile navigation">
         {centerVisible ? (
           <>
             <div className={styles.mobileNavSide}>
-              {leftNavItems.map(renderNavItem)}
+              {primaryMobileItems.slice(0, 2).map(renderNavItem)}
             </div>
 
             <div className={`${styles.mobileNavCenter} ${centerOpen ? styles.mobileNavCenterOpen : ''}`}>
@@ -189,12 +292,14 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
             </div>
 
             <div className={styles.mobileNavSide}>
-              {rightNavItems.map(renderNavItem)}
+              {primaryMobileItems.slice(2).map(renderNavItem)}
+              {renderMenuButton()}
             </div>
           </>
         ) : (
           <div className={styles.mobileNavRow} role="group" aria-label="Primary">
-            {navItems.map(renderNavItem)}
+            {primaryMobileItems.map(renderNavItem)}
+            {renderMenuButton()}
           </div>
         )}
       </nav>

@@ -88,11 +88,28 @@
   transition: all var(--transition-fast);
 }
 
+.iconBtn {
+  position: relative;
+}
+
+/* Larger tap area than the 30px visual (R-03): the hit box reaches
+   44px without changing the header layout. */
+.iconBtn::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+}
+
 .iconBtn:hover {
   color: var(--primary);
-  border-color: rgba(99, 102, 241, 0.45);
-  background: rgba(99, 102, 241, 0.07);
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+  background: color-mix(in srgb, var(--primary) 7%, transparent);
   transform: translateY(-1px);
+}
+
+.iconBtn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .spin {
@@ -132,7 +149,12 @@
 }
 
 .sectionHeaderBtn:hover {
-  background: rgba(99, 102, 241, 0.05);
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+
+.sectionHeaderBtn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .sectionIcon {
@@ -234,7 +256,19 @@
 }
 
 .card:hover {
-  border-color: rgba(99, 102, 241, 0.25);
+  border-color: color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+/* Reference sections (read-only summaries) sit flat under a divider so
+   the workflow cards (Keywords, Bullet Fixes) keep the visual weight. */
+.plainSection {
+  padding: 4px 2px 0;
+  border-top: 1px solid var(--card-border);
+}
+
+.plainSection:first-child {
+  border-top: none;
+  padding-top: 0;
 }
 
 .sectionTitle {
@@ -578,12 +612,18 @@
 }
 
 .tagRecommended {
-  background: rgba(99, 102, 241, 0.09);
+  background: color-mix(in srgb, var(--primary) 9%, transparent);
   color: var(--primary);
-  border-color: rgba(99, 102, 241, 0.32);
+  border-color: color-mix(in srgb, var(--primary) 32%, transparent);
+}
+
+.tagPill:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .tagActionBtn {
+  position: relative;
   background: transparent;
   border: none;
   color: inherit;
@@ -593,6 +633,19 @@
   align-items: center;
   opacity: 0.75;
   transition: opacity var(--transition-fast);
+}
+
+/* Tiny pill icons keep their size; the hit box reaches past 44px. */
+.tagActionBtn::after {
+  content: '';
+  position: absolute;
+  inset: -14px -10px;
+}
+
+.tagActionBtn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  opacity: 1;
 }
 
 .tagActionBtn:hover {
@@ -671,6 +724,7 @@
   font-size: 0.7rem;
   font-weight: 600;
   padding: 5px 11px;
+  min-height: 44px;
   border-radius: 999px;
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -678,7 +732,40 @@
 
 .jdToggle:hover {
   color: var(--primary);
-  border-color: rgba(99, 102, 241, 0.45);
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+}
+
+.jdToggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.retryBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+  min-height: 44px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--foreground);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.retryBtn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.retryBtn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .jdLegend {
@@ -719,14 +806,14 @@
 
 .jdhMatched {
   color: var(--success);
-  background: rgba(16, 185, 129, 0.12) !important;
-  border-bottom: 1.5px solid rgba(16, 185, 129, 0.5);
+  background: color-mix(in srgb, var(--success) 12%, transparent) !important;
+  border-bottom: 1.5px solid color-mix(in srgb, var(--success) 50%, transparent);
 }
 
 .jdhMissing {
   color: var(--danger);
-  background: rgba(239, 68, 68, 0.1) !important;
-  border-bottom: 1.5px solid rgba(239, 68, 68, 0.45);
+  background: color-mix(in srgb, var(--danger) 10%, transparent) !important;
+  border-bottom: 1.5px solid color-mix(in srgb, var(--danger) 45%, transparent);
 }
 
 /* ---------- Proposal cards ---------- */
@@ -743,7 +830,7 @@
 }
 
 .proposalCard:hover {
-  border-color: rgba(245, 158, 11, 0.4);
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
   box-shadow: var(--shadow-sm);
 }
 
@@ -776,12 +863,17 @@
   color: #fff;
   border: none;
   padding: 6px 14px;
+  min-height: 44px;
   border-radius: 8px;
   font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
   transition: all var(--transition-fast);
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.acceptBtn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .acceptBtn:hover {
@@ -794,6 +886,7 @@
   color: var(--muted);
   border: 1px solid var(--card-border);
   padding: 6px 14px;
+  min-height: 44px;
   border-radius: 8px;
   font-size: 0.72rem;
   font-weight: 600;
@@ -803,7 +896,12 @@
 
 .rejectBtn:hover {
   color: var(--danger);
-  border-color: rgba(239, 68, 68, 0.4);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
+.rejectBtn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* ---------- Diff blocks ---------- */
@@ -816,14 +914,14 @@
 }
 
 .bulletDiffOriginal {
-  background: rgba(239, 68, 68, 0.05);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: color-mix(in srgb, var(--danger) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 20%, transparent);
   color: var(--foreground);
 }
 
 .bulletDiffImproved {
-  background: rgba(16, 185, 129, 0.05);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: color-mix(in srgb, var(--success) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
   color: var(--foreground);
 }
 
@@ -845,10 +943,8 @@
 
 /* ---------- Insights: recruiter ---------- */
 .deepCard {
-  border-color: rgba(99, 102, 241, 0.3);
-  background:
-    radial-gradient(130% 130% at 0% 0%, rgba(99, 102, 241, 0.06) 0%, transparent 60%),
-    var(--glass-bg);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+  background: var(--glass-bg);
 }
 
 .recruiterImpression {
@@ -857,8 +953,8 @@
   line-height: 1.55;
   font-style: italic;
   background: var(--card-bg);
-  border-left: 3px solid var(--primary);
-  border-radius: 0 10px 10px 0;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
   padding: 9px 12px;
 }
 
@@ -867,8 +963,8 @@
   font-size: 0.74rem;
   font-weight: 700;
   color: var(--primary);
-  background: rgba(99, 102, 241, 0.08);
-  border: 1px solid rgba(99, 102, 241, 0.25);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
   border-radius: 10px;
   padding: 8px 11px;
   line-height: 1.45;
@@ -902,16 +998,20 @@
   border: 1px solid;
 }
 
+/* Gaps are read-only findings, not actions: flat divider rows instead
+   of cards, so the actionable proposal cards keep the visual weight. */
 .gapCard {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
+  background: transparent;
+  border: none;
+  border-top: 1px dashed var(--card-border);
+  border-radius: 0;
+  padding: 10px 2px;
+  margin-bottom: 0;
 }
 
-.gapCard:last-child {
-  margin-bottom: 0;
+.gapCard:first-child {
+  border-top: none;
+  padding-top: 2px;
 }
 
 .gapTitle {

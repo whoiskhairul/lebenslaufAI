@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ATSDashboardSkeleton } from './skeleton/ATSDashboardSkeleton';
 import {
-  Brain, Sparkles, Plus, RefreshCw, CheckCircle2, XCircle, X, Download,
-  Target, FileText, Lightbulb, Eye, EyeOff, TrendingUp, AlertTriangle, Award, Circle, RotateCcw, Zap, ListChecks, ChevronDown
+  Gauge, PenLine, Info, Tags, Plus, RefreshCw, CheckCircle2, XCircle, X, Download,
+  Target, FileText, Eye, EyeOff, TrendingUp, AlertTriangle, Award, Circle, RotateCcw, ListChecks, ChevronDown
 } from 'lucide-react';
 import { DeepAnalysis } from '../views/editor/types/editor.types';
 import { ChecklistItem } from '../features/editor/utils/atsLocal';
@@ -100,6 +100,7 @@ interface ATSDashboardProps {
   onApplyBulletFix?: (wb: WeakBulletWithOriginal) => void;
   onExportReport?: () => void;
   isRefreshing?: boolean;
+  error?: string | null;
   coverage?: KeywordCoverage | null;
   recommendedKeywords?: RecommendedKeyword[];
   weakBullets?: WeakBulletWithOriginal[];
@@ -160,10 +161,16 @@ const CategoryPickerModal: React.FC<CategoryModalProps> = ({
   }, [totalOptionsCount, selectedIndex, filteredCategories, hasCustomOption, filterText, onSelect, onClose]);
 
   return createPortal(
-    <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+    <div className={styles.modalOverlay} onClick={onClose} role="presentation">
+      <div
+        className={styles.modalCard}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ats-category-modal-title"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className={styles.modalHead}>
-          <h4 className={styles.modalTitle}>Choose Skill Category</h4>
+          <h4 id="ats-category-modal-title" className={styles.modalTitle}>Choose Skill Category</h4>
           <button type="button" onClick={onClose} className={styles.iconBtn} title="Close">
             <X size={15} />
           </button>
@@ -192,7 +199,7 @@ const CategoryPickerModal: React.FC<CategoryModalProps> = ({
                 onClick={() => onSelect(cat)}
                 className={`${styles.modalOption} ${isSelected ? styles.modalOptionActive : ''}`}
               >
-                <span>📁 {cat}</span>
+                <span>{cat}</span>
                 {isSelected && <span className={styles.modalEnterHint}>Press Enter</span>}
               </button>
             );
@@ -281,6 +288,7 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
   onApplyBulletFix,
   onExportReport,
   isRefreshing,
+  error,
   coverage,
   recommendedKeywords = [],
   weakBullets = [],
@@ -357,8 +365,8 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
 
   const getScoreTheme = (s: number) => {
     const color = scoreColor(s);
-    if (s >= 80) return { color, label: 'ATS Ready', desc: 'High match probability with applicant tracking systems.' };
-    if (s >= 60) return { color, label: 'Good Match', desc: 'Adding missing keywords will boost interview callbacks.' };
+    if (s >= 80) return { color, label: 'ATS Ready', desc: 'Strong keyword and structure overlap with this job ad.' };
+    if (s >= 60) return { color, label: 'Good Match', desc: 'Adding missing keywords can raise this score.' };
     return { color, label: 'Needs Optimization', desc: 'Missing key skills and structure required by this job description.' };
   };
 
@@ -407,7 +415,6 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
             className={styles.statusBadge}
             style={{ color: scoreTheme.color, borderColor: scoreTheme.color }}
           >
-            <Zap size={11} />
             {scoreTheme.label}
           </span>
           <div className={styles.heroDesc}>{scoreTheme.desc}</div>
@@ -466,10 +473,9 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
               type="button"
               className={`${styles.statChip} ${styles.statChipBtn}`}
               onClick={() => { setKeywordFilter('recommended'); setOpenSections(prev => ({ ...prev, keywords: true })); }}
-              title="Jump to AI keyword picks"
+              title="Jump to suggested keywords"
             >
-              <Lightbulb size={11} color="var(--primary)" />
-              <span className={styles.statChipValue}>{visibleRecommended.length}</span> AI picks
+              <span className={styles.statChipValue}>{visibleRecommended.length}</span> Suggested picks
             </button>
           )}
           {visibleWeakBullets.length > 0 && (
@@ -498,16 +504,16 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
               className={styles.barFill}
               style={{
                 width: `${coverage.percent}%`,
-                background: 'linear-gradient(90deg, var(--primary), var(--secondary))'
+                background: 'var(--primary)'
               }}
             />
           </div>
           <div className={styles.barFeedback} style={{ marginTop: '6px' }}>
             {coverage.percent >= 80
-              ? 'Excellent — your resume speaks the job ad\'s language.'
+              ? 'Excellent. Your resume speaks the job ad\'s language.'
               : coverage.percent >= 50
-                ? 'Decent foundation — inject the missing keywords below to climb higher.'
-                : 'Low coverage — your resume shares few keywords with this job ad.'}
+                ? 'Decent foundation. Inject the missing keywords below to climb higher.'
+                : 'Low coverage. Your resume shares few keywords with this job ad.'}
           </div>
         </div>
       )}
@@ -535,7 +541,7 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
           className={`${styles.tagFilterBtn} ${keywordFilter === 'recommended' ? styles.tagFilterBtnActive : ''}`}
           onClick={() => setKeywordFilter('recommended')}
         >
-          <Lightbulb size={10} /> AI Picks {visibleRecommended.length}
+          Suggested {visibleRecommended.length}
         </button>
       </div>
 
@@ -567,7 +573,7 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
                     onDismiss(`kw:${k.name.toLowerCase()}`);
                   }}
                   className={`${styles.tagActionBtn} ${styles.tagHideBtn}`}
-                  title={`Ignore '${k.name}' — not a real skill`}
+                  title={`Ignore '${k.name}' (not a real skill)`}
                 >
                   <EyeOff size={11} />
                 </button>
@@ -579,8 +585,17 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
           report?.all_missing?.map((k, i) => (
             <span
               key={`miss-${i}`}
+              role="button"
+              tabIndex={0}
+              aria-label={`Add '${k.name}' to CV Skills`}
               className={`${styles.tagPill} ${styles.tagMissing}`}
               onClick={() => setModalSkill(k.name)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setModalSkill(k.name);
+                }
+              }}
               style={{ cursor: 'pointer', userSelect: 'none' }}
               title={`Click to add '${k.name}' to CV Skills`}
             >
@@ -598,7 +613,7 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
                   }}
                   className={`${styles.tagActionBtn} ${styles.tagHideBtn}`}
                   style={{ marginLeft: '2px' }}
-                  title={`Ignore '${k.name}' — not a real skill`}
+                  title={`Ignore '${k.name}' (not a real skill)`}
                 >
                   <EyeOff size={11} />
                 </button>
@@ -612,7 +627,7 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
             onClick={onRestoreHiddenKeywords}
             style={{ marginTop: '8px' }}
           >
-            <RotateCcw size={11} /> {hiddenKeywordCount} hidden — restore
+            <RotateCcw size={11} /> Restore {hiddenKeywordCount} hidden
           </button>
         )}
 
@@ -624,7 +639,7 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
                 <span
                   key={`rec-applied-${i}`}
                   className={`${styles.tagPill} ${styles.tagMatched}`}
-                  title="AI recommended — added to your skills"
+                  title="Recommended keyword already added to your skills"
                 >
                   <CheckCircle2 size={11} />
                   {rk.name}
@@ -647,12 +662,20 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
             return (
               <span
                 key={`rec-${i}`}
+                role="button"
+                tabIndex={0}
+                aria-label={`Add suggested keyword '${rk.name}' to CV Skills`}
                 className={`${styles.tagPill} ${styles.tagRecommended}`}
                 onClick={() => setModalSkill(rk.name)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setModalSkill(rk.name);
+                  }
+                }}
                 style={{ cursor: 'pointer', userSelect: 'none' }}
-                title={rk.reason || 'AI recommended keyword for this job domain'}
+                title={rk.reason || 'Suggested keyword for this job domain'}
               >
-                <Lightbulb size={11} />
                 <span>{rk.name}</span>
                 <span className={styles.tagActionBtn} style={{ marginLeft: '2px' }}>
                   <Plus size={11} />
@@ -665,12 +688,12 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
       {visibleRecommended.length > 0 && (keywordFilter === 'all' || keywordFilter === 'recommended') && (
         <div className={styles.keywordReasons}>
           <div className={styles.keywordReasonsTitle}>
-            <Lightbulb size={11} /> Why these help
+            <Info size={11} /> Why these help
           </div>
           {visibleRecommended.map((rk, i) => (
             <div key={i} className={styles.keywordReasonItem}>
               <span style={{ flex: 1 }}>
-                <strong>{rk.name}</strong> — {rk.reason || 'Strengthens your profile for this job domain.'}
+                <strong>{rk.name}</strong>: {rk.reason || 'Strengthens your profile for this job domain.'}
               </span>
               {onDismiss && (
                 <button
@@ -733,8 +756,8 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
     return (
       <>
         <div className={styles.sectionInlineActions}>
-          <span className={styles.proposalDesc}>
-            ⚠️ {visibleWeakBullets.length} bullet{visibleWeakBullets.length > 1 ? 's' : ''} flagged as weak
+          <span className={styles.proposalDesc} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+            <AlertTriangle size={12} /> {visibleWeakBullets.length} bullet{visibleWeakBullets.length > 1 ? 's' : ''} flagged as weak
           </span>
           {onApplyBulletFix && (
             <button
@@ -753,7 +776,7 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
             <div className={styles.proposalTitle}>
               <FileText size={12} color="var(--primary)" /> {wb.contextLabel} · Bullet {wb.bullet_index + 1}
             </div>
-            {wb.reason && <div className={styles.proposalDesc}>⚠️ {wb.reason}</div>}
+            {wb.reason && <div className={styles.proposalDesc} style={{ display: 'flex', alignItems: 'flex-start', gap: '5px' }}><AlertTriangle size={12} style={{ flexShrink: 0, marginTop: '2px' }} /><span>{wb.reason}</span></div>}
             <div className={styles.bulletDiffOriginal}>
               <div className={styles.diffLabel}>Current</div>
               {wb.original || '(empty)'}
@@ -826,7 +849,7 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
         {ri && (ri.first_impression || ri.verdict) && (
           <div className={styles.insightBlock}>
             <div className={styles.insightBlockTitle} style={{ color: 'var(--primary)' }}>
-              <Eye size={12} /> Recruiter 6-Second Scan
+              <Eye size={12} /> Recruiter View
             </div>
             {ri.first_impression && (
               <div className={styles.recruiterImpression}>{ri.first_impression}</div>
@@ -937,16 +960,16 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
                 <span
                   className={styles.fitBadge}
                   style={{
-                    background: fr.seniority_match === 'at' ? 'rgba(16, 185, 129, 0.1)' : fr.seniority_match === 'above' ? 'rgba(6, 182, 212, 0.1)' : 'rgba(239, 68, 68, 0.08)',
+                    background: fr.seniority_match === 'at' ? 'color-mix(in srgb, var(--success) 10%, transparent)' : fr.seniority_match === 'above' ? 'color-mix(in srgb, var(--secondary) 10%, transparent)' : 'color-mix(in srgb, var(--danger) 8%, transparent)',
                     color: fr.seniority_match === 'at' ? 'var(--success)' : fr.seniority_match === 'above' ? 'var(--secondary-hover)' : 'var(--danger)',
-                    borderColor: fr.seniority_match === 'at' ? 'rgba(16, 185, 129, 0.35)' : fr.seniority_match === 'above' ? 'rgba(6, 182, 212, 0.35)' : 'rgba(239, 68, 68, 0.35)'
+                    borderColor: fr.seniority_match === 'at' ? 'color-mix(in srgb, var(--success) 35%, transparent)' : fr.seniority_match === 'above' ? 'color-mix(in srgb, var(--secondary) 35%, transparent)' : 'color-mix(in srgb, var(--danger) 35%, transparent)'
                   }}
                 >
                   Seniority: {fr.seniority_match === 'at' ? 'Match' : fr.seniority_match === 'above' ? 'Above role' : 'Below role'}
                 </span>
               )}
               {typeof fr.domain_overlap === 'number' && (
-                <span className={styles.fitBadge} style={{ background: 'rgba(99, 102, 241, 0.08)', color: 'var(--primary)', borderColor: 'rgba(99, 102, 241, 0.3)' }}>
+                <span className={styles.fitBadge} style={{ background: 'color-mix(in srgb, var(--primary) 8%, transparent)', color: 'var(--primary)', borderColor: 'color-mix(in srgb, var(--primary) 30%, transparent)' }}>
                   <Circle size={9} style={{ marginRight: '4px' }} /> Domain overlap: {Math.round(fr.domain_overlap)}%
                 </span>
               )}
@@ -959,7 +982,7 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
                 <div className={styles.gapText}>{g.gap}</div>
                 {g.cover_letter_tip && (
                   <div className={styles.gapTip}>
-                    <Sparkles size={11} color="var(--primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <PenLine size={11} color="var(--primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
                     <span><strong>Cover letter tip:</strong> {g.cover_letter_tip}</span>
                   </div>
                 )}
@@ -985,7 +1008,7 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
       <div className={styles.header}>
         <div className={styles.headerTitle}>
           <div className={styles.brandIcon}>
-            <Brain size={18} />
+            <Gauge size={18} />
           </div>
           <div className={styles.brandText}>
             <span className={styles.brandName}>ATS Optimizer</span>
@@ -1006,22 +1029,37 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
 
       <div className={styles.content}>
         {!report ? (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>
-              <Brain size={26} color="var(--primary)" />
+          isRefreshing ? (
+            <ATSDashboardSkeleton />
+          ) : error ? (
+            <div className={styles.emptyState} role="alert">
+              <div className={styles.emptyIcon}>
+                <AlertTriangle size={26} color="var(--danger)" />
+              </div>
+              <div className={styles.emptyTitle}>Score Check Failed</div>
+              <div className={styles.emptyDesc}>{error}</div>
+              <button type="button" className={styles.retryBtn} onClick={onRefreshScore}>
+                <RefreshCw size={13} /> Try again
+              </button>
             </div>
-            <div className={styles.emptyTitle}>No ATS Analysis Available</div>
-            <div className={styles.emptyDesc}>
-              Paste a target Job Description and click <strong style={{ color: 'var(--primary)' }}>"Analyze &amp; Tailor"</strong> on the AI Tailoring tab to generate match scores, keyword breakdown and deep insights.
+          ) : (
+            <div className={styles.emptyState}>
+              <div className={styles.emptyIcon}>
+                <Gauge size={26} color="var(--primary)" />
+              </div>
+              <div className={styles.emptyTitle}>No ATS Analysis Available</div>
+              <div className={styles.emptyDesc}>
+                Paste a target Job Description and click <strong style={{ color: 'var(--primary)' }}>"Analyze &amp; Tailor"</strong> on the AI Tailoring tab to generate match scores, keyword breakdown and deep insights.
+              </div>
             </div>
-          </div>
+          )
         ) : (
           <>
             {renderHero()}
 
             <div className={styles.card}>
               <SectionHeader
-                icon={<Lightbulb size={13} />}
+                icon={<Tags size={13} />}
                 title="Keywords"
                 badge={{
                   text: `${(report?.all_matched?.length ?? 0)}/${(report?.all_matched?.length ?? 0) + (report?.all_missing?.length ?? 0)}`,
@@ -1047,7 +1085,7 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
             )}
 
             {checklist.length > 0 && (
-              <div className={styles.card}>
+              <div className={styles.plainSection}>
                 <SectionHeader
                   icon={<ListChecks size={13} />}
                   title="Readiness"
@@ -1063,9 +1101,9 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
             )}
 
             {visibleSuggestions.length > 0 && (
-              <div className={styles.card}>
+              <div className={styles.plainSection}>
                 <div className={styles.sectionTitle} style={{ marginBottom: '10px' }}>
-                  <span className={styles.titleLead}><Sparkles size={13} /> Quick Tips</span>
+                  <span className={styles.titleLead}><Info size={13} /> Quick Tips</span>
                 </div>
                 {visibleSuggestions.map((sug) => (
                   <div key={sug} className={styles.suggestionItem}>
@@ -1085,11 +1123,11 @@ export const ATSDashboard: React.FC<ATSDashboardProps> = ({
               </div>
             )}
 
-            <div className={styles.card}>
+            <div className={styles.plainSection}>
               <SectionHeader
                 icon={<Eye size={13} />}
                 title="Deep Insights"
-                badge={deepAnalysis && (deepAnalysis.section_scores?.length || deepAnalysis.recommended_keywords?.length) ? { text: 'AI', color: 'var(--primary)' } : null}
+                badge={deepAnalysis && (deepAnalysis.section_scores?.length || deepAnalysis.recommended_keywords?.length) ? { text: 'Analysis', color: 'var(--primary)' } : null}
                 open={openSections.insights}
                 onToggle={() => toggleSection('insights')}
               />

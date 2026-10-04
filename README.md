@@ -368,5 +368,5 @@ See [`extension/README.md`](extension/README.md) for setup, architecture and pub
 
 - [ ] `views/EditorNew.tsx` (~3.3k lines): Cover Letter page editor, AI-polish modals and panel-resizing logic are still inline — same extraction pattern as the existing panels applies
 - [ ] Remaining base CSS module could be partitioned further (same pattern as the template modules)
-- [ ] No automated tests yet — add Playwright smoke coverage for tailor → edit → print flow
+- [x] `frontend/e2e/tailor-edit-print.spec.ts`: Playwright smoke coverage for tailor → edit → print flow (stubbed API, `npm run test:e2e`); extend with backend-backed cases next
 - [ ] Cover-letter templates are currently a single German-format layout

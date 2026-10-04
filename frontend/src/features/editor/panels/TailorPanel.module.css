@@ -1,0 +1,447 @@
+/* AI Tailoring panel — theme-aware, responsive. Uses app tokens so it
+   follows [data-theme="dark"] automatically. No hardcoded light colors. */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md, 10px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.card h3.title {
+  border-left: none;
+  padding-left: 0;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground);
+  display: block;
+  margin-bottom: 2px;
+}
+
+.optionGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.optionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--background);
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s ease;
+  min-width: 0;
+  text-align: center;
+}
+
+.optionBtnStack {
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+}
+
+.optionBtnActive {
+  border: 2px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.optionSub {
+  font-size: 10px;
+  opacity: 0.8;
+  font-weight: 400;
+}
+
+.select {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  font-size: 13px;
+  outline: none;
+  color: var(--foreground);
+  box-sizing: border-box;
+}
+
+.select:focus {
+  border-color: var(--primary);
+}
+
+.projectsCard {
+  background: var(--background);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.projectsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  gap: 8px;
+}
+
+.projectsTitle {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--foreground);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.projectsToggle {
+  font-size: 11px;
+  color: var(--primary);
+  font-weight: 600;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.projectsList {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.projectRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--foreground);
+}
+
+.projectRowChecked {
+  background: var(--card-bg);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.projectMeta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.projectRole {
+  font-size: 10.5px;
+  color: var(--muted);
+  display: block;
+}
+
+.projectsEmpty {
+  font-size: 11.5px;
+  color: var(--muted);
+  padding: 6px 4px;
+  font-style: italic;
+}
+
+.missingCard {
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.missingTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--warning);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.missingText {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.missingChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.missingChip {
+  font-size: 10.5px;
+  background: var(--card-bg);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  padding: 3px 8px;
+  border-radius: 12px;
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkLabel {
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--foreground);
+}
+
+.trackingCard {
+  padding: 12px;
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trackingTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.trackingHint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.errorBanner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, transparent);
+  color: var(--foreground);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.errorBanner strong {
+  display: block;
+  font-size: 12.5px;
+  margin-bottom: 2px;
+}
+
+.errorIcon {
+  color: var(--danger);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.errorActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.retryBtn {
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  background: var(--card-bg);
+  color: var(--foreground);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.retryBtn:hover {
+  border-color: var(--danger);
+}
+
+.dismissBtn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 8px;
+}
+
+.dismissBtn:hover {
+  color: var(--foreground);
+}
+
+.guidelines {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.guidelines strong {
+  color: var(--foreground);
+}
+
+.auditCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auditHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--card-border);
+  padding-bottom: 10px;
+  gap: 8px;
+}
+
+.auditTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.auditBadge {
+  font-size: 10px;
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--primary);
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.auditStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auditBlock {
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--background);
+  border: 1px solid var(--card-border);
+}
+
+.auditBlock ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.auditBlock li {
+  line-height: 1.4;
+}
+
+.fullWidthBtn {
+  width: 100%;
+}
+
+/* Narrow control-panel widths + phones: stack everything */
+@media (max-width: 560px) {
+  .card {
+    padding: 14px 12px;
+  }
+  .grid2,
+  .optionGrid {
+    grid-template-columns: 1fr;
+  }
+  .title {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .card {
+    padding: 12px 10px;
+    gap: 12px;
+  }
+  .auditHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .optionBtn {
+    transition: none;
+  }
+}

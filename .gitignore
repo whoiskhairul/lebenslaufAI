@@ -13,6 +13,8 @@
 frontend/node_modules/
 frontend/dist/
 frontend/build/
+frontend/test-results/
+frontend/playwright-report/
 frontend/.svelte-kit
 frontend/.next/
 frontend/out/
