@@ -23,7 +23,7 @@ api.interceptors.request.use(
     if (deepseekKey) {
       config.headers['X-Deepseek-Key'] = deepseekKey;
     }
-    // Per-user LLM routing (Settings page). Only sent when explicitly saved,
+    // Per-user LLM routing (Profile → AI Engine tab). Only sent when explicitly saved,
     // otherwise the server default applies. Backend validates both values.
     const aiProvider = localStorage.getItem('ai_provider');
     if (aiProvider) {

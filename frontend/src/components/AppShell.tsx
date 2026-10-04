@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import {
-  LayoutDashboard, UserCircle, Wand2, Settings as SettingsIcon, LogOut, Sun, Moon, Eye, Sliders, ChevronLeft, ChevronRight, ShieldCheck, Archive, Menu, X
+  LayoutDashboard, UserCircle, Wand2, LogOut, Sun, Moon, Eye, Sliders, ChevronLeft, ChevronRight, ShieldCheck, Archive, Menu, X
 } from 'lucide-react';
 import styles from './AppShell.module.css';
 import { Logo } from './Logo';
@@ -26,7 +26,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, activeView, onNavi
     { id: 'archived', label: 'Archived', icon: Archive },
     { id: 'master-profile', label: 'Profile', icon: UserCircle },
     { id: 'editor', label: 'Tailor', icon: Wand2 },
-    { id: 'settings', label: 'Settings', icon: SettingsIcon },
     ...(user?.is_staff || user?.is_superuser
       ? [{ id: 'admin', label: 'Admin', icon: ShieldCheck }]
       : []),

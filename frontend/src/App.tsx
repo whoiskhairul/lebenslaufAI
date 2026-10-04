@@ -5,11 +5,9 @@ import { Landing } from './views/Landing';
 import { Dashboard } from './views/Dashboard';
 import { MasterProfile } from './views/MasterProfile';
 import { Editor } from './views/EditorNew';
-import { Settings } from './views/Settings';
 import { AdminPanel } from './features/admin/AdminPanel';
 import { LoginPage } from './views/auth/LoginPage';
 import { RegisterPage } from './views/auth/RegisterPage';
-import { AccountSecurityPage } from './views/auth/AccountSecurityPage';
 import { NotFound } from './views/NotFound';
 import { navigateTo } from './utils/navigation';
 import './css/globals.css';
@@ -98,7 +96,7 @@ export const App: React.FC = () => {
 
   // Auth-independent route classification: unknown paths → 404 page.
   const publicPaths = ['', 'login', 'register'];
-  const protectedPaths = ['dashboard', 'archived', 'master-profile', 'editor', 'security', 'settings', 'admin'];
+  const protectedPaths = ['dashboard', 'archived', 'master-profile', 'editor', 'admin'];
   const isNotFound = !publicPaths.includes(currentPath) && !protectedPaths.includes(currentPath);
 
   // View actually rendered:
@@ -168,8 +166,6 @@ export const App: React.FC = () => {
       {activeView === 'editor' && (
         <Editor initialJobParams={initialJobParams} />
       )}
-      {activeView === 'security' && <AccountSecurityPage />}
-      {activeView === 'settings' && <Settings />}
       {activeView === 'admin' && isAdmin && <AdminPanel />}
     </AppShell>
   );

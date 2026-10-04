@@ -7,6 +7,8 @@ import { useAuthStore } from '../store/authStore';
 import { MasterProfileSkeleton } from '../components/skeleton/MasterProfileSkeleton';
 import { User, Briefcase, FolderGit2, Dumbbell, GraduationCap, Trash2, Plus, Edit3, Check, X, Upload, Brain, Wand2, Sparkles, Lock, AlertCircle, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
 import { Toast } from '../components/Toast';
+import { AiEngineTab } from './profile/AiEngineTab';
+import { AccountTab } from './profile/AccountTab';
 
 // Tailwind class map -------- replaces the former MasterProfile.module.css (mobile-first, md: = desktop)
 const cls = {
@@ -168,7 +170,7 @@ interface Certification {
 
 export const MasterProfile: React.FC = () => {
   const { user } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'info' | 'experience' | 'projects' | 'skills' | 'education' | 'certs'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'experience' | 'projects' | 'skills' | 'education' | 'certs' | 'ai' | 'account'>('info');
 
   const [profile, setProfile] = useState<{
     personal_info: PersonalInfo;
@@ -367,7 +369,7 @@ export const MasterProfile: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       const serverMsg = err?.response?.data?.error?.message;
-      setParseError(serverMsg || 'AI Parsing service is currently unavailable. Please check your API key in Settings or try again later.');
+      setParseError(serverMsg || 'AI Parsing service is currently unavailable. Please check your API key in the AI Engine tab or try again later.');
     } finally {
       setIsParsing(false);
     }
@@ -1082,12 +1084,15 @@ export const MasterProfile: React.FC = () => {
   };
 
   const tabs = [
-    { id: 'info', label: 'Personal Info', icon: User },
-    { id: 'experience', label: 'Experience', icon: Briefcase },
-    { id: 'projects', label: 'Projects', icon: FolderGit2 },
-    { id: 'skills', label: 'Skills', icon: Dumbbell },
-    { id: 'education', label: 'Education', icon: GraduationCap },
+    { id: 'info', label: 'Personal Info', icon: User, group: 'Resume' },
+    { id: 'experience', label: 'Experience', icon: Briefcase, group: 'Resume' },
+    { id: 'projects', label: 'Projects', icon: FolderGit2, group: 'Resume' },
+    { id: 'skills', label: 'Skills', icon: Dumbbell, group: 'Resume' },
+    { id: 'education', label: 'Education', icon: GraduationCap, group: 'Resume' },
+    { id: 'ai', label: 'AI Engine', icon: Brain, group: 'Setup' },
+    { id: 'account', label: 'Account', icon: Lock, group: 'Setup' },
   ];
+  const tabGroups = ['Resume', 'Setup'];
 
   return (
     <div className={cls.container}>
@@ -1166,24 +1171,36 @@ export const MasterProfile: React.FC = () => {
       </div>
 
       <div className={cls.layout}>
-        {/* Sub Navigation Tabs */}
+        {/* Sub Navigation Tabs, grouped: resume record vs setup */}
         <div className={`${cls.tabs} glass-card`}>
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                className={`${cls.tabBtn} ${activeTab === tab.id ? cls.activeTab : ''}`}
-                onClick={() => {
-                  setActiveTab(tab.id as any);
-                  setIsAdding(false);
-                }}
+          {tabGroups.map((group) => (
+            <div key={group} className="flex flex-row gap-1 md:contents" role="group" aria-label={group}>
+              <span
+                aria-hidden="true"
+                className="hidden md:block px-4 pt-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted"
               >
-                <Icon size={18} />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+                {group}
+              </span>
+              {tabs
+                .filter((tab) => tab.group === group)
+                .map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      className={`${cls.tabBtn} ${activeTab === tab.id ? cls.activeTab : ''}`}
+                      onClick={() => {
+                        setActiveTab(tab.id as any);
+                        setIsAdding(false);
+                      }}
+                    >
+                      <Icon size={18} />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+            </div>
+          ))}
         </div>
 
         {/* Content Viewport */}
@@ -2118,6 +2135,16 @@ export const MasterProfile: React.FC = () => {
                     ))}
                   </div>
                 </div>
+              )}
+
+              {/* AI Engine Tab */}
+              {activeTab === 'ai' && (
+                <AiEngineTab cls={cls} />
+              )}
+
+              {/* Account Tab */}
+              {activeTab === 'account' && (
+                <AccountTab cls={cls} />
               )}
             </>
           )}
