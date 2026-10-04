@@ -5,7 +5,7 @@ import { InputField } from '../components/InputField';
 import api from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Toast } from '../components/Toast';
-import { Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Save, RefreshCw, Trash, Plus, Settings, Minimize2, LayoutGrid, Layers, Sliders, Briefcase, Code, GraduationCap, Globe, Eye, EyeOff, RotateCcw, Mail, ChevronDown } from 'lucide-react';
+import { Wand2, Download, Printer, Check, X, ShieldAlert, Sparkles, FileText, Save, RefreshCw, Trash, Plus, Settings, Minimize2, LayoutGrid, Layers, Sliders, Briefcase, Code, GraduationCap, Globe, Eye, EyeOff, RotateCcw, Mail, ChevronDown, Gauge, Palette } from 'lucide-react';
 import styles from './editorStyles';
 
 import { ATSDashboard, ATSReport, Proposal, WeakBulletWithOriginal, RecommendedKeyword } from '../components/ATSDashboard';
@@ -280,6 +280,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [isProjectsCollapsed, setIsProjectsCollapsed] = useState(false);
   const [isAtsChecking, setIsAtsChecking] = useState<boolean>(false);
+  const [atsError, setAtsError] = useState<string | null>(null);
   const [keywordCategoryPopover, setKeywordCategoryPopover] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [polishModalInfo, setPolishModalInfo] = useState<{ text: string; onAccept: (newText: string) => void } | null>(null);
@@ -739,6 +740,27 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
   }, [currentVersion, userInjectedSkills, userRemovedSkills, dismissedAts]);
 
   const activeAtsScore = liveAtsReport?.score ?? (currentVersion?.ats_score || 85);
+  const tabAtsScore = liveAtsReport?.score ?? null;
+
+  const controlTabs = [
+    { id: 'tailor' as const, label: 'Job details', icon: Briefcase },
+    { id: 'ats' as const, label: 'ATS score', icon: Gauge, badge: tabAtsScore != null ? String(tabAtsScore) : undefined },
+    { id: 'style' as const, label: 'Design', icon: Palette },
+  ];
+
+  const handleControlTabKeyDown = (e: React.KeyboardEvent, index: number) => {
+    let next: number | null = null;
+    if (e.key === 'ArrowRight') next = (index + 1) % controlTabs.length;
+    else if (e.key === 'ArrowLeft') next = (index - 1 + controlTabs.length) % controlTabs.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = controlTabs.length - 1;
+    if (next != null) {
+      e.preventDefault();
+      setActiveControlTab(controlTabs[next].id);
+      const buttons = controlPanelRef.current?.querySelectorAll('[role="tab"]');
+      (buttons?.[next] as HTMLElement | undefined)?.focus();
+    }
+  };
 
   const hiddenKeywordCount = React.useMemo(
     () => dismissedAts.filter(id => id.startsWith('kw:')).length,
@@ -913,6 +935,23 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     }));
   };
   const [isLetterLoading, setIsLetterLoading] = useState(false);
+  const [letterError, setLetterError] = useState<string | null>(null);
+
+  const extractApiErrorMessage = (err: any, fallback: string): string => {
+    const data = err?.response?.data;
+    const nested = data?.error;
+    if (typeof nested === 'string' && nested.trim()) return nested;
+    if (nested && typeof nested.message === 'string' && nested.message.trim()) return nested.message;
+    if (typeof data?.message === 'string' && data.message.trim()) return data.message;
+    if (typeof data?.detail === 'string' && data.detail.trim()) return data.detail;
+    if (typeof err?.message === 'string' && err.message.trim()) {
+      if (err?.code === 'ERR_NETWORK' || !err?.response) {
+        return 'Cannot reach the server. Check your connection and try again.';
+      }
+      return err.message;
+    }
+    return fallback;
+  };
 
   // Saving states
   const [isSaving, setIsSaving] = useState(false);
@@ -1884,10 +1923,13 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
 
   const handleGenerateLetter = async (targetCompany?: string, targetRole?: string) => {
     if (!jobDescription.trim()) {
-      setToast({ message: 'Please provide a job description first.', type: 'info' });
+      const msg = 'Please paste the job description first. It is required to tailor the cover letter.';
+      setLetterError(msg);
+      setToast({ message: msg, type: 'info' });
       return;
     }
     setIsLetterLoading(true);
+    setLetterError(null);
     try {
       const activeCvDetails = {
         personal_info: editablePersonalInfo,
@@ -1909,16 +1951,41 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
         selected_project_ids: selectedProjectIds,
         cv_details: activeCvDetails
       });
-      if (res.data && res.data.success) {
-        setLetterContent(normalizeLetterDate(res.data.content || res.data.data?.content || ''));
+      const payload = res?.data;
+      if (payload && payload.success) {
+        const content = payload.content || payload.data?.content || '';
+        if (!content || !String(content).trim()) {
+          const msg = 'The AI returned an empty cover letter. Please try again.';
+          setLetterError(msg);
+          setToast({ message: msg, type: 'error' });
+          return;
+        }
+        setLetterContent(normalizeLetterDate(content));
+        setLetterError(null);
+        setToast({ message: 'Cover letter generated successfully.', type: 'success' });
         // On mobile, bring the fresh letter into view immediately
         if (isMobileViewport && mobileActivePane === 'editor') {
           setMobileActivePane('preview');
         }
         setEditorTab('letter');
+      } else {
+        const msg = extractApiErrorMessage({ response: { data: payload } }, 'Cover letter generation failed. Please try again.');
+        setLetterError(msg);
+        setToast({ message: msg, type: 'error' });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Letter generation failed:', err);
+      const status = err?.response?.status;
+      let msg = extractApiErrorMessage(err, 'Cover letter generation failed. Please try again.');
+      if (status === 503) {
+        msg = msg || 'AI service is temporarily unavailable. Please try again in a moment.';
+      } else if (status === 400 && /api key|unauthorized|provider/i.test(msg)) {
+        msg = 'Missing or invalid AI API key. Add it in Settings → Preferences & AI Keys, then retry.';
+      } else if (!err?.response) {
+        msg = 'Cannot reach the server. Check your connection and try again.';
+      }
+      setLetterError(msg);
+      setToast({ message: msg, type: 'error' });
     } finally {
       setIsLetterLoading(false);
     }
@@ -1929,6 +1996,7 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
     if (!targetJd) return;
 
     setIsAtsChecking(true);
+    setAtsError(null);
     try {
       const activeCvPayload = {
         summary: editableSummary,
@@ -1970,8 +2038,11 @@ export const Editor: React.FC<EditorProps> = ({ initialJobParams }) => {
           }
         } : null);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to recheck ATS score:', err);
+      const msg = extractApiErrorMessage(err, 'Score check failed. Please try again.');
+      setAtsError(msg);
+      setToast({ message: msg, type: 'error' });
     } finally {
       setIsAtsChecking(false);
     }
@@ -2502,28 +2573,27 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               title="Click and drag to adjust control panel width"
             />
           )}
-          <div className={styles.controlPanelTabs}>
-            <button
-              type="button"
-              className={`${styles.controlTabBtn} ${activeControlTab === 'tailor' ? styles.activeControlTab : ''}`}
-              onClick={() => setActiveControlTab('tailor')}
-            >
-              AI Tailoring
-            </button>
-            <button
-              type="button"
-              className={`${styles.controlTabBtn} ${activeControlTab === 'ats' ? styles.activeControlTab : ''}`}
-              onClick={() => setActiveControlTab('ats')}
-            >
-              ATS Optimization
-            </button>
-            <button
-              type="button"
-              className={`${styles.controlTabBtn} ${activeControlTab === 'style' ? styles.activeControlTab : ''}`}
-              onClick={() => setActiveControlTab('style')}
-            >
-              Design & Layout
-            </button>
+          <div className={styles.controlPanelTabs} role="tablist" aria-label="Control panel sections">
+            {controlTabs.map((tab, index) => {
+              const Icon = tab.icon;
+              const isActive = activeControlTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  tabIndex={isActive ? 0 : -1}
+                  className={`${styles.controlTabBtn} ${isActive ? styles.activeControlTab : ''}`}
+                  onClick={() => setActiveControlTab(tab.id)}
+                  onKeyDown={(e) => handleControlTabKeyDown(e, index)}
+                >
+                  <Icon size={16} className={styles.controlTabIcon} aria-hidden="true" />
+                  <span>{tab.label}</span>
+                  {tab.badge && <span className={styles.controlTabBadge}>{tab.badge}</span>}
+                </button>
+              );
+            })}
           </div>
 
 
@@ -2565,6 +2635,8 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               setLetterLanguage={(v) => setLetterLanguage(v as any)}
               isLetterLoading={isLetterLoading}
               letterContent={letterContent}
+              letterError={letterError}
+              onClearLetterError={() => setLetterError(null)}
               onGenerateLetter={handleGenerateLetter}
             />
           )}
@@ -2585,6 +2657,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               onApplyBulletFix={handleApplyBulletFix}
               onExportReport={handleExportAtsReport}
               isRefreshing={isAtsChecking}
+              error={atsError}
               coverage={atsCoverage}
               recommendedKeywords={recommendedKeywords}
               weakBullets={weakBullets}
@@ -2621,9 +2694,9 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
               />
             ) : (
               // Cover Letter Design Options
-              <div className={`${styles.styleControlsForm} glass-card`}>
+              <div className={styles.styleControlsForm}>
                 <h3>Cover Letter Generator</h3>
-                <p style={{ fontSize: '11.5px', color: '#64748b', marginBottom: '12px', lineHeight: '1.4' }}>
+                <p style={{ fontSize: '11.5px', color: 'var(--muted)', marginBottom: '12px', lineHeight: '1.4' }}>
                   Generate a cover letter based on your active tailored/edited CV canvas content and job description.
                 </p>
 
@@ -2631,23 +2704,43 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   type="button"
                   onClick={() => handleGenerateLetter(company, position)}
                   isLoading={isLetterLoading}
-                  style={{
-                    width: '100%',
-                    marginBottom: '16px',
-                    background: 'var(--primary, #4f46e5)',
-                    color: '#ffffff',
-                    fontWeight: 700,
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px'
-                  }}
+                  style={{ width: '100%', marginBottom: '16px' }}
                 >
                   <Sparkles size={16} />
                   <span>{letterContent ? 'Regenerate Cover Letter' : 'Generate Cover Letter from Tailored CV'}</span>
                 </Button>
+
+                {letterError && (
+                  <div
+                    role="alert"
+                    style={{
+                      display: 'flex',
+                      gap: '8px',
+                      alignItems: 'flex-start',
+                      background: 'color-mix(in srgb, var(--danger) 8%, transparent)',
+                      border: '1px solid color-mix(in srgb, var(--danger) 32%, transparent)',
+                      borderRadius: '10px',
+                      padding: '10px 12px',
+                      fontSize: '12.5px',
+                      lineHeight: 1.5,
+                      marginBottom: '16px'
+                    }}
+                  >
+                    <ShieldAlert size={16} style={{ flexShrink: 0, marginTop: '2px', color: 'var(--danger)' }} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <strong style={{ display: 'block', marginBottom: '2px' }}>Cover letter could not be generated</strong>
+                      <span>{letterError}</span>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                        <Button variant="secondary" onClick={() => handleGenerateLetter(company, position)} isLoading={isLetterLoading}>
+                          Try again
+                        </Button>
+                        <Button variant="ghost" onClick={() => setLetterError(null)}>
+                          Dismiss
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <h3>Cover Letter Style</h3>
 
@@ -2702,19 +2795,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                       id="coverLetterFontFamily"
                       value={letterStyles.fontFamily || ''}
                       onChange={(e) => setLetterStyles(s => ({ ...s, fontFamily: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--card-border, #cbd5e1)',
-                        background: '#ffffff',
-                        fontSize: '12.5px',
-                        color: '#1e293b',
-                        outline: 'none',
-                        cursor: 'pointer',
-                        boxSizing: 'border-box',
-                        height: '35px'
-                      }}
+                      className={styles.letterSelect}
                     >
                       <option value="">Template Default</option>
                       <option value="'Aptos', 'Calibri', sans-serif">Aptos</option>
@@ -2728,9 +2809,9 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                   </div>
                 </div>
 
-                <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '16px', paddingTop: '16px' }}>
+                <div style={{ borderTop: '1px solid var(--card-border)', marginTop: '16px', paddingTop: '16px' }}>
                   <h3 style={{ fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                    ✍️ Signature Settings
+                    Signature Settings
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
@@ -2743,7 +2824,7 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                     </label>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>Signature Image:</span>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--muted)' }}>Signature Image:</span>
                       {editablePersonalInfo.signature_image ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           <div
@@ -2754,9 +2835,9 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                               justifyContent: 'center',
                               padding: '16px',
                               borderRadius: '8px',
-                              border: '1px solid #cbd5e1',
-                              backgroundColor: '#ffffff',
-                              backgroundImage: 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px), radial-gradient(#e2e8f0 1.5px, transparent 1.5px)',
+                              border: '1px solid var(--card-border)',
+                              backgroundColor: 'var(--card-bg)',
+                              backgroundImage: 'radial-gradient(color-mix(in srgb, var(--muted) 25%, transparent) 1.5px, transparent 1.5px), radial-gradient(color-mix(in srgb, var(--muted) 25%, transparent) 1.5px, transparent 1.5px)',
                               backgroundSize: '12px 12px',
                               backgroundPosition: '0 0, 6px 6px',
                               minHeight: '60px',
@@ -2799,18 +2880,18 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                               padding: '8px',
                               fontSize: '11px',
                               fontWeight: 600,
-                              color: '#ef4444',
-                              backgroundColor: '#fef2f2',
-                              border: '1px solid #fee2e2',
+                              color: 'var(--danger)',
+                              backgroundColor: 'color-mix(in srgb, var(--danger) 8%, transparent)',
+                              border: '1px solid color-mix(in srgb, var(--danger) 30%, transparent)',
                               borderRadius: '6px',
                               cursor: 'pointer',
                               transition: 'all 0.2s'
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#fee2e2';
+                              e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--danger) 15%, transparent)';
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#fef2f2';
+                              e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--danger) 8%, transparent)';
                             }}
                           >
                             <X size={12} />
@@ -2873,7 +2954,17 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                             }}
                           />
                           <div
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Upload signature image"
+                            className={styles.dropzone}
                             onClick={() => document.getElementById('sigUploadInputSidebar')?.click()}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                document.getElementById('sigUploadInputSidebar')?.click();
+                              }
+                            }}
                             onDragOver={(e) => {
                               e.preventDefault();
                               setIsSigDragOver(true);
@@ -2937,30 +3028,30 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                               justifyContent: 'center',
                               padding: '16px',
                               borderRadius: '8px',
-                              border: isSigDragOver ? '1.5px dashed #6366f1' : '1.5px dashed #cbd5e1',
-                              backgroundColor: isSigDragOver ? '#e0e7ff33' : '#f8fafc',
+                              border: isSigDragOver ? '1.5px dashed var(--primary)' : '1.5px dashed var(--card-border)',
+                              backgroundColor: isSigDragOver ? 'color-mix(in srgb, var(--primary) 12%, transparent)' : 'var(--background)',
                               cursor: 'pointer',
                               transition: 'all 0.2s',
                               textAlign: 'center'
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.borderColor = '#6366f1';
-                              e.currentTarget.style.backgroundColor = '#e0e7ff33';
+                              e.currentTarget.style.borderColor = 'var(--primary)';
+                              e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--primary) 12%, transparent)';
                             }}
                             onMouseLeave={(e) => {
                               if (!isSigDragOver) {
-                                e.currentTarget.style.borderColor = '#cbd5e1';
-                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                                e.currentTarget.style.borderColor = 'var(--card-border)';
+                                e.currentTarget.style.backgroundColor = 'var(--background)';
                               }
                             }}
                           >
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '6px' }}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '6px' }}>
                               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                               <polyline points="17 8 12 3 7 8" />
                               <line x1="12" y1="3" x2="12" y2="15" />
                             </svg>
-                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#4f46e5' }}>Upload Signature</span>
-                            <span style={{ fontSize: '9px', color: '#64748b', marginTop: '2px' }}>Drag image or click here. Transparent output.</span>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--foreground)' }}>Upload Signature</span>
+                            <span style={{ fontSize: '9px', color: 'var(--muted)', marginTop: '2px' }}>Drag image or click here. Transparent output.</span>
                           </div>
                         </div>
                       )}
@@ -3607,18 +3698,49 @@ ${editableSkills.map(s => `* ${s.name} (${s.category})`).join('\n')}
                             }}
                           >
                             <Mail size={30} className={styles.sideEmptyStateIcon} />
-                            <p style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b' }}>No cover letter yet</p>
-                            <p style={{ fontSize: '0.82rem', maxWidth: '340px', color: '#64748b' }}>
-                              Generate a tailored cover letter from your CV and the job description.
+                            <p style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b' }}>
+                              {letterError ? 'Cover letter generation failed' : 'No cover letter yet'}
                             </p>
-                            {!jobDescription.trim() && (
+                            <p style={{ fontSize: '0.82rem', maxWidth: '340px', color: '#64748b' }}>
+                              {letterError ? letterError : 'Generate a tailored cover letter from your CV and the job description.'}
+                            </p>
+                            {!letterError && !jobDescription.trim() && (
                               <p style={{ fontSize: '0.78rem', maxWidth: '340px', opacity: 0.75, color: '#64748b' }}>
                                 Tip: paste the job description in the AI Tailoring tab first.
                               </p>
                             )}
-                            <Button onClick={() => handleGenerateLetter()} isLoading={isLetterLoading}>
-                              <Sparkles size={15} /> Generate Cover Letter
-                            </Button>
+                            {letterError && (
+                              <div
+                                role="alert"
+                                style={{
+                                  display: 'flex',
+                                  gap: '8px',
+                                  alignItems: 'flex-start',
+                                  maxWidth: '360px',
+                                  background: 'rgba(239, 68, 68, 0.08)',
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                  color: '#b91c1c',
+                                  fontSize: '0.78rem',
+                                  lineHeight: 1.5,
+                                  padding: '10px 12px',
+                                  borderRadius: '8px',
+                                  textAlign: 'left'
+                                }}
+                              >
+                                <ShieldAlert size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                <span>{letterError}</span>
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                              <Button onClick={() => handleGenerateLetter()} isLoading={isLetterLoading}>
+                                <Sparkles size={15} /> {letterError ? 'Retry Generation' : 'Generate Cover Letter'}
+                              </Button>
+                              {letterError && (
+                                <Button variant="ghost" onClick={() => setLetterError(null)}>
+                                  Dismiss
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         ) : (() => {
                           const letter = getParsedLetter(letterContent, editablePersonalInfo);

@@ -57,12 +57,11 @@
 .resizerHandleActive::after {
   background: var(--primary, #6366f1);
   height: 56px;
-  box-shadow: 0 0 10px rgba(99, 102, 241, 0.6);
 }
 
 .resizerHandle:hover,
 .resizerHandleActive {
-  background: rgba(99, 102, 241, 0.08);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
 }
 
 .formGrid,
@@ -85,23 +84,34 @@
 
 .controlPanelTabs {
   display: flex;
-  background: var(--muted-light);
-  padding: 4px;
-  border-radius: var(--radius-md);
-  gap: 2px;
+  gap: 4px;
+  border-bottom: 1px solid var(--card-border);
   margin-bottom: 1.25rem;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--background);
 }
 
 .controlTabBtn {
-  flex: 1;
-  padding: 0.6rem 0.5rem;
-  font-size: 11px;
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 8px 12px;
+  font-size: 13px;
   font-family: var(--font-headers);
   font-weight: 600;
-  border-radius: var(--radius-sm);
   color: var(--muted);
-  transition: all var(--transition-fast);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
   text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 .controlTabBtn:hover {
@@ -109,9 +119,51 @@
 }
 
 .controlTabBtn.activeControlTab {
-  background: var(--card-bg);
-  color: var(--primary);
-  box-shadow: var(--shadow-sm);
+  background: none;
+  color: var(--primary-hover);
+  border-bottom-color: var(--primary);
+  box-shadow: none;
+}
+
+.controlTabBtn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.controlTabIcon {
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .controlTabBtn.activeControlTab,
+[data-theme="dark"] .controlTabBadge {
+  color: #A5B4FC;
+}
+
+.controlTabBadge {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary-hover);
+  border-radius: 999px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .controlPanelTabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .controlPanelTabs::-webkit-scrollbar {
+    display: none;
+  }
+  .controlTabBtn {
+    flex: 1 0 auto;
+    font-size: 12.5px;
+    gap: 6px;
+  }
 }
 
 .form {
@@ -124,14 +176,33 @@
 
 .form h3,
 .styleControlsForm h3 {
-  font-size: var(--text-sm);
+  font-size: 13px;
   font-weight: 700;
   color: var(--foreground);
   margin-bottom: var(--space-1);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-left: 3px solid var(--primary);
-  padding-left: 8px;
+}
+
+.letterSelect {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  font-size: 12.5px;
+  color: var(--foreground);
+  cursor: pointer;
+  box-sizing: border-box;
+  min-height: 44px;
+}
+
+.letterSelect:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.dropzone:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .selectGroup {
@@ -161,6 +232,11 @@
 
 .selectGroup select:focus {
   border-color: var(--primary);
+}
+
+.selectGroup select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .tailorBtn {
@@ -204,7 +280,6 @@
   font-family: var(--font-headers);
   font-weight: 800;
   font-size: 13px;
-  box-shadow: 0 0 10px rgba(99, 102, 241, 0.1);
 }
 
 .keywordsBlock h4,
@@ -288,7 +363,11 @@
   height: 5px;
   background: var(--muted-light);
   border-radius: var(--radius-sm);
-  outline: none;
+}
+
+.sliderGroup input[type="range"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 6px;
 }
 
 .sliderGroup input[type="range"]::-webkit-slider-thumb {
@@ -303,43 +382,6 @@
 
 .sliderGroup input[type="range"]::-webkit-slider-thumb:hover {
   transform: scale(1.2);
-}
-
-.colorPickers {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
-}
-
-.colorPickerGroup {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.colorPickerGroup label {
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.colorPickerGroup input[type="color"] {
-  -webkit-appearance: none;
-  border: 1px solid var(--card-border);
-  width: 100%;
-  height: 32px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  background: transparent;
-  padding: 0;
-}
-
-.colorPickerGroup input[type="color"]::-webkit-color-swatch-wrapper {
-  padding: 2px;
-}
-
-.colorPickerGroup input[type="color"]::-webkit-color-swatch {
-  border: none;
-  border-radius: 6px;
 }
 
 .sectionsList {
@@ -366,18 +408,16 @@
 
 .sectionCardItem:hover {
   border-color: var(--primary, #6366f1);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08);
   transform: translateY(-1px);
 }
 
 .sectionCardHeaderItem {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(99, 102, 241, 0.04) 100%);
-  border-color: rgba(99, 102, 241, 0.25);
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 25%, transparent);
 }
 
 .sectionCardHeaderItem:hover {
   border-color: var(--primary, #4f46e5);
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.12);
 }
 
 .sectionCardDisabled {
@@ -808,7 +848,6 @@
   border-radius: var(--radius-lg, 12px);
   padding: 16px;
   margin-bottom: 20px;
-  backdrop-filter: blur(10px);
   box-shadow: var(--shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.04));
 }
 
@@ -860,13 +899,18 @@
 .presetTile:hover {
   border-color: var(--primary, #6366f1);
   transform: translateY(-2px);
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.15);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.presetTile:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .presetTileActive {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(99, 102, 241, 0.06) 100%);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
   border-color: var(--primary, #6366f1);
-  box-shadow: 0 0 0 1px var(--primary, #6366f1), 0 4px 14px rgba(99, 102, 241, 0.18);
+  box-shadow: 0 0 0 1px var(--primary, #6366f1);
 }
 
 .presetTileTop {
@@ -886,9 +930,46 @@
   color: var(--primary, #6366f1);
 }
 
+.colorPickers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.colorPickerGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.colorPickerGroup label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.colorPickerGroup input[type="color"] {
+  -webkit-appearance: none;
+  border: 1px solid var(--card-border);
+  width: 100%;
+  height: 32px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  background: transparent;
+  padding: 0;
+}
+
+.colorPickerGroup input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.colorPickerGroup input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 6px;
+}
+
 .presetCheck {
   color: var(--primary, #6366f1);
-  background: rgba(99, 102, 241, 0.15);
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
   border-radius: 50%;
   padding: 2px;
   display: flex;
@@ -3286,7 +3367,12 @@
 
 .subTabBtn:hover {
   color: var(--foreground, #0f172a);
-  background: rgba(255, 255, 255, 0.5);
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+.subTabBtn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .subTabBtn.activeSubTab {
@@ -3724,16 +3810,19 @@
     box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
     border-color: var(--card-border, #e2e8f0);
   }
+
   15% {
     box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.35), 0 6px 20px rgba(99, 102, 241, 0.18);
     border-color: #6366f1;
     background-color: rgba(99, 102, 241, 0.06);
   }
+
   50% {
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2), 0 4px 12px rgba(99, 102, 241, 0.12);
     border-color: #818cf8;
     background-color: rgba(99, 102, 241, 0.03);
   }
+
   100% {
     box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
     border-color: rgba(99, 102, 241, 0.4);
@@ -5072,6 +5161,7 @@
     opacity: 0;
     transform: translateY(-4px) scale(0.98);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -5238,12 +5328,20 @@
   }
 }
 
+@media (max-width: 768px) {
+
+  /* Two-column sliders crowd tablet widths, so they stack earlier than
+     the rest of the twin grids. */
+  .slidersTwinGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 480px) {
 
   /* Stack twin-column grids inside the control panel */
   .formGrid,
   .keywordsTwinGrid,
-  .slidersTwinGrid,
   .sideTwinGrid {
     grid-template-columns: 1fr;
   }
@@ -5266,21 +5364,23 @@
     text-overflow: ellipsis;
   }
 
-  /* Sub-tab labels fit narrow screens */
+  /* Sub-tabs keep a full 44px touch height on narrow screens */
   .subTabBtn {
     padding: 7px 4px;
-    font-size: 10.5px;
+    min-height: 44px;
+    font-size: 12px;
     gap: 4px;
   }
 
-  /* Bigger slider thumbs for touch */
+  /* Full-height slider hit area plus a larger thumb for touch */
   .sliderGroup input[type="range"] {
     height: 6px;
+    min-height: 44px;
   }
 
   .sliderGroup input[type="range"]::-webkit-slider-thumb {
-    width: 18px;
-    height: 18px;
+    width: 24px;
+    height: 24px;
   }
 
   /* Section cards: info row on top, action cluster aligned underneath */

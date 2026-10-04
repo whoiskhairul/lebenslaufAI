@@ -5,11 +5,11 @@ import { InputField } from '../components/InputField';
 import inputStyles from '../components/InputField.module.css';
 import api from '../services/api';
 import { SettingsSkeleton } from '../components/skeleton/SettingsSkeleton';
-import { User as UserIcon, Shield, Key, Moon, Sun, Eye, EyeOff, Sparkles, CheckCircle2, AlertTriangle, LogOut, Laptop, Check, Trash2 } from 'lucide-react';
+import { User as UserIcon, Shield, Key, Eye, EyeOff, Sparkles, CheckCircle2, AlertTriangle, LogOut, Laptop, Check, Trash2, Palette } from 'lucide-react';
 import styles from './Settings.module.css';
 
 export const Settings: React.FC = () => {
-  const { user, setUser, theme, setTheme } = useAuthStore();
+  const { user, setUser, theme } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'preferences'>('profile');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -411,22 +411,16 @@ export const Settings: React.FC = () => {
           {/* TAB 3: PREFERENCES & AI KEYS */}
           {activeTab === 'preferences' && (
             <div className={styles.prefStack}>
-              {/* Appearance Preference */}
+              {/* Appearance lives on the navbar now */}
               <div className={`${styles.card} glass-card`}>
                 <div className={styles.sectionHeader}>
-                  <Moon size={22} className={styles.headerIcon} />
+                  <Palette size={22} className={styles.headerIcon} />
                   <div>
-                    <h3>Appearance Preference</h3>
-                    <p className={styles.sectionDesc}>Toggle between dark mode and light mode themes.</p>
+                    <h3>Appearance</h3>
+                    <p className={styles.sectionDesc}>
+                      The theme switch now lives on the navbar — use the Sun/Moon toggle in the sidebar footer (desktop) or the top bar (mobile). Current theme: <strong style={{ textTransform: 'capitalize' }}>{theme} mode</strong>.
+                    </p>
                   </div>
-                </div>
-
-                <div className={styles.themeToggleRow}>
-                  <span>Current Interface Theme: <strong style={{ textTransform: 'capitalize' }}>{theme} Mode</strong></span>
-                  <Button variant="secondary" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-                    {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-                    <span>Switch to {theme === 'dark' ? 'Light' : 'Dark'} Mode</span>
-                  </Button>
                 </div>
               </div>
 

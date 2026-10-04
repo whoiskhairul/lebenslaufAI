@@ -1,10 +1,10 @@
 import React from 'react';
-import { Wand2, Sparkles, ShieldAlert } from 'lucide-react';
+import { Wand2, Sparkles, ShieldAlert, AlertTriangle, RotateCcw, X } from 'lucide-react';
 import { Button } from '../../../components/Button';
 import { InputField } from '../../../components/InputField';
 import { CompanyAutocomplete } from '../../../components/CompanyAutocomplete';
-import { CompanyLogo } from '../../../components/CompanyLogo';
 import ed from '../../../views/editorStyles';
+import panel from './TailorPanel.module.css';
 import { getParsedLetter } from '../utils/parsedLetter';
 
 const styles = ed;
@@ -46,22 +46,47 @@ interface TailorPanelProps {
   setLetterLanguage: (v: string) => void;
   isLetterLoading: boolean;
   letterContent: string;
+  letterError?: string | null;
+  onClearLetterError?: () => void;
   onGenerateLetter: (company: string, position: string) => void;
 }
 
+const LetterErrorBanner: React.FC<{ message: string; onRetry: () => void; onDismiss?: () => void }> = ({
+  message,
+  onRetry,
+  onDismiss,
+}) => (
+  <div className={panel.errorBanner} role="alert" aria-live="assertive">
+    <AlertTriangle size={16} className={panel.errorIcon} />
+    <div style={{ minWidth: 0, flex: 1 }}>
+      <strong>Cover letter could not be generated</strong>
+      <span>{message}</span>
+      <div className={panel.errorActions}>
+        <button type="button" className={panel.retryBtn} onClick={onRetry}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <RotateCcw size={13} /> Try again
+          </span>
+        </button>
+        {onDismiss && (
+          <button type="button" className={panel.dismissBtn} onClick={onDismiss}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <X size={13} /> Dismiss
+            </span>
+          </button>
+        )}
+      </div>
+    </div>
+  </div>
+);
+
 export const TailorPanel: React.FC<TailorPanelProps> = (p) => (
-  p.editorTabIsResume ? (
+  <div className={panel.panel}>
+  {p.editorTabIsResume ? (
     // CV Tailoring UI
     <>
-      <form onSubmit={p.onTailor} className={`${styles.form} glass-card`}>
-        <h3>Job Listing Details</h3>
-        {/* <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-          <CompanyLogo company={p.company} domain={p.companyDomain} size={36} />
-          <div style={{ fontSize: 12, color: 'var(--muted, #64748b)' }}>
-            {p.companyDomain ? p.companyDomain : 'Type to search — pick a suggestion to capture its domain & logo.'}
-          </div>
-        </div> */}
-        <div className={styles.formGrid}>
+      <form onSubmit={p.onTailor} className={`${styles.form} ${panel.card}`}>
+        <h3 className={panel.title}>Job Listing Details</h3>
+        <div className={panel.grid2}>
           <CompanyAutocomplete
             id="editorCompany"
             label="Company Name"
@@ -97,136 +122,95 @@ export const TailorPanel: React.FC<TailorPanelProps> = (p) => (
           </select>
 
           {/* 1. Language & ATS Strategy Options */}
-          <div className={styles.selectGroup} style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main, #1e293b)', marginBottom: '6px', display: 'block' }}>
+          <div className={panel.fieldGroup} style={{ marginTop: '12px' }}>
+            <label className={panel.fieldLabel}>
               Target Output Language
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+            <div className={panel.optionGrid}>
               <button
                 type="button"
                 onClick={() => p.setTargetLanguage('en')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: p.targetLanguage === 'en' ? '2px solid #6366f1' : '1px solid #cbd5e1',
-                  background: p.targetLanguage === 'en' ? 'rgba(99, 102, 241, 0.1)' : '#ffffff',
-                  fontWeight: p.targetLanguage === 'en' ? 700 : 500,
-                  color: p.targetLanguage === 'en' ? '#4f46e5' : '#475569',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  transition: 'all 0.15s ease'
-                }}
+                aria-pressed={p.targetLanguage === 'en'}
+                className={`${panel.optionBtn} ${p.targetLanguage === 'en' ? panel.optionBtnActive : ''}`}
               >
-                <span>🇬🇧 English</span>
+                <span>English</span>
               </button>
               <button
                 type="button"
                 onClick={() => p.setTargetLanguage('de')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: p.targetLanguage === 'de' ? '2px solid #6366f1' : '1px solid #cbd5e1',
-                  background: p.targetLanguage === 'de' ? 'rgba(99, 102, 241, 0.1)' : '#ffffff',
-                  fontWeight: p.targetLanguage === 'de' ? 700 : 500,
-                  color: p.targetLanguage === 'de' ? '#4f46e5' : '#475569',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  transition: 'all 0.15s ease'
-                }}
+                aria-pressed={p.targetLanguage === 'de'}
+                className={`${panel.optionBtn} ${p.targetLanguage === 'de' ? panel.optionBtnActive : ''}`}
               >
-                <span>🇩🇪 Deutsch</span>
+                <span>Deutsch</span>
               </button>
             </div>
 
-            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main, #1e293b)', marginBottom: '6px', display: 'block' }}>
+            <label className={panel.fieldLabel}>
               ATS Keyword Strategy
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div className={panel.optionGrid}>
               <button
                 type="button"
                 onClick={() => p.setAggressiveMode(false)}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '2px',
-                  padding: '8px 10px',
-                  borderRadius: '8px',
-                  border: !p.aggressiveMode ? '2px solid #6366f1' : '1px solid #cbd5e1',
-                  background: !p.aggressiveMode ? 'rgba(99, 102, 241, 0.08)' : '#ffffff',
-                  color: !p.aggressiveMode ? '#4f46e5' : '#475569',
-                  cursor: 'pointer',
-                  textAlign: 'center'
-                }}
+                aria-pressed={!p.aggressiveMode}
+                className={`${panel.optionBtn} ${panel.optionBtnStack} ${!p.aggressiveMode ? panel.optionBtnActive : ''}`}
               >
-                <span style={{ fontWeight: 700, fontSize: '12px' }}>🛡️ Standard</span>
-                <span style={{ fontSize: '10px', opacity: 0.8 }}>Strict Profile Match</span>
+                <span style={{ fontWeight: 700, fontSize: '12px' }}>Standard</span>
+                <span className={panel.optionSub}>Strict Profile Match</span>
               </button>
               <button
                 type="button"
                 onClick={() => p.setAggressiveMode(true)}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '2px',
-                  padding: '8px 10px',
-                  borderRadius: '8px',
-                  border: p.aggressiveMode ? '2px solid #6366f1' : '1px solid #cbd5e1',
-                  background: p.aggressiveMode ? 'rgba(99, 102, 241, 0.12)' : '#ffffff',
-                  color: p.aggressiveMode ? '#6d28d9' : '#475569',
-                  cursor: 'pointer',
-                  textAlign: 'center'
-                }}
+                aria-pressed={p.aggressiveMode}
+                className={`${panel.optionBtn} ${panel.optionBtnStack} ${p.aggressiveMode ? panel.optionBtnActive : ''}`}
               >
-                <span style={{ fontWeight: 700, fontSize: '12px' }}>⚡ Aggressive</span>
-                <span style={{ fontSize: '10px', opacity: 0.85 }}>High ATS Optimization</span>
+                <span style={{ fontWeight: 700, fontSize: '12px' }}>Aggressive</span>
+                <span className={panel.optionSub}>High ATS Optimization</span>
               </button>
             </div>
           </div>
         </div>
 
         {/* 2. Selective Projects List in Side Panel */}
-        <div style={{ marginBottom: '16px', background: 'rgba(248, 250, 252, 0.8)', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px' }}>
+        <div className={panel.projectsCard}>
           <div
             onClick={() => p.setIsProjectsCollapsed(!p.isProjectsCollapsed)}
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
+            className={panel.projectsHeader}
+            role="button"
+            tabIndex={0}
+            aria-expanded={!p.isProjectsCollapsed}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                p.setIsProjectsCollapsed(!p.isProjectsCollapsed);
+              }
+            }}
           >
-            <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div className={panel.projectsTitle}>
               <span>Include Projects ({p.masterProjects.length > 0 ? `${p.selectedProjectIds.length} of ${p.masterProjects.length} selected` : 'None added in profile'})</span>
             </div>
-            <span style={{ fontSize: '11px', color: '#6366f1', fontWeight: 600 }}>
+            <button
+              type="button"
+              tabIndex={-1}
+              className={panel.projectsToggle}
+              onClick={(e) => {
+                e.stopPropagation();
+                p.setIsProjectsCollapsed(!p.isProjectsCollapsed);
+              }}
+            >
               {p.isProjectsCollapsed ? 'Expand ▼' : 'Collapse ▲'}
-            </span>
+            </button>
           </div>
 
           {!p.isProjectsCollapsed && (
-            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
+            <div className={panel.projectsList}>
               {p.masterProjects.length > 0 ? (
                 p.masterProjects.map(proj => {
                   const isChecked = p.selectedProjectIds.includes(proj.id);
                   return (
                     <label
                       key={proj.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '6px 8px',
-                        borderRadius: '6px',
-                        background: isChecked ? '#ffffff' : 'transparent',
-                        border: isChecked ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent',
-                        cursor: 'pointer',
-                        fontSize: '12px'
-                      }}
+                      className={`${panel.projectRow} ${isChecked ? panel.projectRowChecked : ''}`}
                     >
                       <input
                         type="checkbox"
@@ -238,17 +222,17 @@ export const TailorPanel: React.FC<TailorPanelProps> = (p) => (
                             p.setSelectedProjectIds(prev => prev.filter(id => id !== proj.id));
                           }
                         }}
-                        style={{ accentColor: '#6366f1' }}
+                        style={{ accentColor: 'var(--primary)' }}
                       />
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        <strong style={{ color: '#1e293b', display: 'block', lineHeight: '1.2' }}>{proj.title}</strong>
-                        {proj.role && <span style={{ fontSize: '10.5px', color: '#64748b' }}>{proj.role}</span>}
+                      <div className={panel.projectMeta}>
+                        <strong style={{ display: 'block', lineHeight: '1.2' }}>{proj.title}</strong>
+                        {proj.role && <span className={panel.projectRole}>{proj.role}</span>}
                       </div>
                     </label>
                   );
                 })
               ) : (
-                <div style={{ fontSize: '11.5px', color: '#94a3b8', padding: '6px 4px', fontStyle: 'italic' }}>
+                <div className={panel.projectsEmpty}>
                   No projects found in Master Profile. Add projects in your profile settings to filter them here.
                 </div>
               )}
@@ -259,41 +243,30 @@ export const TailorPanel: React.FC<TailorPanelProps> = (p) => (
         {/* 3. Missing Profile Details Diagnostic Widget in Side Panel */}
         {(() => {
           const infoToCheck = p.currentVersion ? p.editablePersonalInfo : (p.masterProfileInfo || {});
-          const missing: { field: string; label: string; icon: string }[] = [];
-          if (!infoToCheck.linkedin) missing.push({ field: 'linkedin', label: 'LinkedIn Profile URL', icon: '🔗' });
-          if (!infoToCheck.github) missing.push({ field: 'github', label: 'GitHub Profile URL', icon: '💻' });
-          if (!infoToCheck.phone) missing.push({ field: 'phone', label: 'Phone Number', icon: '📞' });
-          if (!infoToCheck.location) missing.push({ field: 'location', label: 'Location / City', icon: '📍' });
-          if (!infoToCheck.email) missing.push({ field: 'email', label: 'Email Address', icon: '✉️' });
+          const missing: { field: string; label: string }[] = [];
+          if (!infoToCheck.linkedin) missing.push({ field: 'linkedin', label: 'LinkedIn Profile URL' });
+          if (!infoToCheck.github) missing.push({ field: 'github', label: 'GitHub Profile URL' });
+          if (!infoToCheck.phone) missing.push({ field: 'phone', label: 'Phone Number' });
+          if (!infoToCheck.location) missing.push({ field: 'location', label: 'Location / City' });
+          if (!infoToCheck.email) missing.push({ field: 'email', label: 'Email Address' });
 
           if (missing.length === 0) return null;
 
           return (
-            <div style={{ marginBottom: '16px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '8px', padding: '12px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: '#d48806', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+            <div className={panel.missingCard}>
+              <div className={panel.missingTitle}>
                 <ShieldAlert size={14} />
                 <span>Missing Profile Details ({missing.length})</span>
               </div>
-              <p style={{ fontSize: '11px', color: '#8c6b00', marginBottom: '8px', lineHeight: '1.4' }}>
+              <p className={panel.missingText}>
                 {p.currentVersion
                   ? "The following optional details are missing from your active canvas and won't appear on your CV:"
                   : "The following optional details are missing from your Master Profile:"}
               </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              <div className={panel.missingChips}>
                 {missing.map((item, idx) => (
-                  <span
-                    key={idx}
-                    style={{
-                      fontSize: '10.5px',
-                      background: '#fff',
-                      border: '1px solid #ffe58f',
-                      padding: '3px 8px',
-                      borderRadius: '12px',
-                      color: '#ad6800',
-                      fontWeight: 500
-                    }}
-                  >
-                    {item.icon} {item.label}
+                  <span key={idx} className={panel.missingChip}>
+                    {item.label}
                   </span>
                 ))}
               </div>
@@ -301,38 +274,36 @@ export const TailorPanel: React.FC<TailorPanelProps> = (p) => (
           );
         })()}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+        <div className={panel.checkRow}>
           <input
             type="checkbox"
             id="saveAutomatically"
             checked={p.saveAutomatically}
             onChange={(e) => p.setSaveAutomatically(e.target.checked)}
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
           />
-          <label htmlFor="saveAutomatically" style={{ fontSize: '13px', fontWeight: 500, cursor: 'pointer', color: 'var(--text-main, #1e293b)' }}>
+          <label htmlFor="saveAutomatically" className={panel.checkLabel}>
             Save tailored copy automatically
           </label>
         </div>
 
-        <Button type="submit" isLoading={p.isLoading} className={styles.tailorBtn}>
+        <Button type="submit" isLoading={p.isLoading} className={`${styles.tailorBtn} ${panel.fullWidthBtn}`}>
           <Wand2 size={16} />
           <span>Analyze & Tailor</span>
         </Button>
       </form>
 
       {p.currentVersion && (
-        <div className={styles.trackingSection} style={{ marginTop: '16px', padding: '12px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.2)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main, #1e293b)' }}>
-              {p.applicationTracked ? '✓ Tracking this Application' : 'Track this job application?'}
-            </div>
+        <div className={`${panel.card} ${panel.trackingCard}`}>
+          <div className={panel.trackingTitle}>
+            {p.applicationTracked ? '✓ Tracking this Application' : 'Track this job application?'}
           </div>
           {!p.applicationTracked ? (
-            <Button onClick={p.onTrackApplication} isLoading={p.isTrackingLoading} style={{ width: '100%' }}>
+            <Button onClick={p.onTrackApplication} isLoading={p.isTrackingLoading} className={panel.fullWidthBtn}>
               Add to Application Tracking
             </Button>
           ) : (
-            <div style={{ fontSize: '12px', color: '#475569' }}>
+            <div className={panel.trackingHint}>
               This CV is linked to an active job tracking card.
             </div>
           )}
@@ -347,16 +318,10 @@ export const TailorPanel: React.FC<TailorPanelProps> = (p) => (
           e.preventDefault();
           p.onGenerateLetter(p.company, p.position);
         }}
-        className={`${styles.form} glass-card`}
+        className={`${styles.form} ${panel.card}`}
       >
-        <h3>Cover Letter Tailoring</h3>
-        {/* <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-          <CompanyLogo company={p.company} domain={p.companyDomain} size={36} />
-          <div style={{ fontSize: 12, color: 'var(--muted, #64748b)' }}>
-            {p.companyDomain ? p.companyDomain : 'Type to search — pick a suggestion to capture its domain & logo.'}
-          </div>
-        </div> */}
-        <div className={styles.formGrid}>
+        <h3 className={panel.title}>Cover Letter Tailoring</h3>
+        <div className={panel.grid2}>
           <CompanyAutocomplete
             id="letterCompany"
             label="Company Name"
@@ -384,23 +349,22 @@ export const TailorPanel: React.FC<TailorPanelProps> = (p) => (
           required
         />
 
-        <div className={styles.formGrid} style={{ marginBottom: '16px' }}>
+        {p.letterError && (
+          <LetterErrorBanner
+            message={p.letterError}
+            onRetry={() => p.onGenerateLetter(p.company, p.position)}
+            onDismiss={p.onClearLetterError}
+          />
+        )}
+
+        <div className={panel.grid2}>
           <div className={styles.selectGroup}>
             <label htmlFor="letterTone">Writing Tone</label>
             <select
               id="letterTone"
               value={p.letterTone}
               onChange={(e) => p.setLetterTone(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                border: '1px solid var(--card-border, #cbd5e1)',
-                background: 'white',
-                fontSize: '13px',
-                outline: 'none',
-                color: 'var(--text-main, #1e293b)'
-              }}
+              className={panel.select}
             >
               <option value="professional">Professional & Direct (Recommended)</option>
               <option value="enthusiastic">Enthusiastic & Passionate</option>
@@ -416,16 +380,7 @@ export const TailorPanel: React.FC<TailorPanelProps> = (p) => (
               id="letterLanguageSelect"
               value={p.letterLanguage}
               onChange={(e) => p.setLetterLanguage(e.target.value as any)}
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                border: '1px solid var(--card-border, #cbd5e1)',
-                background: 'white',
-                fontSize: '13px',
-                outline: 'none',
-                color: 'var(--text-main, #1e293b)'
-              }}
+              className={panel.select}
             >
               <option value="auto">Auto (Match Resume Language)</option>
               <option value="en">English</option>
@@ -434,15 +389,15 @@ export const TailorPanel: React.FC<TailorPanelProps> = (p) => (
           </div>
         </div>
 
-        <Button type="submit" isLoading={p.isLetterLoading} className={styles.tailorBtn}>
+        <Button type="submit" isLoading={p.isLetterLoading} className={`${styles.tailorBtn} ${panel.fullWidthBtn}`}>
           <Sparkles size={16} />
           <span>Generate & Tailor Cover Letter</span>
         </Button>
       </form>
 
-      <div className={`${styles.atsCard} glass-card`}>
-        <h3>Cover Letter Guidelines</h3>
-        <div style={{ fontSize: '13px', lineHeight: '1.6', color: 'var(--muted, #64748b)', display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+      <div className={`${styles.atsCard} ${panel.card}`}>
+        <h3 className={panel.title}>Cover Letter Guidelines</h3>
+        <div className={panel.guidelines}>
           <p>
             <strong>1. Premium Structure:</strong> A cover letter should be kept to a single, impactful page. It includes contact details, greeting, hook opening, value body paragraphs, and professional closing.
           </p>
@@ -459,67 +414,63 @@ export const TailorPanel: React.FC<TailorPanelProps> = (p) => (
           return null;
         }
         return (
-          <div className={`${styles.atsCard} glass-card`} style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e293b', fontSize: '14px', fontWeight: 700, margin: 0 }}>
-                <Sparkles size={16} style={{ color: '#6366f1' }} />
+          <div className={`${styles.atsCard} ${panel.card} ${panel.auditCard}`}>
+            <div className={panel.auditHeader}>
+              <h3 className={panel.auditTitle}>
+                <Sparkles size={16} style={{ color: 'var(--primary)' }} />
                 AI Generation Audit
               </h3>
-              <span style={{ fontSize: '10px', background: '#e0e7ff', color: '#4f46e5', padding: '3px 8px', borderRadius: '12px', fontWeight: 600 }}>Active Audit</span>
+              <span className={panel.auditBadge}>Active Audit</span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className={panel.auditStack}>
               {notes.requirements_emphasized && notes.requirements_emphasized.length > 0 && (
-                <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '3.5px solid #6366f1', border: '1px solid #e2e8f0', borderLeftWidth: '3.5px' }}>
+                <div className={panel.auditBlock} style={{ borderLeft: '3.5px solid var(--primary)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '14px' }}>🎯</span>
-                    <strong style={{ fontSize: '12px', color: '#1e293b' }}>Emphasized Requirements</strong>
+                    <strong style={{ fontSize: '12px' }}>Emphasized Requirements</strong>
                   </div>
-                  <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <ul>
                     {notes.requirements_emphasized.map((req, idx) => (
-                      <li key={idx} style={{ lineHeight: '1.4' }}>{req}</li>
+                      <li key={idx}>{req}</li>
                     ))}
                   </ul>
                 </div>
               )}
 
               {notes.resume_evidence_used && notes.resume_evidence_used.length > 0 && (
-                <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '3.5px solid #10b981', border: '1px solid #e2e8f0', borderLeftWidth: '3.5px' }}>
+                <div className={panel.auditBlock} style={{ borderLeft: '3.5px solid var(--success)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '14px' }}>📄</span>
-                    <strong style={{ fontSize: '12px', color: '#1e293b' }}>Evidence Used from CV</strong>
+                    <strong style={{ fontSize: '12px' }}>Evidence Used from CV</strong>
                   </div>
-                  <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <ul>
                     {notes.resume_evidence_used.map((ev, idx) => (
-                      <li key={idx} style={{ lineHeight: '1.4' }}>{ev}</li>
+                      <li key={idx}>{ev}</li>
                     ))}
                   </ul>
                 </div>
               )}
 
               {notes.placeholders && notes.placeholders.length > 0 && (
-                <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#fffbeb', borderLeft: '3.5px solid #f59e0b', border: '1px solid #fef3c7', borderLeftWidth: '3.5px' }}>
+                <div className={panel.auditBlock} style={{ borderLeft: '3.5px solid var(--warning)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '14px' }}>⚠️</span>
-                    <strong style={{ fontSize: '12px', color: '#b45309' }}>Missing Facts / Placeholders</strong>
+                    <strong style={{ fontSize: '12px' }}>Missing Facts / Placeholders</strong>
                   </div>
-                  <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#78350f', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <ul>
                     {notes.placeholders.map((pl, idx) => (
-                      <li key={idx} style={{ lineHeight: '1.4' }}>{pl}</li>
+                      <li key={idx}>{pl}</li>
                     ))}
                   </ul>
                 </div>
               )}
 
               {notes.confirmation_needed && notes.confirmation_needed.length > 0 && (
-                <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#fef2f2', borderLeft: '3.5px solid #ef4444', border: '1px solid #fee2e2', borderLeftWidth: '3.5px' }}>
+                <div className={panel.auditBlock} style={{ borderLeft: '3.5px solid var(--danger)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '14px' }}>🔍</span>
-                    <strong style={{ fontSize: '12px', color: '#b91c1c' }}>Confirmation Required</strong>
+                    <strong style={{ fontSize: '12px' }}>Confirmation Required</strong>
                   </div>
-                  <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: '#991b1b', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <ul>
                     {notes.confirmation_needed.map((conf, idx) => (
-                      <li key={idx} style={{ lineHeight: '1.4' }}>{conf}</li>
+                      <li key={idx}>{conf}</li>
                     ))}
                   </ul>
                 </div>
@@ -529,5 +480,6 @@ export const TailorPanel: React.FC<TailorPanelProps> = (p) => (
         );
       })()}
     </>
-  )
+  )}
+  </div>
 );
