@@ -9,6 +9,8 @@ import { Settings } from './views/Settings';
 import { LoginPage } from './views/auth/LoginPage';
 import { RegisterPage } from './views/auth/RegisterPage';
 import { AccountSecurityPage } from './views/auth/AccountSecurityPage';
+import { VerifyEmailPage } from './views/auth/VerifyEmailPage';
+import { ResetPasswordPage } from './views/auth/ResetPasswordPage';
 import { navigateTo } from './utils/navigation';
 import './css/globals.css';
 
@@ -65,9 +67,11 @@ export const App: React.FC = () => {
 
   // 1. Unauthenticated Route Resolution
   if (!isAuthenticated) {
-    if (currentPath === 'login') return <LoginPage />;
     if (currentPath === 'register') return <RegisterPage />;
-    return <Landing />;
+    if (currentPath === 'verify-email') return <VerifyEmailPage />;
+    if (currentPath === 'reset-password') return <ResetPasswordPage />;
+    if (currentPath === '') return <Landing />;
+    return <LoginPage />;
   }
 
   // 2. Authenticated Route Resolution (Normalize invalid or auth paths to 'dashboard')

@@ -54,6 +54,8 @@ export const RegisterPage: React.FC = () => {
     onError: () => setError('Google sign-up popup was cancelled or failed.'),
   });
 
+  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
   const handleSocialClick = (provider: string) => {
     if (provider === 'google') {
       loginWithGoogle();
@@ -63,7 +65,7 @@ export const RegisterPage: React.FC = () => {
       const left = window.screen.width / 2 - width / 2;
       const top = window.screen.height / 2 - height / 2;
       window.open(
-        `http://localhost:8000/api/v1/auth/auth/social-${provider}`,
+        `${apiBase}/auth/auth/social-${provider}`,
         `OAuth_${provider}`,
         `width=${width},height=${height},top=${top},left=${left}`
       );
@@ -217,6 +219,9 @@ export const RegisterPage: React.FC = () => {
                 <button type="button" className={styles.socialBtn} onClick={() => handleSocialClick('github')}>
                   <Github size={18} />
                   <span>GitHub</span>
+                </button>
+                <button type="button" className={styles.socialBtn} onClick={() => handleSocialClick('linkedin')}>
+                  <span>LinkedIn</span>
                 </button>
               </div>
             </>

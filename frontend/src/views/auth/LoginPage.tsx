@@ -18,13 +18,22 @@ export const LoginPage: React.FC = () => {
   const [requires2FA, setRequires2FA] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+
+  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
   React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const access = params.get('access');
-    const refresh = params.get('refresh');
-    const sessionKey = params.get('session_key');
-    const err = params.get('error');
+    // Tokens arrive in the URL fragment (never the query string) so they
+    // stay out of server logs. Strip them the moment they are read.
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const queryParams = new URLSearchParams(window.location.search);
+    const access = hashParams.get('access') || queryParams.get('access');
+    const refresh = hashParams.get('refresh') || queryParams.get('refresh');
+    const sessionKey = hashParams.get('session_key') || queryParams.get('session_key');
+    const err = queryParams.get('error');
+    window.history.replaceState({}, '', window.location.pathname);
 
     if (err) {
       setError('Social authentication failed or was cancelled.');
@@ -32,7 +41,7 @@ export const LoginPage: React.FC = () => {
       useAuthStore.getState().setTokens(access, refresh);
       apiClient.get('/auth/account/profile')
         .then((res) => {
-          setAuth(access, refresh, res.data.user, sessionKey || undefined);
+          setAuth(access, refresh, res.data.user, sessionKey || undefined, true);
           navigateTo('/dashboard');
         })
         .catch(() => {
@@ -40,6 +49,23 @@ export const LoginPage: React.FC = () => {
         });
     }
   }, []);
+
+  const handleResendVerification = async () => {
+    if (!email) {
+      setResendMsg('Enter your email address above first.');
+      return;
+    }
+    setResending(true);
+    setResendMsg(null);
+    try {
+      const res = await apiClient.post('/auth/auth/resend-verification', { email });
+      setResendMsg(res.data?.message || 'Verification email sent. Check your inbox.');
+    } catch (err: any) {
+      setResendMsg(err?.response?.data?.error || 'Could not resend the verification email.');
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,13 +90,16 @@ export const LoginPage: React.FC = () => {
         response.data.access,
         response.data.refresh,
         response.data.user,
-        response.data.session_key
+        response.data.session_key,
+        rememberMe
       );
 
       navigateTo('/dashboard');
     } catch (err: any) {
+      const code = err.response?.data?.code;
       const msg = err.response?.data?.error || err.response?.data?.detail || 'Login failed. Please check your credentials.';
       setError(msg);
+      setNeedsVerification(code === 'email_not_verified');
     } finally {
       setLoading(false);
     }
@@ -89,12 +118,15 @@ export const LoginPage: React.FC = () => {
         response.data.access,
         response.data.refresh,
         response.data.user,
-        response.data.session_key
+        response.data.session_key,
+        true
       );
 
       navigateTo('/dashboard');
     } catch (err: any) {
-      setError('Google login failed to authenticate with backend.');
+      const code = err.response?.data?.code;
+      setError(err.response?.data?.error || 'Google login failed to authenticate with backend.');
+      setNeedsVerification(code === 'email_not_verified' || code === 'account_exists');
     } finally {
       setLoading(false);
     }
@@ -115,7 +147,7 @@ export const LoginPage: React.FC = () => {
       const left = window.screen.width / 2 - width / 2;
       const top = window.screen.height / 2 - height / 2;
       window.open(
-        `http://localhost:8000/api/v1/auth/auth/social-${provider}`,
+        `${apiBase}/auth/auth/social-${provider}`,
         `OAuth_${provider}`,
         `width=${width},height=${height},top=${top},left=${left}`
       );
@@ -134,6 +166,23 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {error && <div className={styles.errorBanner}>{error}</div>}
+
+          {needsVerification && (
+            <div style={{ marginBottom: '1rem' }}>
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                disabled={resending}
+                onClick={handleResendVerification}
+                style={{ width: '100%' }}
+              >
+                {resending ? 'Sending...' : 'Resend Verification Email'}
+              </button>
+              {resendMsg && (
+                <p style={{ fontSize: '0.85rem', color: '#cbd5e1', marginTop: '0.5rem' }}>{resendMsg}</p>
+              )}
+            </div>
+          )}
 
           {!requires2FA ? (
             <form onSubmit={handleLogin}>

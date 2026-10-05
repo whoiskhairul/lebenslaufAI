@@ -17,8 +17,10 @@ from django.utils.encoding import force_bytes, force_str
 from rest_framework import status, permissions, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 
 from .models import UserProfile, UserSession, AuthAuditLog
 from .serializers import (
@@ -43,8 +45,32 @@ def log_auth_event(user, event_type, request, details=None):
     )
 
 
+def blacklist_all_user_tokens(user):
+    """Blacklist every outstanding refresh token for a user.
+
+    JWT access tokens are stateless, so flipping UserSession.is_active
+    alone never revokes them. Blacklisting here makes password
+    change/reset actually sign devices out (access tokens expire
+    within the hour on their own).
+    """
+    for outstanding in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=outstanding)
+
+
+def consume_recovery_code(user, code):
+    """Single-use recovery codes: remove and persist on use."""
+    codes = list(user.two_factor_recovery_codes or [])
+    if code in codes:
+        codes.remove(code)
+        user.two_factor_recovery_codes = codes
+        user.save(update_fields=['two_factor_recovery_codes'])
+        return True
+    return False
+
+
 class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_scope = 'register'
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
@@ -97,6 +123,7 @@ class EmailVerifyView(APIView):
 
 class EmailVerifyResendView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_scope = 'email'
 
     def post(self, request):
         email = request.data.get('email')
@@ -106,8 +133,8 @@ class EmailVerifyResendView(APIView):
         try:
             user = User.objects.get(email=email)
             if user.email_verified:
-                return Response({"message": "Email is already verified."})
-            
+                return Response({"message": "If an account exists with this email, a verification link was sent."})
+
             token = str(uuid.uuid4())
             user.email_verification_token = token
             user.save(update_fields=['email_verification_token'])
@@ -127,6 +154,7 @@ class EmailVerifyResendView(APIView):
 
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_scope = 'login'
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -166,6 +194,12 @@ class LoginView(APIView):
         user.account_locked_until = None
         user.save(update_fields=['login_attempts_count', 'account_locked_until'])
 
+        if not user.email_verified:
+            return Response({
+                "error": "Please verify your email address before logging in. Check your inbox for the verification link.",
+                "code": "email_not_verified"
+            }, status=status.HTTP_403_FORBIDDEN)
+
         # 2FA Check if enabled
         if user.two_factor_enabled:
             if not totp_code:
@@ -175,7 +209,11 @@ class LoginView(APIView):
                 }, status=status.HTTP_200_OK)
 
             totp = pyotp.TOTP(user.two_factor_secret)
-            is_valid = totp.verify(totp_code) or (totp_code in (user.two_factor_recovery_codes or []))
+            if totp.verify(totp_code):
+                is_valid = True
+            else:
+                # Recovery codes are single-use: accepted here, then consumed.
+                is_valid = consume_recovery_code(user, totp_code)
             if not is_valid:
                 log_auth_event(user, 'LOGIN_FAILED', request, {"reason": "Invalid 2FA code"})
                 return Response({"error": "Invalid 2FA verification code."}, status=status.HTTP_401_UNAUTHORIZED)
@@ -229,6 +267,7 @@ class LogoutView(APIView):
 
 class PasswordResetRequestView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_scope = 'password'
 
     def post(self, request):
         serializer = PasswordResetSerializer(data=request.data)
@@ -279,6 +318,7 @@ class PasswordResetConfirmView(APIView):
             user.save()
             # Deactivate all active sessions on password reset
             UserSession.objects.filter(user=user).update(is_active=False)
+            blacklist_all_user_tokens(user)
             log_auth_event(user, 'PASSWORD_RESET_CONF', request)
             return Response({"message": "Password reset successfully. You can now log in with your new password."})
         
@@ -301,6 +341,7 @@ class PasswordChangeView(APIView):
         user.save()
         # Revoke other sessions on password change
         UserSession.objects.filter(user=user).update(is_active=False)
+        blacklist_all_user_tokens(user)
         log_auth_event(user, 'PASSWORD_CHANGE', request)
         return Response({"message": "Password changed successfully."})
 
@@ -339,6 +380,7 @@ class TwoFactorSetupView(APIView):
 
 class TwoFactorVerifyView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    throttle_scope = 'twofa'
 
     def post(self, request):
         serializer = TwoFactorVerifySerializer(data=request.data)
@@ -356,6 +398,12 @@ class TwoFactorVerifyView(APIView):
             user.two_factor_enabled = True
             user.save(update_fields=['two_factor_enabled'])
             log_auth_event(user, '2FA_ENABLED', request)
+            return Response({"message": "Two-factor authentication enabled successfully."})
+
+        if consume_recovery_code(user, code):
+            user.two_factor_enabled = True
+            user.save(update_fields=['two_factor_enabled'])
+            log_auth_event(user, '2FA_ENABLED', request, {"via": "recovery_code"})
             return Response({"message": "Two-factor authentication enabled successfully."})
 
         return Response({"error": "Invalid verification code."}, status=status.HTTP_400_BAD_REQUEST)
@@ -384,7 +432,13 @@ class SessionListView(APIView):
     def get(self, request):
         sessions = UserSession.objects.filter(user=request.user, is_active=True).order_by('-last_activity')
         serializer = UserSessionSerializer(sessions, many=True, context={'request': request})
-        return Response(serializer.data)
+        data = serializer.data
+        current_key = request.headers.get('X-Session-Key') or request.query_params.get('session_key')
+        if current_key:
+            for entry in data:
+                if entry.get('session_key') == current_key:
+                    entry['is_current'] = True
+        return Response(data)
 
 
 class SessionRevokeView(APIView):
@@ -446,6 +500,7 @@ import requests
 
 class SocialLoginView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_scope = 'login'
 
     def post(self, request):
         serializer = SocialLoginSerializer(data=request.data)
@@ -490,9 +545,35 @@ class SocialLoginView(APIView):
                 except Exception as e:
                     pass
 
+            elif provider == 'linkedin_oauth2':
+                try:
+                    resp = requests.get(
+                        'https://api.linkedin.com/v2/userinfo',
+                        headers={'Authorization': f'Bearer {access_token}'},
+                        timeout=10
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        email = data.get('email') or email
+                        full_name = data.get('name') or full_name
+                        avatar = data.get('picture')
+                except Exception as e:
+                    pass
+
         if not email:
             provider_id = request.data.get('provider_id', str(uuid.uuid4()))
             email = f"{provider}_{provider_id[:8]}@oauth.lebenslauf.ai"
+
+        existing_user = User.objects.filter(email=email).first()
+        if existing_user and existing_user.has_usable_password() and not existing_user.email_verified:
+            log_auth_event(existing_user, 'LOGIN_FAILED', request, {
+                "reason": "social login blocked: unverified password account exists",
+                "provider": provider
+            })
+            return Response({
+                "error": "An account with this email already exists. Log in with your password (or reset it), verify your email, then continue.",
+                "code": "account_exists"
+            }, status=status.HTTP_403_FORBIDDEN)
 
         user, created = User.objects.get_or_create(
             email=email,
@@ -573,9 +654,14 @@ class SocialCallbackRedirectView(APIView):
 
             access_token = str(refresh.access_token)
             refresh_token = str(refresh)
-            
-            # Redirect to React SPA with tokens
-            frontend_redirect = f"{settings.FRONTEND_URL}/login?access={access_token}&refresh={refresh_token}&session_key={session_key}"
+
+            # Tokens travel in the URL fragment, never the query string, so
+            # they stay out of server logs and analytics. The SPA strips
+            # the fragment immediately after reading it.
+            frontend_redirect = (
+                f"{settings.FRONTEND_URL}/login"
+                f"#access={access_token}&refresh={refresh_token}&session_key={session_key}"
+            )
             return redirect(frontend_redirect)
 
         return redirect(f"{settings.FRONTEND_URL}/login?error=OAuthAuthenticationFailed")

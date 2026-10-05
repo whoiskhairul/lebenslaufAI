@@ -13,11 +13,17 @@ const api = axios.create({
 // Inject Bearer tokens automatically
 api.interceptors.request.use(
   (config) => {
-    const token = useAuthStore.getState().accessToken || 
-                  localStorage.getItem('access_token') || 
-                  localStorage.getItem('auth_token');
+    const stored = (key: string) =>
+      localStorage.getItem(key) ?? sessionStorage.getItem(key);
+    const token = useAuthStore.getState().accessToken ||
+                  stored('access_token') ||
+                  stored('auth_token');
+    const sessionKey = useAuthStore.getState().sessionKey || stored('session_key');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    if (sessionKey) {
+      config.headers['X-Session-Key'] = sessionKey;
     }
     const deepseekKey = localStorage.getItem('deepseek_api_key');
     if (deepseekKey) {
