@@ -9,6 +9,8 @@ import { AdminPanel } from './features/admin/AdminPanel';
 import { LoginPage } from './views/auth/LoginPage';
 import { RegisterPage } from './views/auth/RegisterPage';
 import { NotFound } from './views/NotFound';
+import { VerifyEmailPage } from './views/auth/VerifyEmailPage';
+import { ResetPasswordPage } from './views/auth/ResetPasswordPage';
 import { navigateTo } from './utils/navigation';
 import './css/globals.css';
 
@@ -95,7 +97,7 @@ export const App: React.FC = () => {
   const isAdmin = !!user?.is_staff || !!user?.is_superuser;
 
   // Auth-independent route classification: unknown paths → 404 page.
-  const publicPaths = ['', 'login', 'register'];
+  const publicPaths = ['', 'login', 'register', 'verify-email', 'reset-password'];
   const protectedPaths = ['dashboard', 'archived', 'master-profile', 'editor', 'admin'];
   const isNotFound = !publicPaths.includes(currentPath) && !protectedPaths.includes(currentPath);
 
@@ -106,10 +108,10 @@ export const App: React.FC = () => {
   //   route's existence is not revealed to non-admins;
   // - logged-out users hitting a protected path are redirected to login.
   const activeView = isAuthenticated
-    ? currentPath === '' || currentPath === 'login' || currentPath === 'register' || (currentPath === 'admin' && !isAdmin)
+    ? currentPath === '' || currentPath === 'login' || currentPath === 'register' || currentPath === 'verify-email' || currentPath === 'reset-password' || (currentPath === 'admin' && !isAdmin)
       ? 'dashboard'
       : currentPath
-    : currentPath === '' || currentPath === 'login' || currentPath === 'register'
+    : currentPath === '' || currentPath === 'login' || currentPath === 'register' || currentPath === 'verify-email' || currentPath === 'reset-password'
       ? currentPath
       : 'login';
 
@@ -149,6 +151,8 @@ export const App: React.FC = () => {
   // 2. Unauthenticated Route Resolution (protected paths render the login page)
   if (!isAuthenticated) {
     if (currentPath === 'register') return <RegisterPage />;
+    if (currentPath === 'verify-email') return <VerifyEmailPage />;
+    if (currentPath === 'reset-password') return <ResetPasswordPage />;
     if (currentPath === '') return <Landing />;
     return <LoginPage />;
   }

@@ -43,6 +43,45 @@ export interface UserSession {
   is_current: boolean;
 }
 
+const AUTH_KEYS = ['access_token', 'auth_token', 'refresh_token', 'user_data', 'session_key'];
+
+// Token storage honors "remember me": persistent logins live in
+// localStorage, session-only logins in sessionStorage (cleared when the
+// tab closes). Readers check localStorage first, then sessionStorage.
+const readToken = (key: string): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(key) ?? sessionStorage.getItem(key);
+};
+
+const isPersistentSession = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  return localStorage.getItem('access_token') !== null;
+};
+
+const writeToken = (key: string, value: string | null, persistent: boolean) => {
+  if (typeof window === 'undefined') return;
+  if (value === null) {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+    return;
+  }
+  if (persistent) {
+    localStorage.setItem(key, value);
+    sessionStorage.removeItem(key);
+  } else {
+    sessionStorage.setItem(key, value);
+    localStorage.removeItem(key);
+  }
+};
+
+const clearAuthKeys = () => {
+  if (typeof window === 'undefined') return;
+  for (const key of AUTH_KEYS) {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  }
+};
+
 interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
@@ -54,9 +93,9 @@ interface AuthState {
   theme: 'light' | 'dark';
   sidebarCollapsed: boolean;
   mobileActivePane: 'preview' | 'editor';
-  
+
   // Actions
-  setAuth: (accessToken: string, refreshToken: string, user: User, sessionKey?: string) => void;
+  setAuth: (accessToken: string, refreshToken: string, user: User, sessionKey?: string, persistent?: boolean) => void;
   setTokens: (accessToken: string, refreshToken?: string) => void;
   setUser: (user: User) => void;
   setTwoFactorRequired: (required: boolean, email?: string) => void;
@@ -68,10 +107,10 @@ interface AuthState {
 }
 
 const getInitialState = () => {
-  const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-  const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
-  const sessionKey = typeof window !== 'undefined' ? localStorage.getItem('session_key') : null;
-  const rawUserData = typeof window !== 'undefined' ? localStorage.getItem('user_data') : null;
+  const accessToken = readToken('access_token');
+  const refreshToken = readToken('refresh_token');
+  const sessionKey = readToken('session_key');
+  const rawUserData = readToken('user_data');
   const storedTheme = (typeof window !== 'undefined' ? localStorage.getItem('app_theme') : null) as 'light' | 'dark' | null;
   const storedSidebarCollapsed = typeof window !== 'undefined' ? localStorage.getItem('sidebar_collapsed') === 'true' : false;
   
@@ -88,7 +127,7 @@ const getInitialState = () => {
       user = JSON.parse(rawUserData);
       isAuthenticated = true;
     } catch (e) {
-      if (typeof window !== 'undefined') localStorage.removeItem('user_data');
+      writeToken('user_data', null, true);
     }
   }
 
@@ -111,20 +150,17 @@ const initialState = getInitialState();
 export const useAuthStore = create<AuthState>((set) => ({
   ...initialState,
 
-  setAuth: (accessToken, refreshToken, user, sessionKey) => {
+  setAuth: (accessToken, refreshToken, user, sessionKey, persistent = true) => {
 
-    // Purge any stale user state from previous logins
-    const currentTheme = localStorage.getItem('app_theme') || 'dark';
-    const currentSidebarCollapsed = localStorage.getItem('sidebar_collapsed');
-    localStorage.clear();
-    localStorage.setItem('app_theme', currentTheme);
-    if (currentSidebarCollapsed !== null) localStorage.setItem('sidebar_collapsed', currentSidebarCollapsed);
+    // Purge stale auth state only; unrelated keys (AI credentials,
+    // theme, drafts, sidebar preference) must survive login and logout.
+    clearAuthKeys();
 
-    localStorage.setItem('access_token', accessToken);
-    localStorage.setItem('auth_token', accessToken);
-    localStorage.setItem('refresh_token', refreshToken);
-    localStorage.setItem('user_data', JSON.stringify(user));
-    if (sessionKey) localStorage.setItem('session_key', sessionKey);
+    writeToken('access_token', accessToken, persistent);
+    writeToken('auth_token', accessToken, persistent);
+    writeToken('refresh_token', refreshToken, persistent);
+    writeToken('user_data', JSON.stringify(user), persistent);
+    if (sessionKey) writeToken('session_key', sessionKey, persistent);
 
     set({
       accessToken,
@@ -138,9 +174,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   setTokens: (accessToken, refreshToken) => {
-    localStorage.setItem('access_token', accessToken);
-    localStorage.setItem('auth_token', accessToken);
-    if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
+    const persistent = isPersistentSession();
+    writeToken('access_token', accessToken, persistent);
+    writeToken('auth_token', accessToken, persistent);
+    if (refreshToken) writeToken('refresh_token', refreshToken, persistent);
     set((state) => ({
       accessToken,
       refreshToken: refreshToken || state.refreshToken,
@@ -149,7 +186,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 
   setUser: (user) => {
-    localStorage.setItem('user_data', JSON.stringify(user));
+    writeToken('user_data', JSON.stringify(user), isPersistentSession());
     set({ user });
   },
 
@@ -158,11 +195,29 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: () => {
-    const currentTheme = localStorage.getItem('app_theme') || 'dark';
-    const currentSidebarCollapsed = localStorage.getItem('sidebar_collapsed');
-    localStorage.clear();
-    localStorage.setItem('app_theme', currentTheme);
-    if (currentSidebarCollapsed !== null) localStorage.setItem('sidebar_collapsed', currentSidebarCollapsed);
+    const { accessToken, refreshToken, sessionKey } = useAuthStore.getState();
+    // Tell the backend so the refresh token is blacklisted and the
+    // session row deactivated. Fire-and-forget: local logout proceeds
+    // even when offline. (Access tokens expire on their own within
+    // the hour; they cannot be revoked client-side.)
+    try {
+      const base = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+      void fetch(`${base}/auth/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({
+          ...(refreshToken ? { refresh: refreshToken } : {}),
+          ...(sessionKey ? { session_key: sessionKey } : {}),
+        }),
+        keepalive: true,
+      }).catch(() => undefined);
+    } catch {
+      // ignore: logout is local-first
+    }
+    clearAuthKeys();
 
     set({
       accessToken: null,
@@ -200,10 +255,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   initAuth: () => {
-    const accessToken = localStorage.getItem('access_token');
-    const refreshToken = localStorage.getItem('refresh_token');
-    const sessionKey = localStorage.getItem('session_key');
-    const rawUserData = localStorage.getItem('user_data');
+    const accessToken = readToken('access_token');
+    const refreshToken = readToken('refresh_token');
+    const sessionKey = readToken('session_key');
+    const rawUserData = readToken('user_data');
     const storedTheme = localStorage.getItem('app_theme') as 'light' | 'dark' | null;
     const storedSidebarCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
     
@@ -223,7 +278,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           sidebarCollapsed: storedSidebarCollapsed
         });
       } catch (e) {
-        localStorage.removeItem('user_data');
+        writeToken('user_data', null, true);
         set({ theme, sidebarCollapsed: storedSidebarCollapsed });
       }
     } else {
