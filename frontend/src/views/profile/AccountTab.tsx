@@ -105,7 +105,7 @@ const PasswordSection: React.FC<{ cls: Record<string, string> }> = ({ cls }) => 
     }
     setChanging(true);
     try {
-      const res = await api.post('/auth/password-change', {
+      const res = await api.post('/auth/auth/password-change', {
         old_password: oldPassword,
         new_password: newPassword
       });
@@ -114,7 +114,10 @@ const PasswordSection: React.FC<{ cls: Record<string, string> }> = ({ cls }) => 
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
-      setMsg({ type: 'error', text: err?.response?.data?.error || err?.response?.data?.old_password?.[0] || 'Could not change password.' });
+      const data = err?.response?.data || {};
+      const fieldError =
+        data?.new_password?.[0] || data?.old_password?.[0] || data?.non_field_errors?.[0];
+      setMsg({ type: 'error', text: data?.error || fieldError || 'Could not change password.' });
     } finally {
       setChanging(false);
     }
@@ -131,6 +134,9 @@ const PasswordSection: React.FC<{ cls: Record<string, string> }> = ({ cls }) => 
         </Button>
       </div>
       <Banner cls={cls} type={msg.type} text={msg.text} />
+      <p className={cls.subtext} style={{ marginBottom: '12px' }}>
+        Minimum 8 characters. Common and weak passwords are rejected. Signed up with Google? Use Forgot password on the login page to set one first.
+      </p>
       <form onSubmit={handleSubmit} className={cls.form}>
         <InputField
           label="Current Password"
@@ -173,7 +179,7 @@ const SessionsSection: React.FC<{ cls: Record<string, string> }> = ({ cls }) => 
 
   const fetchSessions = async () => {
     try {
-      const res = await api.get('/security/sessions');
+      const res = await api.get('/auth/security/sessions');
       if (Array.isArray(res.data)) setSessions(res.data);
     } catch (err) {
       setMsg({ type: 'error', text: 'Could not load active sessions.' });
@@ -186,7 +192,7 @@ const SessionsSection: React.FC<{ cls: Record<string, string> }> = ({ cls }) => 
 
   const handleRevoke = async (sessionId: string) => {
     try {
-      await api.post(`/security/sessions/${sessionId}/revoke`);
+      await api.post(`/auth/security/sessions/${sessionId}/revoke`);
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
     } catch (err) {
       setMsg({ type: 'error', text: 'Could not revoke that session.' });
