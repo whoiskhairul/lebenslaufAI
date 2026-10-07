@@ -203,26 +203,34 @@ class AuthSystemTests(TestCase):
         ref_res = self.client.post(refresh_url, {"refresh": refresh_token}, format='json')
         self.assertEqual(ref_res.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_password_change_blacklists_old_tokens(self):
+    def test_password_change_keeps_current_session(self):
         self._verified_user()
-        login_res = self.client.post(self.login_url, {
+        first = self.client.post(self.login_url, {
             "email": self.user_data['email'],
             "password": self.user_data['password']
         }, format='json')
-        refresh_token = login_res.data['refresh']
-        access_token = login_res.data['access']
+        other = APIClient()
+        second = other.post(self.login_url, {
+            "email": self.user_data['email'],
+            "password": self.user_data['password']
+        }, format='json')
 
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {first.data['access']}")
         change_res = self.client.post(reverse('auth_password_change'), {
             "old_password": self.user_data['password'],
             "new_password": "BrandNewPass99!#"
         }, format='json')
         self.assertEqual(change_res.status_code, status.HTTP_200_OK)
 
-        self.client.credentials()
-        refresh_url = reverse('auth_refresh')
-        ref_res = self.client.post(refresh_url, {"refresh": refresh_token}, format='json')
-        self.assertEqual(ref_res.status_code, status.HTTP_401_UNAUTHORIZED)
+        # Current session keeps working, including refresh rotation.
+        me_res = self.client.get(reverse('account_profile'))
+        self.assertEqual(me_res.status_code, status.HTTP_200_OK)
+        ref_res = self.client.post(reverse('auth_refresh'), {"refresh": first.data['refresh']}, format='json')
+        self.assertEqual(ref_res.status_code, status.HTTP_200_OK)
+
+        # The other device is signed out.
+        other_res = other.post(reverse('auth_refresh'), {"refresh": second.data['refresh']}, format='json')
+        self.assertEqual(other_res.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_recovery_code_is_single_use(self):
         user = self._verified_user()
@@ -250,6 +258,47 @@ class AuthSystemTests(TestCase):
         }, format='json')
         self.assertEqual(second.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_sendgrid_backend_posts_to_api(self):
+        from django.core.mail import EmailMessage
+        from users.sendgrid_backend import SendGridEmailBackend
+        with mock.patch('users.sendgrid_backend.requests.Session') as mock_session_cls:
+            session = mock_session_cls.return_value
+            response = mock.Mock()
+            response.status_code = 202
+            response.raise_for_status.return_value = None
+            session.post.return_value = response
+            backend = SendGridEmailBackend(api_key='SG.test_key', fail_silently=False)
+            message = EmailMessage(
+                'Verify your account', 'Click the link',
+                'Lebenslauf AI <noreply@lebenslauf.ai>', ['user@example.com'],
+            )
+            self.assertEqual(backend.send_messages([message]), 1)
+            args, kwargs = session.post.call_args
+            self.assertIn('api.sendgrid.com/v3/mail/send', args[0])
+            payload = kwargs['json']
+            self.assertEqual(payload['subject'], 'Verify your account')
+            self.assertEqual(payload['from'], {'name': 'Lebenslauf AI', 'email': 'noreply@lebenslauf.ai'})
+            self.assertEqual(payload['personalizations'][0]['to'], [{'email': 'user@example.com'}])
+            self.assertEqual(payload['content'], [{'type': 'text/plain', 'value': 'Click the link'}])
+            headers_arg = session.headers.update.call_args[0][0]
+            self.assertEqual(headers_arg['Authorization'], 'Bearer SG.test_key')
+
+    def test_sendgrid_backend_handles_failure(self):
+        from django.core.mail import EmailMessage
+        from users.sendgrid_backend import SendGridEmailBackend
+        import requests as http_requests
+        with mock.patch('users.sendgrid_backend.requests.Session') as mock_session_cls:
+            session = mock_session_cls.return_value
+            session.post.side_effect = http_requests.ConnectionError('down')
+            message = EmailMessage('s', 'b', 'from@x.ai', ['to@y.ai'])
+            quiet = SendGridEmailBackend(api_key='SG.test_key', fail_silently=True)
+            self.assertEqual(quiet.send_messages([message]), 0)
+            strict = SendGridEmailBackend(api_key='SG.test_key', fail_silently=False)
+            with self.assertRaises(http_requests.ConnectionError):
+                strict.send_messages([message])
+            nokey = SendGridEmailBackend(api_key='', fail_silently=True)
+            self.assertEqual(nokey.send_messages([message]), 0)
+
     def test_zz_login_throttled_after_burst(self):
         for i in range(11):
             response = self.client.post(self.login_url, {
@@ -265,7 +314,7 @@ class AuthSystemTests(TestCase):
         unknown = self.client.post(resend_url, {"email": "nobody@lebenslauf.ai"}, format='json')
         self.assertEqual(known.data.get('message'), unknown.data.get('message'))
 
-    def test_social_login_blocked_for_unverified_password_account(self):
+    def test_social_login_merges_unverified_password_account(self):
         User.objects.create_user(
             username=self.user_data['email'],
             email=self.user_data['email'],
@@ -285,5 +334,27 @@ class AuthSystemTests(TestCase):
                 "provider": "google",
                 "access_token": "valid-provider-token",
             }, format='json')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(response.data.get('code'), 'account_exists')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data.get('password_reset_required'))
+        user = User.objects.get(email=self.user_data['email'])
+        self.assertTrue(user.email_verified)
+        self.assertFalse(user.has_usable_password())
+        self.assertFalse(user.check_password(self.user_data['password']))
+
+    def test_social_login_rejects_unverified_provider_email(self):
+        social_url = reverse('auth_social_login')
+        mock_resp = mock.Mock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "email": self.user_data['email'],
+            "name": "Test User",
+            "picture": "",
+            "email_verified": False,
+        }
+        with mock.patch('users.views.requests.get', return_value=mock_resp):
+            response = self.client.post(social_url, {
+                "provider": "google",
+                "access_token": "valid-provider-token",
+            }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(User.objects.filter(email=self.user_data['email']).exists())

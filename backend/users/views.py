@@ -66,6 +66,17 @@ def issue_session_tokens(user, request, lifetime_days=7, device_info=None):
     refresh['session_key'] = session_key
     access = refresh.access_token
     access['session_key'] = session_key
+    # for_user() stores the pre-mutation token string in OutstandingToken;
+    # refresh it so the row carries the final claims (session_key). Without
+    # this, claim-based matching (e.g. keep-current-session on password
+    # change) can never see the session binding.
+    try:
+        expires_at = timezone.datetime.fromtimestamp(refresh['exp'], tz=timezone.utc)
+    except Exception:
+        expires_at = timezone.now() + timedelta(days=lifetime_days)
+    OutstandingToken.objects.filter(user=user, jti=refresh['jti']).update(
+        token=str(refresh), expires_at=expires_at,
+    )
     return refresh, session_key
 
 
@@ -359,11 +370,34 @@ class PasswordChangeView(APIView):
 
         user.set_password(serializer.validated_data['new_password'])
         user.save()
-        # Revoke other sessions on password change
-        UserSession.objects.filter(user=user).update(is_active=False)
-        blacklist_all_user_tokens(user)
+        # Sign out every OTHER device, but keep the session the user is
+        # changing the password from. Refresh and access tokens have
+        # different jtis, so the current session is matched by its
+        # session_key claim (decoded from each outstanding token). If
+        # unidentifiable, fall back to revoking everything.
+        current_session_key = None
+        try:
+            token = request.auth
+            if token is not None:
+                current_session_key = token.get('session_key')
+        except Exception:
+            pass
+        if current_session_key:
+            UserSession.objects.filter(user=user).exclude(
+                session_key=current_session_key
+            ).update(is_active=False)
+            for outstanding in OutstandingToken.objects.filter(user=user):
+                try:
+                    if RefreshToken(outstanding.token).get('session_key') == current_session_key:
+                        continue
+                except TokenError:
+                    pass
+                BlacklistedToken.objects.get_or_create(token=outstanding)
+        else:
+            UserSession.objects.filter(user=user).update(is_active=False)
+            blacklist_all_user_tokens(user)
         log_auth_event(user, 'PASSWORD_CHANGE', request)
-        return Response({"message": "Password changed successfully."})
+        return Response({"message": "Password changed. Other devices were signed out."})
 
 
 class TwoFactorSetupView(APIView):
@@ -621,15 +655,44 @@ class SocialLoginView(APIView):
             )
 
         existing_user = User.objects.filter(email=email).first()
+        password_reset_required = False
         if existing_user and existing_user.has_usable_password() and not existing_user.email_verified:
-            log_auth_event(existing_user, 'LOGIN_FAILED', request, {
-                "reason": "social login blocked: unverified password account exists",
-                "provider": provider
+            # The provider just attested ownership of this verified email
+            # address, so merging is safe — but the pre-existing password
+            # was set by someone who never verified, and must not survive.
+            # Kill it and let the verified owner set a fresh one.
+            existing_user.set_unusable_password()
+            existing_user.email_verified = True
+            if full_name and not existing_user.full_name:
+                existing_user.full_name = full_name
+            existing_user.save()
+            password_reset_required = True
+            reset_token = default_token_generator.make_token(existing_user)
+            reset_uid = urlsafe_base64_encode(force_bytes(existing_user.pk))
+            reset_url = (
+                f"{settings.FRONTEND_URL}/reset-password"
+                f"?uid={reset_uid}&token={reset_token}"
+            )
+            try:
+                send_mail(
+                    subject="Set your Lebenslauf AI password",
+                    message=(
+                        f"Hello,\n\nYou just signed in with {provider}, which proved "
+                        f"ownership of this email address. For your security, any "
+                        f"previously set password was removed.\n\nSet a new password here:\n"
+                        f"{reset_url}\n\nIf this was not you, please contact support."
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[existing_user.email],
+                    fail_silently=True,
+                )
+            except Exception:
+                pass
+            log_auth_event(existing_user, 'SOCIAL_LOGIN', request, {
+                "provider": provider,
+                "flow": "client_api",
+                "note": "merged into unverified password account; password invalidated",
             })
-            return Response({
-                "error": "An account with this email already exists. Log in with your password (or reset it), verify your email, then continue.",
-                "code": "account_exists"
-            }, status=status.HTTP_403_FORBIDDEN)
 
         user, created = User.objects.get_or_create(
             email=email,
@@ -657,7 +720,8 @@ class SocialLoginView(APIView):
             "refresh": str(refresh),
             "user": UserSerializer(user).data,
             "session_key": session_key,
-            "created": created
+            "created": created,
+            "password_reset_required": password_reset_required,
         })
 
 
