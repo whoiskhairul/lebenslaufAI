@@ -188,8 +188,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
       if (res.data) {
         setApplications(res.data);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching applications:', err);
+      if (err?.response?.status === 401) {
+        setToast({ message: 'Session expired. Please log in again to see your data.', type: 'error' });
+      } else {
+        setToast({ message: 'Could not load your applications. Check your connection and refresh.', type: 'error' });
+      }
     }
   };
 
@@ -211,8 +216,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
       if (lettersRes.data) {
         setCoverLetters(lettersRes.data);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching ATS scores/letters:', err);
+      if (err?.response?.status !== 401) {
+        setToast({ message: 'Could not load CV versions and cover letters.', type: 'error' });
+      }
     }
   };
 

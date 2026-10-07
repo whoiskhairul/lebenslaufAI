@@ -1,71 +1,58 @@
-/* Auth pages are fixed-dark: they do not follow [data-theme]. */
+/* Auth pages are fixed-light: same paper as the landing navbar and
+   footer, so the three read as one continuous sheet. Colors are fixed
+   (not theme tokens) because these pages don't use [data-theme]. */
 
 .authContainer {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  color: #f8fafc;
-  padding: 2rem 1rem;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 3rem 1rem 4rem;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  position: relative;
-  overflow: hidden;
-}
-
-/* Single soft accent wash behind the card. One accent, one moment. */
-.authContainer::before {
-  content: '';
-  position: absolute;
-  top: -180px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(640px, 90vw);
-  height: 340px;
-  background: radial-gradient(closest-side, rgba(99, 102, 241, 0.22), transparent);
-  pointer-events: none;
 }
 
 .authCard {
-  position: relative;
   width: 100%;
   max-width: 440px;
-  background: #16161b;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  padding: 2.5rem 2rem;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  background: #ffffff;
+  border: 1px solid #e6ebf1;
+  border-radius: 18px;
+  padding: 2.75rem 2.25rem 2.25rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 16px 40px -16px rgba(15, 23, 42, 0.18);
   animation: fadeIn 0.3s ease-out;
 }
 
 .authHeader {
   text-align: left;
-  margin-bottom: 1.75rem;
+  margin-bottom: 2rem;
 }
 
 .authHeader h1 {
   font-family: 'Space Grotesk', 'Outfit', sans-serif;
-  font-size: 1.75rem;
+  font-size: 1.9rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
-  color: #f8fafc;
-  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: #0f172a;
+  margin-bottom: 0.6rem;
 }
 
 .authHeader p {
-  color: #94a3b8;
-  font-size: 0.925rem;
-  line-height: 1.5;
+  color: #64748b;
+  font-size: 0.95rem;
+  line-height: 1.55;
 }
 
 .stepTag {
   display: inline-block;
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  color: #a5b4fc;
-  background: rgba(99, 102, 241, 0.14);
-  border: 1px solid rgba(99, 102, 241, 0.35);
+  letter-spacing: 0.06em;
+  color: #4338ca;
+  background: rgba(79, 70, 229, 0.08);
+  border: 1px solid #c7d2fe;
   border-radius: 999px;
   padding: 0.2rem 0.65rem;
   margin-bottom: 0.75rem;
@@ -79,7 +66,7 @@
   display: block;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #e2e8f0;
+  color: #0f172a;
   margin-bottom: 0.5rem;
 }
 
@@ -92,7 +79,7 @@
 .inputIcon {
   position: absolute;
   left: 1rem;
-  color: #64748b;
+  color: #94a3b8;
   width: 18px;
   height: 18px;
   pointer-events: none;
@@ -101,34 +88,33 @@
 .authInput {
   width: 100%;
   padding: 0.8rem 1rem 0.8rem 2.75rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
   border-radius: 12px;
-  color: #f8fafc;
+  color: #0f172a;
   font-size: 0.95rem;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .authInput::placeholder {
-  color: #64748b;
+  color: #94a3b8;
 }
 
 .authInput:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: #94a3b8;
 }
 
 .authInput:focus {
   outline: none;
-  border-color: #818cf8;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.28);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
 }
 
 .authInput:-webkit-autofill {
-  -webkit-text-fill-color: #f8fafc;
-  caret-color: #f8fafc;
-  box-shadow: inset 0 0 0 100px #1c1c22;
-  border-color: rgba(255, 255, 255, 0.12);
+  -webkit-text-fill-color: #0f172a;
+  caret-color: #0f172a;
+  box-shadow: inset 0 0 0 100px #f1f5f9;
+  border-color: #cbd5e1;
 }
 
 .eyeBtn {
@@ -142,17 +128,17 @@
   background: transparent;
   border: none;
   border-radius: 10px;
-  color: #64748b;
+  color: #94a3b8;
   cursor: pointer;
   transition: color 0.15s ease;
 }
 
 .eyeBtn:hover {
-  color: #e2e8f0;
+  color: #0f172a;
 }
 
 .eyeBtn:focus-visible {
-  outline: 2px solid #818cf8;
+  outline: 2px solid #4f46e5;
   outline-offset: 1px;
 }
 
@@ -162,7 +148,8 @@
 
 .capsHint {
   font-size: 0.75rem;
-  color: #fbbf24;
+  font-weight: 600;
+  color: #92400e;
   margin-top: 0.4rem;
   display: flex;
   align-items: center;
@@ -186,7 +173,8 @@
   flex-direction: column;
   gap: 0.3rem;
   font-size: 0.8rem;
-  color: #64748b;
+  font-weight: 500;
+  color: #94a3b8;
 }
 
 .checkList li {
@@ -196,7 +184,7 @@
 }
 
 .checkList li.ok {
-  color: #34d399;
+  color: #166534;
 }
 
 .strengthMeter {
@@ -205,7 +193,7 @@
 
 .strengthBarTrack {
   height: 4px;
-  background: rgba(255, 255, 255, 0.1);
+  background: #e2e8f0;
   border-radius: 2px;
   overflow: hidden;
 }
@@ -217,6 +205,7 @@
 
 .strengthLabel {
   font-size: 0.75rem;
+  font-weight: 600;
   margin-top: 0.25rem;
   display: block;
 }
@@ -235,10 +224,10 @@
   gap: 0.5rem;
   min-height: 48px;
   padding: 0.7rem 0.5rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
   border-radius: 12px;
-  color: #e2e8f0;
+  color: #0f172a;
   font-weight: 500;
   font-size: 0.875rem;
   cursor: pointer;
@@ -246,13 +235,13 @@
 }
 
 .socialBtn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.22);
-  color: #f8fafc;
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .socialBtn:focus-visible {
-  outline: 2px solid #818cf8;
+  outline: 2px solid #4f46e5;
   outline-offset: 2px;
 }
 
@@ -268,7 +257,7 @@
 .divider::after {
   content: '';
   flex: 1;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .divider span {
@@ -279,19 +268,19 @@
   width: 100%;
   min-height: 48px;
   padding: 0.85rem;
-  background: #6366f1;
+  background: #0f172a;
   border: none;
   border-radius: 12px;
-  color: #ffffff;
+  color: #f8fafc;
   font-weight: 600;
   font-size: 0.95rem;
   cursor: pointer;
-  transition: background-color 0.15s ease, filter 0.15s ease;
+  transition: background-color 0.15s ease;
 }
 
 .primaryBtn:hover:not(:disabled) {
-  background: #5457e5;
-  color: #ffffff;
+  background: #1e293b;
+  color: #f8fafc;
 }
 
 .primaryBtn:disabled {
@@ -300,7 +289,7 @@
 }
 
 .primaryBtn:focus-visible {
-  outline: 2px solid #a5b4fc;
+  outline: 2px solid #4f46e5;
   outline-offset: 2px;
 }
 
@@ -308,10 +297,10 @@
   width: 100%;
   min-height: 48px;
   padding: 0.85rem;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
   border-radius: 12px;
-  color: #e2e8f0;
+  color: #0f172a;
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
@@ -319,8 +308,8 @@
 }
 
 .secondaryBtn:hover:not(:disabled) {
-  border-color: rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: #94a3b8;
+  background: #f8fafc;
 }
 
 .secondaryBtn:disabled {
@@ -329,7 +318,7 @@
 }
 
 .secondaryBtn:focus-visible {
-  outline: 2px solid #818cf8;
+  outline: 2px solid #4f46e5;
   outline-offset: 2px;
 }
 
@@ -337,9 +326,9 @@
   display: flex;
   align-items: flex-start;
   gap: 0.6rem;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #fca5a5;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
   padding: 0.75rem 1rem;
   border-radius: 12px;
   font-size: 0.875rem;
@@ -351,9 +340,9 @@
   display: flex;
   align-items: flex-start;
   gap: 0.6rem;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  color: #6ee7b7;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
   padding: 0.75rem 1rem;
   border-radius: 12px;
   font-size: 0.875rem;
@@ -368,7 +357,7 @@
 
 .hintText {
   font-size: 0.85rem;
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 0.5rem;
   line-height: 1.5;
 }
@@ -381,7 +370,7 @@
 }
 
 .authFooter a {
-  color: #a78bfa;
+  color: #4f46e5;
   text-decoration: none;
   font-weight: 500;
 }
@@ -391,7 +380,7 @@
 }
 
 .authFooter a:focus-visible {
-  outline: 2px solid #818cf8;
+  outline: 2px solid #4f46e5;
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -409,6 +398,11 @@
 
 /* ===== Small Screen Polish ===== */
 @media (max-width: 480px) {
+  .authContainer {
+    padding: 2rem 0.75rem 3rem;
+    align-items: flex-start;
+  }
+
   .authCard {
     padding: 1.75rem 1.25rem;
     border-radius: 16px;

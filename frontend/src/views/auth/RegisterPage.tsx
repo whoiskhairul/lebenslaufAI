@@ -115,7 +115,7 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div style={{ background: '#0f0f12', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ background: '#F8FAFC', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar />
 
       <div className={styles.authContainer} style={{ flex: 1, padding: '7rem 1rem 4rem' }}>

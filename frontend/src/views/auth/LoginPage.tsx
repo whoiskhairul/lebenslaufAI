@@ -45,6 +45,7 @@ export const LoginPage: React.FC = () => {
   const [capsOn, setCapsOn] = useState(false);
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [now, setNow] = useState(Date.now());
+  const [mergeNotice, setMergeNotice] = useState<string | null>(null);
   const autoSubmitRef = React.useRef(false);
 
   const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -179,6 +180,14 @@ export const LoginPage: React.FC = () => {
         true
       );
 
+      if (response.data.password_reset_required) {
+        setMergeNotice(
+          'Signed in with Google. For your security we removed the old unverified password — check your email for a link to set a new one.'
+        );
+        setLoading(false);
+        return;
+      }
+
       navigateTo(getPostLoginRedirect());
     } catch (err: any) {
       const code = err.response?.data?.code;
@@ -212,7 +221,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div style={{ background: '#0f0f12', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ background: '#F8FAFC', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar />
 
       <div className={styles.authContainer} style={{ flex: 1, padding: '7rem 1rem 4rem' }}>
@@ -226,6 +235,22 @@ export const LoginPage: React.FC = () => {
             <div className={styles.errorBanner} role="alert">
               <AlertCircle size={17} className={styles.bannerIcon} />
               <span>{error}</span>
+            </div>
+          )}
+
+          {mergeNotice && (
+            <div>
+              <div className={styles.successBanner} role="status">
+                <span>{mergeNotice}</span>
+              </div>
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                onClick={() => navigateTo(getPostLoginRedirect())}
+                style={{ width: '100%', marginBottom: '1rem' }}
+              >
+                Continue to Dashboard
+              </button>
             </div>
           )}
 

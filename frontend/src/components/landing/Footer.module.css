@@ -1,5 +1,5 @@
-/* Light paper strip matching the landing footer, sits at the bottom of the
-   dark auth page. Fixed colors — auth pages don't use [data-theme]. */
+/* Light paper strip shared by the landing footer and the light auth pages.
+   Fixed colors — auth pages don't use [data-theme]. */
 .footer {
   background: #F8FAFC;
   border-top: 1px solid rgba(226, 232, 240, 0.9);

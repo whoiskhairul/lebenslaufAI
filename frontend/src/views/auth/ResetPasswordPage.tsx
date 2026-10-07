@@ -77,7 +77,7 @@ export const ResetPasswordPage: React.FC = () => {
   };
 
   return (
-    <div style={{ background: '#0f0f12', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ background: '#F8FAFC', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar />
       <div className={styles.authContainer} style={{ flex: 1, padding: '7rem 1rem 4rem' }}>
         <div className={styles.authCard}>
@@ -94,7 +94,7 @@ export const ResetPasswordPage: React.FC = () => {
           )}
           {success && (
             <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-              <CheckCircle2 style={{ width: '48px', height: '48px', color: '#22c55e', margin: '0 auto 1rem' }} />
+              <CheckCircle2 style={{ width: '48px', height: '48px', color: '#16a34a', margin: '0 auto 1rem' }} />
               <div className={styles.successBanner}>{success}</div>
               <a href="/login" onClick={(e) => navigateTo('/login', e)} className={styles.primaryBtn} style={{ display: 'inline-block', textDecoration: 'none' }}>
                 Proceed to Sign In
