@@ -145,6 +145,16 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.ScopedRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'login': '10/min',
+        'twofa': '10/min',
+        'email': '5/hour',
+        'password': '5/hour',
+        'register': '20/hour',
+    },
 }
 
 # Simple JWT Configurations
@@ -164,6 +174,18 @@ SIMPLE_JWT = {
 
 # CORS configuration
 CORS_ALLOW_CREDENTIALS = True
+# The SPA sends bespoke headers (session binding, per-user AI routing).
+# Browsers preflight any non-safelisted header, so every custom header
+# the frontend sends must be listed here or cross-origin calls fail
+# while same-origin checks and curl keep working.
+from corsheaders.defaults import default_headers as _cors_default_headers
+CORS_ALLOW_HEADERS = (
+    *_cors_default_headers,
+    'x-session-key',
+    'x-deepseek-key',
+    'x-ai-provider',
+    'x-ai-model',
+)
 
 cors_origins_env = os.environ.get('CORS_ALLOWED_ORIGINS')
 if cors_origins_env:
@@ -172,7 +194,23 @@ else:
     CORS_ALLOW_ALL_ORIGINS = True
 
 # Email Configuration
-EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+# Without SMTP credentials Django prints mail to the server console
+# instead of sending it — verification and reset emails will never
+# arrive. Set EMAIL_HOST/USER/PASSWORD (e.g. Gmail App Password or
+# Resend SMTP) to actually deliver mail.
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '10'))
+SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
+if SENDGRID_API_KEY:
+    EMAIL_BACKEND = 'users.sendgrid_backend.SendGridEmailBackend'
+elif EMAIL_HOST and EMAIL_HOST_USER:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Lebenslauf AI <noreply@lebenslauf.ai>')
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 
@@ -185,9 +223,10 @@ AUTHENTICATION_BACKENDS = [
 LOGIN_REDIRECT_URL = '/api/v1/auth/auth/social-callback'
 ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*']
-# ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 SOCIALACCOUNT_AUTO_SIGNUP = True
-SOCIALACCOUNT_LOGIN_ON_GET = True
+SOCIALACCOUNT_LOGIN_ON_GET = False
 
 
 

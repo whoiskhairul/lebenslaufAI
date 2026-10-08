@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import zxcvbn from 'zxcvbn';
-import { Mail, Lock, User as UserIcon, CheckCircle2, Github } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, CheckCircle2, Check, X, Github, Linkedin, Eye, EyeOff, AlertCircle, AlertTriangle } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { useAuthStore } from '../../store/authStore';
 import { apiClient } from '../../api/apiClient';
@@ -19,10 +19,20 @@ export const RegisterPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [capsOn, setCapsOn] = useState(false);
 
   const pwdScore = password ? zxcvbn(password).score : 0;
-  const strengthColors = ['#DC2626', '#EA580C', '#CA8A04', '#2563EB', '#16A34A'];
+  const strengthColors = ['#ef4444', '#f97316', '#eab308', '#3b82f6', '#22c55e'];
   const strengthLabels = ['Too Weak', 'Weak', 'Fair', 'Good', 'Strong'];
+  const lengthOk = password.length >= 8;
+  const matchOk = confirmPassword.length > 0 && password === confirmPassword;
+
+  const checkCaps = (e: React.KeyboardEvent) => {
+    if (typeof e.getModifierState === 'function') {
+      setCapsOn(e.getModifierState('CapsLock'));
+    }
+  };
 
   const handleGoogleSuccess = async (tokenResponse: any) => {
     setLoading(true);
@@ -54,6 +64,8 @@ export const RegisterPage: React.FC = () => {
     onError: () => setError('Google sign-up popup was cancelled or failed.'),
   });
 
+  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
   const handleSocialClick = (provider: string) => {
     if (provider === 'google') {
       loginWithGoogle();
@@ -63,7 +75,7 @@ export const RegisterPage: React.FC = () => {
       const left = window.screen.width / 2 - width / 2;
       const top = window.screen.height / 2 - height / 2;
       window.open(
-        `http://localhost:8000/api/v1/auth/auth/social-${provider}`,
+        `${apiBase}/auth/auth/social-${provider}`,
         `OAuth_${provider}`,
         `width=${width},height=${height},top=${top},left=${left}`
       );
@@ -113,8 +125,18 @@ export const RegisterPage: React.FC = () => {
             <p>Join Lebenslauf AI to generate ATS-optimized resumes</p>
           </div>
 
-          {error && <div className={styles.errorBanner}>{error}</div>}
-          {successMsg && <div className={styles.successBanner}>{successMsg}</div>}
+          {error && (
+            <div className={styles.errorBanner} role="alert">
+              <AlertCircle size={17} className={styles.bannerIcon} />
+              <span>{error}</span>
+            </div>
+          )}
+          {successMsg && (
+            <div className={styles.successBanner} role="status">
+              <CheckCircle2 size={17} className={styles.bannerIcon} />
+              <span>{successMsg}</span>
+            </div>
+          )}
 
           {!successMsg ? (
             <>
@@ -150,18 +172,35 @@ export const RegisterPage: React.FC = () => {
                 </div>
 
                 <div className={styles.formGroup}>
-                  <label>Password</label>
+                  <label htmlFor="registerPassword">Password</label>
                   <div className={styles.inputWrapper}>
                     <Lock className={styles.inputIcon} />
                     <input
-                      type="password"
-                      className={styles.authInput}
+                      id="registerPassword"
+                      type={showPassword ? 'text' : 'password'}
+                      className={`${styles.authInput} ${styles.authInputWithEye}`}
                       placeholder="••••••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      onKeyUp={checkCaps}
+                      onBlur={() => setCapsOn(false)}
                       required
+                      autoComplete="new-password"
                     />
+                    <button
+                      type="button"
+                      className={styles.eyeBtn}
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
+                  {capsOn && (
+                    <p className={styles.capsHint}>
+                      <AlertTriangle size={13} /> Caps Lock is on
+                    </p>
+                  )}
                   {password && (
                     <div className={styles.strengthMeter}>
                       <div className={styles.strengthBarTrack}>
@@ -176,20 +215,34 @@ export const RegisterPage: React.FC = () => {
                       <span className={styles.strengthLabel} style={{ color: strengthColors[pwdScore] }}>
                         Strength: {strengthLabels[pwdScore]}
                       </span>
+                      <ul className={styles.checkList} aria-live="polite">
+                        <li className={lengthOk ? styles.ok : ''}>
+                          {lengthOk ? <Check size={13} /> : <X size={13} />} At least 8 characters
+                        </li>
+                        <li className={pwdScore >= 2 ? styles.ok : ''}>
+                          {pwdScore >= 2 ? <Check size={13} /> : <X size={13} />} Strong enough to be accepted
+                        </li>
+                        <li className={matchOk ? styles.ok : ''}>
+                          {matchOk ? <Check size={13} /> : <X size={13} />} Passwords match
+                        </li>
+                      </ul>
                     </div>
                   )}
                 </div>
 
                 <div className={styles.formGroup}>
-                  <label>Confirm Password</label>
+                  <label htmlFor="registerConfirm">Confirm Password</label>
                   <div className={styles.inputWrapper}>
                     <Lock className={styles.inputIcon} />
                     <input
-                      type="password"
-                      className={styles.authInput}
+                      id="registerConfirm"
+                      type={showPassword ? 'text' : 'password'}
+                      className={`${styles.authInput} ${styles.authInputWithEye}`}
                       placeholder="••••••••••••"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
+                      onKeyUp={checkCaps}
+                      onBlur={() => setCapsOn(false)}
                       required
                     />
                   </div>
@@ -201,12 +254,12 @@ export const RegisterPage: React.FC = () => {
               </form>
 
               <div className={styles.divider}>
-                <span>OR CONTINUE WITH</span>
+                <span>Or continue with</span>
               </div>
 
               <div className={styles.socialGrid}>
-                <button type="button" className={styles.socialBtn} onClick={() => handleSocialClick('google')}>
-                  <svg width="18" height="18" viewBox="0 0 24 24">
+                <button type="button" className={styles.socialBtn} onClick={() => handleSocialClick('google')} aria-label="Continue with Google">
+                  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
@@ -214,9 +267,13 @@ export const RegisterPage: React.FC = () => {
                   </svg>
                   <span>Google</span>
                 </button>
-                <button type="button" className={styles.socialBtn} onClick={() => handleSocialClick('github')}>
+                <button type="button" className={styles.socialBtn} onClick={() => handleSocialClick('github')} aria-label="Continue with GitHub">
                   <Github size={18} />
                   <span>GitHub</span>
+                </button>
+                <button type="button" className={styles.socialBtn} onClick={() => handleSocialClick('linkedin')} aria-label="Continue with LinkedIn">
+                  <Linkedin size={18} />
+                  <span>LinkedIn</span>
                 </button>
               </div>
             </>

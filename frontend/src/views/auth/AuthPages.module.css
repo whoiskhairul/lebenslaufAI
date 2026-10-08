@@ -1,22 +1,26 @@
+/* Auth pages are fixed-light: same paper as the landing navbar and
+   footer, so the three read as one continuous sheet. Colors are fixed
+   (not theme tokens) because these pages don't use [data-theme]. */
+
 .authContainer {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #F8FAFC;
-  color: #0F172A;
-  padding: 2rem 1rem;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 3rem 1rem 4rem;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 .authCard {
   width: 100%;
   max-width: 440px;
-  background: #FFFFFF;
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  border-radius: 6px;
-  padding: 2.5rem 2rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  background: #ffffff;
+  border: 1px solid #e6ebf1;
+  border-radius: 18px;
+  padding: 2.75rem 2.25rem 2.25rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 16px 40px -16px rgba(15, 23, 42, 0.18);
   animation: fadeIn 0.3s ease-out;
 }
 
@@ -27,17 +31,31 @@
 
 .authHeader h1 {
   font-family: 'Space Grotesk', 'Outfit', sans-serif;
-  font-size: 1.75rem;
+  font-size: 1.9rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
-  color: #0F172A;
-  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: #0f172a;
+  margin-bottom: 0.6rem;
 }
 
 .authHeader p {
-  color: #64748B;
-  font-size: 0.925rem;
-  line-height: 1.5;
+  color: #64748b;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.stepTag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #4338ca;
+  background: rgba(79, 70, 229, 0.08);
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  margin-bottom: 0.75rem;
 }
 
 .formGroup {
@@ -47,8 +65,8 @@
 .formGroup label {
   display: block;
   font-size: 0.85rem;
-  font-weight: 500;
-  color: #0F172A;
+  font-weight: 600;
+  color: #0f172a;
   margin-bottom: 0.5rem;
 }
 
@@ -61,30 +79,112 @@
 .inputIcon {
   position: absolute;
   left: 1rem;
-  color: #94A3B8;
+  color: #94a3b8;
   width: 18px;
   height: 18px;
+  pointer-events: none;
 }
 
 .authInput {
   width: 100%;
   padding: 0.8rem 1rem 0.8rem 2.75rem;
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 4px;
-  color: #0F172A;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  color: #0f172a;
   font-size: 0.95rem;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .authInput::placeholder {
-  color: #94A3B8;
+  color: #94a3b8;
+}
+
+.authInput:hover {
+  border-color: #94a3b8;
 }
 
 .authInput:focus {
   outline: none;
-  border-color: #818CF8;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.authInput:-webkit-autofill {
+  -webkit-text-fill-color: #0f172a;
+  caret-color: #0f172a;
+  box-shadow: inset 0 0 0 100px #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.eyeBtn {
+  position: absolute;
+  right: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.eyeBtn:hover {
+  color: #0f172a;
+}
+
+.eyeBtn:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 1px;
+}
+
+.authInputWithEye {
+  padding-right: 3.25rem;
+}
+
+.capsHint {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #92400e;
+  margin-top: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.codeInput {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.5em;
+  text-indent: 0.5em;
+  padding: 1rem 1rem 1rem 1.5rem;
+}
+
+.checkList {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.checkList li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.checkList li.ok {
+  color: #166534;
 }
 
 .strengthMeter {
@@ -93,7 +193,7 @@
 
 .strengthBarTrack {
   height: 4px;
-  background: #E2E8F0;
+  background: #e2e8f0;
   border-radius: 2px;
   overflow: hidden;
 }
@@ -105,6 +205,7 @@
 
 .strengthLabel {
   font-size: 0.75rem;
+  font-weight: 600;
   margin-top: 0.25rem;
   display: block;
 }
@@ -121,11 +222,12 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.7rem;
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 4px;
-  color: #0F172A !important;
+  min-height: 48px;
+  padding: 0.7rem 0.5rem;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  color: #0f172a;
   font-weight: 500;
   font-size: 0.875rem;
   cursor: pointer;
@@ -133,16 +235,21 @@
 }
 
 .socialBtn:hover {
-  background: #F8FAFC;
-  border-color: #94A3B8;
-  color: #0F172A !important;
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.socialBtn:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
 }
 
 .divider {
   display: flex;
   align-items: center;
   margin: 1.5rem 0;
-  color: #64748B;
+  color: #64748b;
   font-size: 0.8rem;
 }
 
@@ -150,7 +257,7 @@
 .divider::after {
   content: '';
   flex: 1;
-  border-bottom: 1px solid #E2E8F0;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .divider span {
@@ -159,56 +266,111 @@
 
 .primaryBtn {
   width: 100%;
+  min-height: 48px;
   padding: 0.85rem;
-  background: #0F172A;
+  background: #0f172a;
   border: none;
-  border-radius: 4px;
-  color: #F8FAFC !important;
-  font-weight: 500;
+  border-radius: 12px;
+  color: #f8fafc;
+  font-weight: 600;
   font-size: 0.95rem;
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
 
 .primaryBtn:hover:not(:disabled) {
-  background: #1E293B;
-  color: #F8FAFC !important;
+  background: #1e293b;
+  color: #f8fafc;
 }
 
 .primaryBtn:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
+.primaryBtn:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+.secondaryBtn {
+  width: 100%;
+  min-height: 48px;
+  padding: 0.85rem;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  color: #0f172a;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.secondaryBtn:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.secondaryBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.secondaryBtn:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
 .errorBanner {
-  background: #FEF2F2;
-  border: 1px solid #FECACA;
-  color: #B91C1C;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
   padding: 0.75rem 1rem;
-  border-radius: 4px;
+  border-radius: 12px;
   font-size: 0.875rem;
+  line-height: 1.45;
   margin-bottom: 1.25rem;
 }
 
 .successBanner {
-  background: #ECFDF5;
-  border: 1px solid #A7F3D0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
   color: #047857;
   padding: 0.75rem 1rem;
-  border-radius: 4px;
+  border-radius: 12px;
   font-size: 0.875rem;
+  line-height: 1.45;
   margin-bottom: 1.25rem;
+}
+
+.bannerIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.hintText {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-top: 0.5rem;
+  line-height: 1.5;
 }
 
 .authFooter {
   text-align: center;
   margin-top: 1.5rem;
   font-size: 0.875rem;
-  color: #64748B;
+  color: #64748b;
 }
 
 .authFooter a {
-  color: #4F46E5;
+  color: #4f46e5;
   text-decoration: none;
   font-weight: 500;
 }
@@ -217,15 +379,33 @@
   text-decoration: underline;
 }
 
+.authFooter a:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .authCard {
+    animation: none;
+  }
+}
+
 /* ===== Small Screen Polish ===== */
 @media (max-width: 480px) {
+  .authContainer {
+    padding: 2rem 0.75rem 3rem;
+    align-items: flex-start;
+  }
+
   .authCard {
     padding: 1.75rem 1.25rem;
+    border-radius: 16px;
   }
 
   .authHeader h1 {

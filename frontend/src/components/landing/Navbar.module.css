@@ -1,6 +1,6 @@
-/* Light paper strip matching the landing header, sits on top of the dark
-   auth page. Colors are fixed (not theme tokens) because the auth pages
-   don't use the app-wide [data-theme] system. */
+/* Light paper strip shared by the landing header and the light auth pages.
+   Colors are fixed (not theme tokens) because the auth pages don't use
+   the app-wide [data-theme] system. */
 .navbar {
   background: #F8FAFC;
   border-bottom: 1px solid rgba(226, 232, 240, 0.9);

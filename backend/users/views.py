@@ -17,8 +17,10 @@ from django.utils.encoding import force_bytes, force_str
 from rest_framework import status, permissions, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 
 from .models import UserProfile, UserSession, AuthAuditLog
 from .serializers import (
@@ -64,6 +66,17 @@ def issue_session_tokens(user, request, lifetime_days=7, device_info=None):
     refresh['session_key'] = session_key
     access = refresh.access_token
     access['session_key'] = session_key
+    # for_user() stores the pre-mutation token string in OutstandingToken;
+    # refresh it so the row carries the final claims (session_key). Without
+    # this, claim-based matching (e.g. keep-current-session on password
+    # change) can never see the session binding.
+    try:
+        expires_at = timezone.datetime.fromtimestamp(refresh['exp'], tz=timezone.utc)
+    except Exception:
+        expires_at = timezone.now() + timedelta(days=lifetime_days)
+    OutstandingToken.objects.filter(user=user, jti=refresh['jti']).update(
+        token=str(refresh), expires_at=expires_at,
+    )
     return refresh, session_key
 
 
@@ -77,8 +90,32 @@ def register_failed_attempt(user, request, reason):
     log_auth_event(user, 'LOGIN_FAILED', request, {"reason": reason} if reason else None)
 
 
+def blacklist_all_user_tokens(user):
+    """Blacklist every outstanding refresh token for a user.
+
+    JWT access tokens are stateless, so flipping UserSession.is_active
+    alone never revokes them. Blacklisting here makes password
+    change/reset actually sign devices out (access tokens expire
+    within the hour on their own).
+    """
+    for outstanding in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=outstanding)
+
+
+def consume_recovery_code(user, code):
+    """Single-use recovery codes: remove and persist on use."""
+    codes = list(user.two_factor_recovery_codes or [])
+    if code in codes:
+        codes.remove(code)
+        user.two_factor_recovery_codes = codes
+        user.save(update_fields=['two_factor_recovery_codes'])
+        return True
+    return False
+
+
 class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_scope = 'register'
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
@@ -131,6 +168,7 @@ class EmailVerifyView(APIView):
 
 class EmailVerifyResendView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_scope = 'email'
 
     def post(self, request):
         email = request.data.get('email')
@@ -140,8 +178,8 @@ class EmailVerifyResendView(APIView):
         try:
             user = User.objects.get(email=email)
             if user.email_verified:
-                return Response({"message": "Email is already verified."})
-            
+                return Response({"message": "If an account exists with this email, a verification link was sent."})
+
             token = str(uuid.uuid4())
             user.email_verification_token = token
             user.save(update_fields=['email_verification_token'])
@@ -161,6 +199,7 @@ class EmailVerifyResendView(APIView):
 
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_scope = 'login'
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -192,6 +231,12 @@ class LoginView(APIView):
         user.login_attempts_count = 0
         user.account_locked_until = None
         user.save(update_fields=['login_attempts_count', 'account_locked_until'])
+
+        if not user.email_verified:
+            return Response({
+                "error": "Please verify your email address before logging in. Check your inbox for the verification link.",
+                "code": "email_not_verified"
+            }, status=status.HTTP_403_FORBIDDEN)
 
         # 2FA Check if enabled
         if user.two_factor_enabled:
@@ -253,6 +298,7 @@ class LogoutView(APIView):
 
 class PasswordResetRequestView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_scope = 'password'
 
     def post(self, request):
         serializer = PasswordResetSerializer(data=request.data)
@@ -303,6 +349,7 @@ class PasswordResetConfirmView(APIView):
             user.save()
             # Deactivate all active sessions on password reset
             UserSession.objects.filter(user=user).update(is_active=False)
+            blacklist_all_user_tokens(user)
             log_auth_event(user, 'PASSWORD_RESET_CONF', request)
             return Response({"message": "Password reset successfully. You can now log in with your new password."})
         
@@ -323,10 +370,34 @@ class PasswordChangeView(APIView):
 
         user.set_password(serializer.validated_data['new_password'])
         user.save()
-        # Revoke other sessions on password change
-        UserSession.objects.filter(user=user).update(is_active=False)
+        # Sign out every OTHER device, but keep the session the user is
+        # changing the password from. Refresh and access tokens have
+        # different jtis, so the current session is matched by its
+        # session_key claim (decoded from each outstanding token). If
+        # unidentifiable, fall back to revoking everything.
+        current_session_key = None
+        try:
+            token = request.auth
+            if token is not None:
+                current_session_key = token.get('session_key')
+        except Exception:
+            pass
+        if current_session_key:
+            UserSession.objects.filter(user=user).exclude(
+                session_key=current_session_key
+            ).update(is_active=False)
+            for outstanding in OutstandingToken.objects.filter(user=user):
+                try:
+                    if RefreshToken(outstanding.token).get('session_key') == current_session_key:
+                        continue
+                except TokenError:
+                    pass
+                BlacklistedToken.objects.get_or_create(token=outstanding)
+        else:
+            UserSession.objects.filter(user=user).update(is_active=False)
+            blacklist_all_user_tokens(user)
         log_auth_event(user, 'PASSWORD_CHANGE', request)
-        return Response({"message": "Password changed successfully."})
+        return Response({"message": "Password changed. Other devices were signed out."})
 
 
 class TwoFactorSetupView(APIView):
@@ -363,6 +434,7 @@ class TwoFactorSetupView(APIView):
 
 class TwoFactorVerifyView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    throttle_scope = 'twofa'
 
     def post(self, request):
         serializer = TwoFactorVerifySerializer(data=request.data)
@@ -380,6 +452,12 @@ class TwoFactorVerifyView(APIView):
             user.two_factor_enabled = True
             user.save(update_fields=['two_factor_enabled'])
             log_auth_event(user, '2FA_ENABLED', request)
+            return Response({"message": "Two-factor authentication enabled successfully."})
+
+        if consume_recovery_code(user, code):
+            user.two_factor_enabled = True
+            user.save(update_fields=['two_factor_enabled'])
+            log_auth_event(user, '2FA_ENABLED', request, {"via": "recovery_code"})
             return Response({"message": "Two-factor authentication enabled successfully."})
 
         return Response({"error": "Invalid verification code."}, status=status.HTTP_400_BAD_REQUEST)
@@ -408,7 +486,13 @@ class SessionListView(APIView):
     def get(self, request):
         sessions = UserSession.objects.filter(user=request.user, is_active=True).order_by('-last_activity')
         serializer = UserSessionSerializer(sessions, many=True, context={'request': request})
-        return Response(serializer.data)
+        data = serializer.data
+        current_key = request.headers.get('X-Session-Key') or request.query_params.get('session_key')
+        if current_key:
+            for entry in data:
+                if entry.get('session_key') == current_key:
+                    entry['is_current'] = True
+        return Response(data)
 
 
 class SessionRevokeView(APIView):
@@ -478,6 +562,7 @@ class SocialLoginView(APIView):
     impersonation of any account).
     """
     permission_classes = [permissions.AllowAny]
+    throttle_scope = 'login'
 
     def _verify_with_provider(self, provider, access_token):
         """Return (email, full_name, avatar, email_verified) or None."""
@@ -569,6 +654,46 @@ class SocialLoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
+        existing_user = User.objects.filter(email=email).first()
+        password_reset_required = False
+        if existing_user and existing_user.has_usable_password() and not existing_user.email_verified:
+            # The provider just attested ownership of this verified email
+            # address, so merging is safe — but the pre-existing password
+            # was set by someone who never verified, and must not survive.
+            # Kill it and let the verified owner set a fresh one.
+            existing_user.set_unusable_password()
+            existing_user.email_verified = True
+            if full_name and not existing_user.full_name:
+                existing_user.full_name = full_name
+            existing_user.save()
+            password_reset_required = True
+            reset_token = default_token_generator.make_token(existing_user)
+            reset_uid = urlsafe_base64_encode(force_bytes(existing_user.pk))
+            reset_url = (
+                f"{settings.FRONTEND_URL}/reset-password"
+                f"?uid={reset_uid}&token={reset_token}"
+            )
+            try:
+                send_mail(
+                    subject="Set your Lebenslauf AI password",
+                    message=(
+                        f"Hello,\n\nYou just signed in with {provider}, which proved "
+                        f"ownership of this email address. For your security, any "
+                        f"previously set password was removed.\n\nSet a new password here:\n"
+                        f"{reset_url}\n\nIf this was not you, please contact support."
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[existing_user.email],
+                    fail_silently=True,
+                )
+            except Exception:
+                pass
+            log_auth_event(existing_user, 'SOCIAL_LOGIN', request, {
+                "provider": provider,
+                "flow": "client_api",
+                "note": "merged into unverified password account; password invalidated",
+            })
+
         user, created = User.objects.get_or_create(
             email=email,
             defaults={
@@ -595,7 +720,8 @@ class SocialLoginView(APIView):
             "refresh": str(refresh),
             "user": UserSerializer(user).data,
             "session_key": session_key,
-            "created": created
+            "created": created,
+            "password_reset_required": password_reset_required,
         })
 
 
@@ -634,9 +760,14 @@ class SocialCallbackRedirectView(APIView):
 
             access_token = str(refresh.access_token)
             refresh_token = str(refresh)
-            
-            # Redirect to React SPA with tokens
-            frontend_redirect = f"{settings.FRONTEND_URL}/login?access={access_token}&refresh={refresh_token}&session_key={session_key}"
+
+            # Tokens travel in the URL fragment, never the query string, so
+            # they stay out of server logs and analytics. The SPA strips
+            # the fragment immediately after reading it.
+            frontend_redirect = (
+                f"{settings.FRONTEND_URL}/login"
+                f"#access={access_token}&refresh={refresh_token}&session_key={session_key}"
+            )
             return redirect(frontend_redirect)
 
         return redirect(f"{settings.FRONTEND_URL}/login?error=OAuthAuthenticationFailed")
