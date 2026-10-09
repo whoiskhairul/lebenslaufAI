@@ -17,6 +17,7 @@ import {
   Check,
   Brain,
   ChevronDown,
+  MoreHorizontal,
 } from 'lucide-react';
 import { Button } from './Button';
 import { CompanyLogo } from './CompanyLogo';
@@ -140,7 +141,7 @@ const StatusSelect: React.FC<{
         aria-haspopup="listbox"
         aria-expanded={open}
         title="Change application status"
-        className="inline-flex items-center gap-1.5 h-8 pl-2.5 pr-2 rounded-lg border border-cardline bg-card text-foreground text-xs font-bold hover:border-primary transition-colors max-w-[150px]"
+        className="inline-flex items-center gap-1.5 h-10 pl-2.5 pr-2 rounded-lg border border-cardline bg-card text-foreground text-xs font-bold hover:border-primary transition-colors max-w-[44vw] sm:max-w-[150px]"
       >
         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: current.color }} />
         <span className="truncate capitalize">{current.label}</span>
@@ -210,6 +211,12 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
   const [notesDraft, setNotesDraft] = useState(app.notes || '');
   const [savingNotes, setSavingNotes] = useState(false);
   const [notesSavedTick, setNotesSavedTick] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
+  const savedTickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevFocusRef = useRef<HTMLElement | null>(null);
 
   // Reset per-application UI state when switching cards.
   useEffect(() => {
@@ -218,8 +225,14 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
     setDescDraft(app.job_description || '');
     setNotesDraft(app.notes || '');
     setNotesSavedTick(false);
+    setMoreOpen(false);
+    setShowHistory(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app.id]);
+
+  useEffect(() => () => {
+    if (savedTickTimer.current) clearTimeout(savedTickTimer.current);
+  }, []);
 
   // Keep drafts in sync after a successful save round-trip.
   useEffect(() => {
@@ -229,15 +242,69 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
     setNotesDraft(app.notes || '');
   }, [app.notes]);
 
-  // Esc closes the popover.
+  // Esc closes the popover. Scroll-lock + initial focus + restore focus.
   useEffect(() => {
+    prevFocusRef.current = document.activeElement as HTMLElement | null;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') p.onClose();
+      if (e.key === 'Escape') {
+        if (moreOpen) {
+          setMoreOpen(false);
+          return;
+        }
+        p.onClose();
+      }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const t = window.setTimeout(() => {
+      dialogRef.current?.querySelector<HTMLElement>(
+        'input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled])'
+      )?.focus();
+    }, 30);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+      window.clearTimeout(t);
+      prevFocusRef.current?.focus?.();
+      prevFocusRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Close the overflow menu on outside click.
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (!moreRef.current?.contains(e.target as Node)) setMoreOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [moreOpen]);
+
+  const focusTab = (id: TabId) => {
+    setTab(id);
+    window.setTimeout(() => {
+      const candidates = [...document.querySelectorAll<HTMLElement>(`[data-tab="${id}"]`)];
+      candidates.find((el) => el.offsetParent !== null)?.focus();
+    }, 0);
+  };
+
+  const onTabListKeyDown = (e: React.KeyboardEvent) => {
+    const ids = TABS.map((t) => t.id);
+    const i = ids.indexOf(tab);
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1;
+    focusTab(ids[(i + dir + ids.length) % ids.length]);
+  };
+
+  const tabPillCls = (active: boolean) =>
+    `inline-flex flex-none snap-start items-center gap-1.5 rounded-lg font-semibold whitespace-nowrap transition-colors border ${
+      active
+        ? 'border-primary text-primary bg-primary/10'
+        : 'border-transparent text-muted hover:text-foreground hover:bg-mutedlight'
+    }`;
 
   const saveDescription = async () => {
     setSavingDesc(true);
@@ -255,9 +322,29 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
     try {
       await p.onPatchFields(app.id, { notes: notesDraft });
       setNotesSavedTick(true);
-      setTimeout(() => setNotesSavedTick(false), 2500);
+      if (savedTickTimer.current) clearTimeout(savedTickTimer.current);
+      savedTickTimer.current = setTimeout(() => setNotesSavedTick(false), 2500);
     } finally {
       setSavingNotes(false);
+    }
+  };
+
+  const trapTab = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Tab') return;
+    const root = dialogRef.current;
+    if (!root) return;
+    const focusable = [...root.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )].filter((el) => el.offsetParent !== null);
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
     }
   };
 
@@ -265,137 +352,211 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
 
   return (
     <div
-      className="fixed inset-0 z-[800] bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 md:p-6"
-      onClick={p.onClose}
+      className="fixed inset-0 z-[800] bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 animate-fadeIn"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) p.onClose();
+      }}
       role="dialog"
       aria-modal="true"
-      aria-label="Job details"
+      aria-labelledby="job-details-title"
     >
       <div
-        className="w-[min(1120px,100%)] h-[min(800px,calc(100vh-2rem))] md:h-[min(800px,calc(100vh-4rem))] bg-card border border-cardline rounded-2xl shadow-lg flex flex-col overflow-hidden text-left"
+        ref={dialogRef}
+        onKeyDown={trapTab}
+        className="w-full sm:w-[min(1120px,100%)] h-[calc(100dvh-0.75rem)] sm:h-[min(800px,calc(100dvh-2rem))] md:h-[min(800px,calc(100vh-4rem))] bg-card border-0 sm:border border-cardline rounded-t-2xl sm:rounded-2xl shadow-lg flex flex-col overflow-hidden text-left animate-cardSlideIn"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Title bar */}
-        <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-cardline shrink-0">
-          <h3 className="font-header text-base md:text-lg font-bold text-foreground">Job Details</h3>
+        {/* Identity header (single title row) */}
+        <div className="flex items-start gap-2.5 md:gap-3 px-3.5 md:px-6 py-3 md:py-4 border-b border-cardline shrink-0">
+          <div className="flex items-start gap-2.5 md:gap-3 min-w-0 flex-1">
+            <div className="shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-lg border border-cardline bg-mutedlight flex items-center justify-center overflow-hidden">
+              <CompanyLogo company={app.company} domain={app.company_domain} size={36} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 id="job-details-title" className="font-header text-base md:text-xl font-extrabold text-foreground line-clamp-2 break-words leading-snug">{app.position}</h2>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[13px] md:text-sm text-muted">
+                <span className="inline-flex items-center gap-1.5 font-medium text-foreground/80">
+                  <Building2 size={14} className="text-muted" />
+                  <span className="break-words" title={app.company}>{app.company}</span>
+                </span>
+                {app.location && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin size={14} />
+                    <span className="break-words">{app.location}</span>
+                  </span>
+                )}
+                {app.salary && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <DollarSign size={14} />
+                    <span className="break-words">{app.salary}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
           <button
             type="button"
             onClick={p.onClose}
             aria-label="Close job details"
-            className="w-[30px] h-[30px] rounded-md flex items-center justify-center text-muted hover:text-foreground hover:bg-mutedlight transition-colors"
+            className="w-11 h-11 shrink-0 rounded-md flex items-center justify-center text-muted hover:text-foreground hover:bg-mutedlight transition-colors"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Identity header */}
-        <div className="flex flex-col lg:flex-row lg:items-start gap-3 px-4 md:px-6 py-4 border-b border-cardline shrink-0">
-          <div className="flex items-start gap-3 min-w-0 flex-1">
-            <div className="shrink-0 w-14 h-14 rounded-lg border border-cardline bg-mutedlight flex items-center justify-center overflow-hidden">
-              <CompanyLogo company={app.company} domain={app.company_domain} size={40} />
-            </div>
-            <div className="min-w-0">
-              <h2 className="font-header text-lg md:text-xl font-extrabold text-foreground truncate">{app.position}</h2>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-muted">
-                <span className="inline-flex items-center gap-1.5 font-medium text-foreground/80">
-                  <Building2 size={14} className="text-muted" />
-                  <span className="truncate max-w-[180px]" title={app.company}>{app.company}</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin size={14} />
-                  <span className="truncate max-w-[180px]">{app.location || 'Location Not Specified'}</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <DollarSign size={14} />
-                  <span className="truncate max-w-[180px]">Salary: {app.salary || 'Not specified'}</span>
-                </span>
+        {/* Actions row */}
+        <div className="flex flex-wrap items-center gap-2 px-3.5 md:px-6 py-2.5 border-b border-cardline shrink-0">
+          <Button
+            onClick={p.onOpenEditor}
+            className="h-10"
+            style={{ padding: '0 12px', fontSize: '12px' }}
+          >
+            <Sparkles size={14} />
+            <span className="hidden min-[420px]:inline">Open Tailoring Canvas</span>
+            <span className="min-[420px]:hidden">Tailor</span>
+          </Button>
+          <button
+            type="button"
+            onClick={() => p.onEdit(app)}
+            title="Edit application"
+            aria-label="Edit application"
+            className="h-10 px-3 inline-flex items-center gap-1.5 rounded-lg border border-cardline text-foreground hover:border-primary hover:text-primary text-xs font-bold transition-colors"
+          >
+            <Pencil size={14} />
+            Edit
+          </button>
+          {app.status === 'archived' ? (
+            <button
+              type="button"
+              onClick={() => p.onRestore(app.id)}
+              title={`Restore to ${p.previousStatusLabel}`}
+              aria-label="Restore application"
+              className="w-10 h-10 inline-flex items-center justify-center rounded-lg border border-cardline text-foreground hover:border-success hover:text-success transition-colors"
+            >
+              <Undo2 size={15} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => p.onArchive(app.id)}
+              title="Archive application"
+              aria-label="Archive application"
+              className="w-10 h-10 inline-flex items-center justify-center rounded-lg border border-cardline text-muted hover:text-foreground hover:border-muted transition-colors"
+            >
+              <Archive size={15} />
+            </button>
+          )}
+          <div ref={moreRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setMoreOpen((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={moreOpen}
+              title="More actions"
+              aria-label="More actions"
+              className="w-10 h-10 inline-flex items-center justify-center rounded-lg border border-cardline text-muted hover:text-foreground hover:border-muted transition-colors"
+            >
+              <MoreHorizontal size={15} />
+            </button>
+            {moreOpen && (
+              <div role="menu" className="absolute left-0 top-[calc(100%+6px)] min-w-[180px] p-1 rounded-xl bg-card border border-cardline shadow-lg z-[100]">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    p.onDelete(app.id);
+                  }}
+                  className="w-full flex items-center gap-2 px-2.5 py-3 rounded-lg text-xs font-bold text-danger hover:bg-danger/10 transition-colors"
+                >
+                  <Trash2 size={14} />
+                  Delete application
+                </button>
               </div>
-            </div>
-          </div>
-          <div className="flex flex-col items-start lg:items-end gap-1 shrink-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => p.onDelete(app.id)}
-                title="Delete application"
-                aria-label="Delete application"
-                className="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-danger/60 text-danger hover:bg-danger/10 transition-colors"
-              >
-                <Trash2 size={14} />
-              </button>
-              <button
-                type="button"
-                onClick={() => p.onEdit(app)}
-                title="Edit application"
-                aria-label="Edit application"
-                className="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-primary/60 text-primary hover:bg-primary/10 transition-colors"
-              >
-                <Pencil size={14} />
-              </button>
-              {app.status === 'archived' ? (
-                <button
-                  type="button"
-                  onClick={() => p.onRestore(app.id)}
-                  title={`Restore to ${p.previousStatusLabel}`}
-                  aria-label="Restore application"
-                  className="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-cardline text-foreground hover:border-success hover:text-success transition-colors"
-                >
-                  <Undo2 size={14} />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => p.onArchive(app.id)}
-                  title="Archive application"
-                  aria-label="Archive application"
-                  className="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-cardline text-muted hover:text-foreground hover:border-muted transition-colors"
-                >
-                  <Archive size={14} />
-                </button>
-              )}
-              <StatusSelect
-                value={app.status}
-                options={p.statusOptions}
-                onChange={(s) => p.onStatusChange(app.id, s)}
-              />
-            </div>
-            {app.created_at && (
-              <p className="text-xs text-muted">Added on {formatDate(app.created_at)}.</p>
             )}
+          </div>
+          <div className="ml-auto flex items-center gap-1.5 min-w-0 flex-1 sm:flex-none sm:ml-auto justify-end">
+            <StatusSelect
+              value={app.status}
+              options={p.statusOptions}
+              onChange={(s) => p.onStatusChange(app.id, s)}
+            />
+          </div>
+          {app.created_at && (
+            <p className="text-xs text-muted w-full mt-1">Added on {formatDate(app.created_at)}.</p>
+          )}
+        </div>
+
+        {/* Mobile tab bar: fixed outside the scroll area, scrolls internally */}
+        <div className="lg:hidden shrink-0 min-w-0 max-w-full border-b border-cardline bg-card">
+          <div
+            role="tablist"
+            aria-label="Detail sections"
+            onKeyDown={onTabListKeyDown}
+            className="flex gap-1 p-2 overflow-x-auto thin-scrollbar max-w-full"
+          >
+            {TABS.map(({ id, label, Icon }) => {
+              const active = tab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  data-tab={id}
+                  aria-selected={active}
+                  aria-controls={`job-panel-${id}`}
+                  tabIndex={active ? 0 : -1}
+                  onClick={() => setTab(id)}
+                  className={`${tabPillCls(active)} px-2.5 py-1.5 text-xs`}
+                >
+                  <Icon size={14} />
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* 3-column body */}
-        <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden">
-          <div className="grid lg:grid-cols-[190px_minmax(0,1fr)_270px] min-h-full lg:h-full">
-            {/* Left tabs */}
-            <nav
-              aria-label="Detail sections"
-              className="flex lg:flex-col gap-1.5 p-3 lg:p-4 lg:border-r border-b lg:border-b-0 border-cardline overflow-x-auto lg:overflow-visible shrink-0"
-            >
+        {/* Body: one scroll on mobile, three independent columns on desktop */}
+        <div className="flex-1 min-h-0 min-w-0 max-w-full overflow-y-auto lg:overflow-hidden thin-scrollbar">
+          <div className="grid grid-cols-1 lg:grid-cols-[172px_minmax(0,1fr)_270px] min-h-full lg:h-full min-w-0 max-w-full">
+            {/* Left tabs (desktop only) */}
+            <nav aria-label="Detail sections" className="hidden lg:block lg:h-full lg:min-h-0 lg:overflow-y-auto thin-scrollbar min-w-0">
+              <div
+                role="tablist"
+                aria-label="Detail sections"
+                onKeyDown={onTabListKeyDown}
+                className="flex lg:flex-col gap-1 p-2 lg:p-3 lg:border-r border-cardline shrink-0"
+              >
               {TABS.map(({ id, label, Icon }) => {
                 const active = tab === id;
                 return (
                   <button
                     key={id}
                     type="button"
+                    role="tab"
+                    data-tab={id}
+                    aria-selected={active}
+                    aria-controls={`job-panel-${id}`}
+                    tabIndex={active ? 0 : -1}
                     onClick={() => setTab(id)}
-                    aria-current={active ? 'true' : undefined}
-                    className={`inline-flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors border ${
-                      active
-                        ? 'border-primary text-primary bg-primary/10'
-                        : 'border-transparent text-muted hover:text-foreground hover:bg-mutedlight'
-                    }`}
+                    className={`${tabPillCls(active)} px-3 py-2 text-[13px]`}
                   >
-                    <Icon size={17} />
+                    <Icon size={15} />
                     {label}
                   </button>
                 );
               })}
+              </div>
             </nav>
 
-            {/* Middle content */}
-            <div className="p-4 md:p-6 lg:overflow-y-auto lg:min-h-0 thin-scrollbar">
+            {/* Middle content (own scroll on desktop) */}
+            <div
+              role="tabpanel"
+              id={`job-panel-${tab}`}
+              aria-label={TABS.find((t) => t.id === tab)?.label ?? 'Details'}
+              className="p-4 md:p-6 min-h-0 min-w-0 max-w-full overflow-x-clip lg:h-full lg:min-h-0 lg:overflow-y-auto thin-scrollbar"
+            >
               {tab === 'overview' && (
                 <div>
                   {app.url && (
@@ -436,15 +597,7 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
                       </div>
                     ) : (
                       <div>
-                        <div
-                          className="whitespace-pre-wrap max-h-[420px] overflow-y-auto thin-scrollbar pr-1"
-                          style={{
-                            fontFamily: "Georgia, 'Times New Roman', serif",
-                            fontSize: '14.5px',
-                            lineHeight: 1.75,
-                            color: 'var(--foreground)',
-                          }}
-                        >
+                        <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
                           {app.job_description}
                         </div>
                         <button
@@ -482,27 +635,21 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center text-center py-6">
-                      <div className="w-20 h-20 rounded-2xl bg-sky-100 dark:bg-sky-500/10 flex items-center justify-center mb-5">
-                        <FileText size={44} className="text-sky-300 dark:text-sky-400" />
+                    <div className="flex flex-col items-center text-center py-8">
+                      <div className="w-16 h-16 rounded-2xl bg-mutedlight flex items-center justify-center mb-4">
+                        <FileText size={32} className="text-muted" />
                       </div>
-                      <p className="font-header text-lg font-bold text-foreground mb-3">
-                        This job does not have any description
+                      <p className="font-header text-base font-bold text-foreground mb-2">
+                        No description yet
                       </p>
-                      <p className="text-sm text-muted leading-relaxed max-w-[520px] mb-6">
-                        You can edit this job to add a description to it. Once you add a description
-                        you will also be able to tailor your CV against it.
+                      <p className="text-sm text-muted leading-relaxed max-w-[440px] mb-5">
+                        Add the job description to tailor your CV against it.
                       </p>
-                      <Button onClick={() => setEditingDesc(true)} style={{ padding: '10px 22px', fontSize: '14px' }}>
+                      <Button onClick={() => setEditingDesc(true)} style={{ padding: '9px 18px', fontSize: '13px' }}>
                         Add Description
                       </Button>
                     </div>
                   )}
-
-                  <Button onClick={p.onOpenEditor} className="w-full mt-5">
-                    <Sparkles size={16} />
-                    <span>Launch Tailoring Canvas</span>
-                  </Button>
                 </div>
               )}
 
@@ -512,11 +659,13 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
                   <div className="flex flex-col gap-3">
                     {[
                       { label: 'Company Name', value: app.company },
-                      { label: 'Company Domain', value: app.company_domain || '—' },
-                      { label: 'Location', value: app.location || 'Not Specified' },
-                      { label: 'Contact Name', value: app.contact_name || '—' },
-                      { label: 'Contact Email', value: app.contact_email || '—' },
-                    ].map((row) => (
+                      { label: 'Company Domain', value: app.company_domain || '' },
+                      { label: 'Location', value: app.location || '' },
+                      { label: 'Contact Name', value: app.contact_name || '' },
+                      { label: 'Contact Email', value: app.contact_email || '' },
+                    ]
+                      .filter((row) => row.value && row.value.trim() !== '')
+                      .map((row) => (
                       <div key={row.label} className="flex flex-col gap-0.5 border-b border-cardline pb-2.5">
                         <span className="text-[10px] font-bold uppercase tracking-wide text-muted">{row.label}</span>
                         <span className="text-sm font-semibold text-foreground break-words">{row.value}</span>
@@ -531,10 +680,6 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
                       </div>
                     )}
                   </div>
-                  <Button variant="secondary" onClick={() => p.onEdit(app)} className="mt-4">
-                    <Pencil size={14} />
-                    <span>Edit Company Details</span>
-                  </Button>
                 </div>
               )}
 
@@ -575,13 +720,9 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
                         <FileText size={32} className="text-muted" />
                       </div>
                       <p className="font-header text-base font-bold text-foreground mb-2">No tailored documents yet</p>
-                      <p className="text-sm text-muted leading-relaxed max-w-[440px] mb-5">
-                        Tailored CV versions and cover letters for this application will appear here.
+                      <p className="text-sm text-muted leading-relaxed max-w-[440px]">
+                        Tailored CV versions and cover letters for this application will appear here. Use the button below to create one.
                       </p>
-                      <Button onClick={p.onOpenEditor} style={{ padding: '9px 18px', fontSize: '13px' }}>
-                        <Sparkles size={15} />
-                        <span>Launch Tailoring Canvas</span>
-                      </Button>
                     </div>
                   ) : (
                     <div className="flex flex-col gap-4">
@@ -656,18 +797,13 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
                     if (!version) {
                       return (
                         <div className="flex flex-col items-center text-center py-8">
-                          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-                            <Brain size={30} className="text-primary" />
+                          <div className="w-16 h-16 rounded-2xl bg-mutedlight flex items-center justify-center mb-4">
+                            <Brain size={32} className="text-muted" />
                           </div>
                           <p className="font-header text-base font-bold text-foreground mb-2">No AI insights yet</p>
-                          <p className="text-sm text-muted leading-relaxed max-w-[440px] mb-5">
-                            Once you generate a tailored resume for this job, the AI&apos;s analysis —
-                            match score, keywords, recruiter impression and gaps — will appear here.
+                          <p className="text-sm text-muted leading-relaxed max-w-[440px]">
+                            Tailor a resume for this job to see match score and keywords here.
                           </p>
-                          <Button onClick={p.onOpenEditor} style={{ padding: '9px 18px', fontSize: '13px' }}>
-                            <Sparkles size={15} />
-                            <span>Generate Tailored Resume</span>
-                          </Button>
                         </div>
                       );
                     }
@@ -814,11 +950,6 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
                             ))}
                           </div>
                         )}
-
-                        <Button variant="secondary" onClick={p.onOpenEditor} className="w-full">
-                          <Sparkles size={15} />
-                          <span>Open in Tailoring Canvas</span>
-                        </Button>
                       </div>
                     );
                   })()}
@@ -826,40 +957,51 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
               )}
             </div>
 
-            {/* Right timeline */}
-            <aside aria-label="Status history" className="p-4 md:p-5 lg:border-l border-t lg:border-t-0 border-cardline lg:overflow-y-auto lg:min-h-0 thin-scrollbar">
-              <h4 className="font-header text-lg font-bold text-foreground mb-4">Timeline</h4>
+            {/* Right timeline (own scroll on desktop, disclosure on mobile) */}
+            <div className="lg:border-l border-t lg:border-t-0 border-cardline lg:h-full lg:min-h-0 lg:overflow-y-auto thin-scrollbar min-w-0 max-w-full">
+              <button
+                type="button"
+                aria-expanded={showHistory}
+                aria-controls="job-timeline"
+                onClick={() => setShowHistory((v) => !v)}
+                className="lg:hidden w-full flex items-center gap-2 px-4 py-3 text-sm font-bold text-muted hover:text-foreground transition-colors"
+              >
+                <ChevronDown
+                  size={16}
+                  aria-hidden="true"
+                  className={`transition-transform duration-200 ${showHistory ? 'rotate-180' : ''}`}
+                />
+                History{history.length > 0 ? ` (${history.length})` : ''}
+              </button>
+              <aside
+                id="job-timeline"
+                aria-label="Status history"
+                className={`${showHistory ? 'block' : 'hidden'} lg:block p-4 md:p-5 pt-1 lg:pt-5`}
+              >
+              <h4 className="hidden lg:block font-header text-lg font-bold text-foreground mb-4">Timeline</h4>
               {history.length === 0 ? (
                 <p className="text-xs text-muted">No history yet.</p>
               ) : (
                 <ol className="relative flex flex-col gap-3 pl-5 before:content-[''] before:absolute before:left-[5px] before:top-2 before:bottom-2 before:w-[2px] before:bg-cardline before:rounded">
                   {history.map((h, i) => {
                     const isCreation = i === history.length - 1;
-                    const prevEntry = history[i + 1];
                     // Index into the chronological status_history array.
                     const entryIndex = history.length - 1 - i;
                     return (
                       <li key={`${h.status}-${h.date}-${i}`} className="relative group">
                         <span className="absolute -left-5 top-1.5 w-[11px] h-[11px] rounded-full bg-muted border-2 border-card translate-x-[0.5px]" />
-                        <div className="relative bg-mutedlight/60 border border-cardline rounded-lg px-3 py-2 pr-7">
+                        <div className="relative bg-mutedlight/60 border border-cardline rounded-lg px-3 py-2 pr-9">
                           <button
                             type="button"
                             onClick={() => p.onDeleteHistoryStep(entryIndex)}
                             title="Delete this timeline entry"
                             aria-label="Delete this timeline entry"
-                            className="absolute top-1.5 right-1.5 w-5 h-5 rounded-md flex items-center justify-center text-muted opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100 hover:text-danger hover:bg-danger/10 transition-all"
+                            className="absolute top-1 right-1 w-7 h-7 rounded-md flex items-center justify-center text-muted opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100 hover:text-danger hover:bg-danger/10 transition-all"
                           >
-                            <X size={12} />
+                            <X size={13} />
                           </button>
                           <p className="text-[13px] font-bold text-foreground m-0">
-                            {isCreation ? 'New Job created' : `Moved to ${capitalize(h.status)}`}
-                          </p>
-                          <p className="text-[11px] text-muted m-0 mt-0.5 leading-snug">
-                            {isCreation
-                              ? 'You added a new job'
-                              : prevEntry
-                                ? `You moved this job from ${capitalize(prevEntry.status)} to ${capitalize(h.status)}`
-                                : `Status set to ${capitalize(h.status)}`}
+                            {isCreation ? 'Created' : `Moved to ${capitalize(h.status)}`}
                           </p>
                           <p className="text-[10px] text-muted/80 m-0 mt-1">{formatDate(h.date)}</p>
                         </div>
@@ -869,6 +1011,7 @@ export const ApplicationDetailsPopover: React.FC<Props> = (p) => {
                 </ol>
               )}
             </aside>
+            </div>
           </div>
         </div>
       </div>

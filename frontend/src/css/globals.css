@@ -105,6 +105,49 @@ button {
   animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Smooth expand/collapse for the modal's optional block.
+   Grid-rows 0fr -> 1fr animates height without JS measurement. */
+.optional-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition:
+    grid-template-rows 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 0.32s;
+}
+
+.optional-collapse.open {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  transition:
+    grid-template-rows 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s;
+}
+
+.optional-collapse-inner {
+  overflow: hidden;
+  min-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.28s ease, transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.optional-collapse.open .optional-collapse-inner {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .optional-collapse,
+  .optional-collapse-inner {
+    transition: none;
+  }
+  .optional-collapse-inner {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Glassmorphic Styles */
 .glass {
   background: var(--glass-bg);
