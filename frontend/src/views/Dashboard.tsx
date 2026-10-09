@@ -10,7 +10,7 @@ import { Toast } from '../components/Toast';
 import { ApplicationDetailsPopover, type ApplicationStatus } from '../components/ApplicationDetailsPopover';
 import { KanbanCardSkeleton } from '../components/skeleton/DashboardSkeleton';
 import { Skeleton } from '../components/skeleton/Skeleton';
-import { Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, ExternalLink, Sparkles, Info, FileText, Undo2, Search } from 'lucide-react';
+import { Plus, Calendar, MapPin, DollarSign, ArrowLeft, ArrowRight, Trash2, ExternalLink, Sparkles, Info, FileText, Undo2, Search, X, ChevronDown } from 'lucide-react';
 
 // Shared utility class strings for the kanban icon buttons
 const iconBtnBase = 'w-[26px] h-[26px] rounded-md flex items-center justify-center text-muted transition-colors';
@@ -153,6 +153,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [showOptional, setShowOptional] = useState(false);
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const prevFocusRef = useRef<HTMLElement | null>(null);
 
   // Selected Card Details Sidebar State
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
@@ -270,9 +274,44 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
     setContactName('');
     setContactEmail('');
     setEditingId(null);
+    setErrorMsg('');
+    setFieldErrors({});
+    setShowOptional(false);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    resetForm();
+  };
+
+  const validateModal = (): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    if (!company.trim()) errors.company = 'Company is required.';
+    if (!position.trim()) errors.position = 'Position is required.';
+    if (!jobDescription.trim()) errors.jobDescription = 'Job description is required.';
+    if (contactEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) {
+      errors.contactEmail = 'Enter a valid email address.';
+    }
+    if (url.trim()) {
+      try {
+        const parsed = new URL(url.trim());
+        if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('bad protocol');
+      } catch {
+        errors.url = 'Enter a valid URL starting with http(s)://';
+      }
+    }
+    return errors;
+  };
+
+  const openCreate = () => {
+    prevFocusRef.current = document.activeElement as HTMLElement | null;
+    resetForm();
+    setShowOptional(false);
+    setIsModalOpen(true);
   };
 
   const openEdit = (app: Application) => {
+    prevFocusRef.current = document.activeElement as HTMLElement | null;
     setCompany(app.company || '');
     setCompanyDomain(app.company_domain || '');
     setPosition(app.position || '');
@@ -287,8 +326,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
     setContactEmail(app.contact_email || '');
     setEditingId(app.id);
     setErrorMsg('');
+    setFieldErrors({});
+    // Pre-expand optional block when existing data would otherwise be hidden.
+    setShowOptional(Boolean(
+      app.url || app.salary || app.location || app.deadline ||
+      app.notes || app.contact_name || app.contact_email
+    ));
     setIsModalOpen(true);
   };
+
+  // Dialog a11y: scroll-lock, initial focus, restore focus on close.
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    prevFocusRef.current = prevFocusRef.current ?? (document.activeElement as HTMLElement | null);
+    const t = window.setTimeout(() => {
+      const root = modalRef.current;
+      const first = root?.querySelector<HTMLElement>(
+        'input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled])'
+      );
+      first?.focus();
+    }, 30);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.clearTimeout(t);
+      prevFocusRef.current?.focus?.();
+      prevFocusRef.current = null;
+    };
+  }, [isModalOpen]);
 
   // Partial inline update (notes / description tabs in the details popover).
   const handlePatchFields = async (appId: string, fields: Partial<Application>) => {
@@ -303,8 +369,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!company || !position) {
-      setErrorMsg('Company and Position are required fields.');
+    const errors = validateModal();
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setErrorMsg('Please fix the highlighted fields below.');
+      // Reveal hidden optional fields so their errors are visible.
+      if (errors.contactEmail || errors.url) setShowOptional(true);
+      // Move focus to the first invalid field.
+      const firstKey = Object.keys(errors)[0];
+      const idMap: Record<string, string> = {
+        company: 'modalCompany',
+        position: 'modalPosition',
+        jobDescription: 'modalJobDescription',
+        contactEmail: 'modalContactEmail',
+        url: 'modalUrl',
+      };
+      const targetId = idMap[firstKey];
+      if (targetId) {
+        window.setTimeout(() => document.getElementById(targetId)?.focus(), 30);
+      }
       return;
     }
     setIsLoading(true);
@@ -784,7 +867,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
           <p className="text-xs md:text-sm text-muted">Track applications, verify conversions, and launch tailoring tasks.</p>
         </div>
         <div className="flex flex-col gap-1.5 md:flex-row md:items-center">
-          <Button onClick={() => setIsModalOpen(true)} className="w-full md:w-auto flex items-center gap-2 justify-center">
+          <Button onClick={openCreate} className="w-full md:w-auto flex items-center gap-2 justify-center">
             <Plus size={18} />
             <span>Create New Application</span>
           </Button>
@@ -1162,134 +1245,251 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToEditor, active
         />
       )}
 
-      {/* Creation Modal Overlay */}
+      {/* Create / Edit Application Dialog */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[800] bg-black/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="w-full max-w-[580px] mx-3 md:mx-0 bg-card border border-cardline rounded-2xl md:rounded-3xl p-4 md:p-6 max-h-[85vh] md:max-h-[90vh] overflow-y-auto shadow-lg">
-            <div className="flex justify-between items-center mb-4 border-b border-cardline pb-2">
-              <h3 className="text-base md:text-lg text-foreground">{editingId ? 'Edit Job Application' : 'Track Job Application'}</h3>
-              <Button variant="ghost" onClick={() => { setIsModalOpen(false); resetForm(); }} className="w-[30px] h-[30px] flex items-center justify-center p-0">
-                X
+        <div
+          className="fixed inset-0 z-[800] bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 animate-fadeIn"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
+        >
+          <div
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="app-modal-title"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.stopPropagation();
+                closeModal();
+                return;
+              }
+              if (e.key !== 'Tab') return;
+              const root = modalRef.current;
+              if (!root) return;
+              const focusable = [...root.querySelectorAll<HTMLElement>(
+                'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+              )].filter((el) => el.offsetParent !== null);
+              if (focusable.length === 0) return;
+              const first = focusable[0];
+              const last = focusable[focusable.length - 1];
+              if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+              } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+              }
+            }}
+            className="w-full max-w-[580px] bg-card border border-cardline rounded-2xl md:rounded-3xl shadow-lg animate-cardSlideIn flex flex-col overflow-hidden max-h-[90dvh]"
+          >
+            <div className="flex justify-between items-center gap-3 px-4 md:px-6 pt-4 md:pt-5 pb-3 border-b border-cardline shrink-0 bg-card">
+              <h3 id="app-modal-title" className="font-header text-base md:text-lg font-bold text-foreground">
+                {editingId ? 'Edit Application' : 'Create New Application'}
+              </h3>
+              <Button
+                variant="ghost"
+                onClick={closeModal}
+                aria-label="Close dialog"
+                className="w-11 h-11 shrink-0 flex items-center justify-center p-0"
+              >
+                <X size={18} aria-hidden="true" />
               </Button>
             </div>
 
-            {errorMsg && <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm mb-4">{errorMsg}</div>}
-
-            <form onSubmit={handleSubmit} className="flex flex-col gap-1">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <CompanyAutocomplete
-                  id="modalCompany"
-                  label="Company Name *"
-                  placeholder="e.g. Google"
-                  value={company}
-                  domain={companyDomain}
-                  onCompanyChange={setCompany}
-                  onDomainChange={setCompanyDomain}
-                />
-                <InputField
-                  label="Position / Role *"
-                  id="modalPosition"
-                  placeholder="e.g. Senior React Developer"
-                  value={position}
-                  onChange={(e) => setPosition(e.target.value)}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField
-                  label="Salary Range"
-                  id="modalSalary"
-                  placeholder="e.g. $120k - $140k"
-                  value={salary}
-                  onChange={(e) => setSalary(e.target.value)}
-                />
-                <InputField
-                  label="Location"
-                  id="modalLocation"
-                  placeholder="e.g. Berlin (Hybrid) / Remote"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField
-                  label="Application Deadline"
-                  id="modalDeadline"
-                  placeholder="e.g. July 25th"
-                  value={deadline}
-                  onChange={(e) => setDeadline(e.target.value)}
-                />
-                <div className="flex flex-col mb-4">
-                  <label htmlFor="modalStatus" className="font-header font-semibold text-sm mb-1 text-left text-foreground">Kanban Column</label>
-                  <select
-                    id="modalStatus"
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as any)}
-                    className="px-4 py-3 rounded-lg border border-cardline bg-card text-foreground focus:border-primary outline-none transition-colors"
-                  >
-                    <option value="wishlist">Wishlist</option>
-                    <option value="preparing">Preparing</option>
-                    <option value="applied">Applied</option>
-                    <option value="interview">Interview</option>
-                    <option value="offer">Offer</option>
-                    <option value="rejected">Rejected</option>
-                  </select>
+            <div className="overflow-y-auto px-4 md:px-6 py-4 thin-scrollbar">
+              {errorMsg && (
+                <div role="alert" className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm mb-4">
+                  {errorMsg}
                 </div>
-              </div>
+              )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField
-                  label="Contact Name"
-                  id="modalContactName"
-                  placeholder="e.g. Jane Doe (Recruiter)"
-                  value={contactName}
-                  onChange={(e) => setContactName(e.target.value)}
-                />
-                <InputField
-                  label="Contact Email"
-                  id="modalContactEmail"
-                  placeholder="e.g. jane@company.com"
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                />
-              </div>
+              <form id="app-modal-form" onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+                <section aria-labelledby="app-modal-section-essential">
+                  <h4 id="app-modal-section-essential" className={fieldLabelCls}>Essential</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <CompanyAutocomplete
+                      id="modalCompany"
+                      label="Company Name"
+                      required
+                      placeholder="e.g. Google"
+                      value={company}
+                      domain={companyDomain}
+                      onCompanyChange={(v) => {
+                        setCompany(v);
+                        if (fieldErrors.company) setFieldErrors((p) => ({ ...p, company: '' }));
+                      }}
+                      onDomainChange={setCompanyDomain}
+                      error={fieldErrors.company || undefined}
+                    />
+                    <InputField
+                      label="Position / Role"
+                      required
+                      id="modalPosition"
+                      placeholder="e.g. Senior React Developer"
+                      value={position}
+                      error={fieldErrors.position || undefined}
+                      onChange={(e) => {
+                        setPosition(e.target.value);
+                        if (fieldErrors.position) setFieldErrors((p) => ({ ...p, position: '' }));
+                      }}
+                    />
+                  </div>
+                  <div className="mt-4">
+                    <InputField
+                      label="Job Description"
+                      required
+                      id="modalJobDescription"
+                      type="textarea"
+                      rows={5}
+                      minHeight={120}
+                      placeholder="Paste the full job advertisement description text here..."
+                      value={jobDescription}
+                      error={fieldErrors.jobDescription || undefined}
+                      onChange={(e) => {
+                        setJobDescription(e.target.value);
+                        if (fieldErrors.jobDescription) setFieldErrors((p) => ({ ...p, jobDescription: '' }));
+                      }}
+                    />
+                  </div>
+                </section>
 
-              <InputField
-                label="Job Posting URL"
-                id="modalUrl"
-                placeholder="https://jobs.company.com/..."
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-              />
+                <button
+                  type="button"
+                  aria-expanded={showOptional}
+                  aria-controls="app-modal-optional"
+                  onClick={() => setShowOptional((v) => !v)}
+                  className="flex items-center gap-2 self-start text-sm font-bold text-muted hover:text-foreground transition-colors py-1"
+                >
+                  <ChevronDown
+                    size={16}
+                    aria-hidden="true"
+                    className={`transition-transform duration-200 ${showOptional ? 'rotate-180' : ''}`}
+                  />
+                  Additional details (optional)
+                </button>
 
-              <InputField
-                label="Raw Job Description (For Tailoring Pipeline)"
-                id="modalJobDescription"
-                type="textarea"
-                placeholder="Paste the full job advertisement description text here..."
-                value={jobDescription}
-                onChange={(e) => setJobDescription(e.target.value)}
-              />
+                { /* Animated reveal: grid-rows 0fr -> 1fr keeps modal growth smooth */ }
+                <div
+                  id="app-modal-optional"
+                  className={`optional-collapse ${showOptional ? 'open' : ''}`}
+                >
+                <div className="optional-collapse-inner flex flex-col gap-5 pt-1 min-h-0">
+                <section aria-labelledby="app-modal-section-details">
+                  <h4 id="app-modal-section-details" className={fieldLabelCls}>Details</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <InputField
+                      label="Salary Range"
+                      id="modalSalary"
+                      placeholder="e.g. $120k - $140k"
+                      value={salary}
+                      onChange={(e) => setSalary(e.target.value)}
+                    />
+                    <InputField
+                      label="Location"
+                      id="modalLocation"
+                      placeholder="e.g. Berlin (Hybrid) / Remote"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                    />
+                  </div>
 
-              <InputField
-                label="Internal Notes / Progress Diary"
-                id="modalNotes"
-                type="textarea"
-                placeholder="Add any details, contact notes or interview dates."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <InputField
+                      label="Application Deadline"
+                      id="modalDeadline"
+                      placeholder="e.g. 2026-07-25"
+                      value={deadline}
+                      onChange={(e) => setDeadline(e.target.value)}
+                    />
+                    <div className="flex flex-col mb-4 w-full">
+                      <label htmlFor="modalStatus" className="font-header font-semibold text-sm mb-1 text-left text-foreground">
+                        Status
+                      </label>
+                      <select
+                        id="modalStatus"
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value as any)}
+                        className="w-full px-4 py-3 rounded-lg border border-cardline bg-card text-foreground text-base focus:border-primary outline-none transition-colors"
+                      >
+                        <option value="wishlist">Wishlist</option>
+                        <option value="preparing">Preparing</option>
+                        <option value="applied">Applied</option>
+                        <option value="interview">Interview</option>
+                        <option value="offer">Offer</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                    </div>
+                  </div>
+                </section>
 
-              <div className="flex flex-col-reverse md:flex-row md:justify-end gap-3 mt-4 border-t border-cardline pt-4 [&>button]:w-full md:[&>button]:w-auto">
-                <Button variant="secondary" type="button" onClick={() => { setIsModalOpen(false); resetForm(); }}>
-                  Cancel
-                </Button>
-                <Button type="submit" isLoading={isLoading}>
-                  {editingId ? 'Save Changes' : 'Save Card'}
-                </Button>
-              </div>
-            </form>
+                <section aria-labelledby="app-modal-section-contact">
+                  <h4 id="app-modal-section-contact" className={fieldLabelCls}>Contact</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <InputField
+                      label="Contact Name"
+                      id="modalContactName"
+                      autoComplete="name"
+                      placeholder="e.g. Jane Doe (Recruiter)"
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
+                    />
+                    <InputField
+                      label="Contact Email"
+                      id="modalContactEmail"
+                      type="email"
+                      autoComplete="email"
+                      placeholder="e.g. jane@company.com"
+                      value={contactEmail}
+                      error={fieldErrors.contactEmail || undefined}
+                      onChange={(e) => {
+                        setContactEmail(e.target.value);
+                        if (fieldErrors.contactEmail) setFieldErrors((p) => ({ ...p, contactEmail: '' }));
+                      }}
+                    />
+                  </div>
+                </section>
+
+                <section aria-labelledby="app-modal-section-additional" className="flex flex-col gap-4">
+                  <h4 id="app-modal-section-additional" className={fieldLabelCls}>Additional</h4>
+                  <InputField
+                    label="Job Posting URL"
+                    id="modalUrl"
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://jobs.company.com/..."
+                    value={url}
+                    error={fieldErrors.url || undefined}
+                    onChange={(e) => {
+                      setUrl(e.target.value);
+                      if (fieldErrors.url) setFieldErrors((p) => ({ ...p, url: '' }));
+                    }}
+                  />
+
+                  <InputField
+                    label="Internal Notes"
+                    id="modalNotes"
+                    type="textarea"
+                    rows={3}
+                    minHeight={84}
+                    placeholder="Add any details, contact notes or interview dates."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                  />
+                </section>
+                </div>
+                </div>
+              </form>
+            </div>
+
+            <div className="flex flex-col-reverse md:flex-row md:justify-end gap-3 px-4 md:px-6 py-4 border-t border-cardline bg-card shrink-0 [&>button]:w-full md:[&>button]:w-auto">
+              <Button variant="secondary" type="button" onClick={closeModal}>
+                Cancel
+              </Button>
+              <Button type="submit" form="app-modal-form" isLoading={isLoading}>
+                {editingId ? 'Save Changes' : 'Create Application'}
+              </Button>
+            </div>
           </div>
         </div>
       )}

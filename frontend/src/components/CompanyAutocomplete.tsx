@@ -11,6 +11,9 @@ interface CompanyAutocompleteProps {
   domain: string;
   onCompanyChange: (name: string) => void;
   onDomainChange: (domain: string) => void;
+  error?: string;
+  helper?: string;
+  required?: boolean;
 }
 
 /**
@@ -26,6 +29,9 @@ export const CompanyAutocomplete: React.FC<CompanyAutocompleteProps> = ({
   domain,
   onCompanyChange,
   onDomainChange,
+  error,
+  helper,
+  required,
 }) => {
   const [suggestions, setSuggestions] = useState<CompanySuggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -55,6 +61,8 @@ export const CompanyAutocomplete: React.FC<CompanyAutocompleteProps> = ({
       return;
     }
     setLoading(true);
+    setOpen(true);
+    setHighlight(-1);
     debounceRef.current = setTimeout(async () => {
       const ctrl = new AbortController();
       abortRef.current = ctrl;
@@ -101,8 +109,15 @@ export const CompanyAutocomplete: React.FC<CompanyAutocompleteProps> = ({
   };
 
   return (
-    <div ref={wrapRef} className={styles.group} style={{ position: 'relative' }}>
-      <label htmlFor={id} className={styles.label}>{label}</label>
+    <div ref={wrapRef} className={`${styles.group} ${error ? styles.error : ''}`} style={{ position: 'relative' }}>
+      <label htmlFor={id} className={styles.label}>
+        {label}
+        {required && (
+          <span aria-hidden="true" style={{ color: 'var(--danger)', fontWeight: 700 }}>
+            {' '}*
+          </span>
+        )}
+      </label>
       <input
         id={id}
         type="text"
@@ -110,12 +125,22 @@ export const CompanyAutocomplete: React.FC<CompanyAutocompleteProps> = ({
         role="combobox"
         aria-expanded={open}
         aria-autocomplete="list"
+        aria-controls={open ? `${id}-listbox` : undefined}
+        aria-activedescendant={open && highlight >= 0 ? `${id}-option-${highlight}` : undefined}
+        aria-invalid={!!error}
+        aria-describedby={
+          [error ? `${id}-error` : null, !error && helper ? `${id}-helper` : null]
+            .filter(Boolean)
+            .join(' ') || undefined
+        }
+        aria-required={required}
+        required={required}
         className={styles.input}
         placeholder={placeholder}
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        onFocus={() => { if (suggestions.length > 0) setOpen(true); }}
+        onFocus={() => { if (suggestions.length > 0 || loading) setOpen(true); }}
         onBlur={() => {
           // Delay close so click events on suggestions still fire.
           if (blurTimer.current) clearTimeout(blurTimer.current);
@@ -127,9 +152,21 @@ export const CompanyAutocomplete: React.FC<CompanyAutocompleteProps> = ({
           {domain}
         </span>
       )}
-      {open && suggestions.length > 0 && (
+      {error && (
+        <span id={`${id}-error`} role="alert" className={styles.errorMsg}>
+          {error}
+        </span>
+      )}
+      {!error && helper && (
+        <span id={`${id}-helper`} className={styles.helper}>
+          {helper}
+        </span>
+      )}
+      {open && (loading || suggestions.length > 0) && (
         <ul
+          id={`${id}-listbox`}
           role="listbox"
+          aria-label="Company suggestions"
           style={{
             position: 'absolute',
             top: '100%',
@@ -151,7 +188,7 @@ export const CompanyAutocomplete: React.FC<CompanyAutocompleteProps> = ({
             <li style={{ padding: '8px 10px', fontSize: 12, color: 'var(--muted)' }}>Searching…</li>
           )}
           {suggestions.map((s, i) => (
-            <li key={`${s.domain}-${i}`} role="option" aria-selected={i === highlight}>
+            <li key={`${s.domain}-${i}`} id={`${id}-option-${i}`} role="option" aria-selected={i === highlight}>
               <button
                 type="button"
                 onMouseDown={(e) => { e.preventDefault(); pick(s); }}

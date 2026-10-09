@@ -53,3 +53,24 @@
   text-align: left;
   font-weight: 500;
 }
+
+.helper {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  margin-top: var(--space-1);
+  text-align: left;
+  line-height: 1.4;
+}
+
+.required {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.charCount {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  margin-top: var(--space-1);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
